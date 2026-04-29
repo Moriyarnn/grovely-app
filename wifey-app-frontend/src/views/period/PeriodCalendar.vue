@@ -4,15 +4,13 @@
 
         <!-- Header -->
         <div class="period-header">
-          <button class="back-btn back-btn--mobile-only" @click="$router.push('/')">
-            <v-icon size="18" color="#993556">mdi-arrow-left</v-icon>
+          <h1 class="period-title">Period Tracker</h1>
+          <button class="settings-icon-btn" @click="tutorialOpen = true" aria-label="Open tutorial">
+            <v-icon size="20" color="#993556">mdi-help-circle</v-icon>
           </button>
-          <div>
-            <p class="period-date">{{ todayLabel }}</p>
-            <h1 class="period-title">Period Tracker</h1>
-          </div>
-          <button class="settings-icon-btn" @click="tutorialOpen = true" aria-label="Help">
-            <v-icon size="17" color="grey-darken-1">mdi-help-circle-outline</v-icon>
+          <button class="back-chip back-chip--mobile-only" @click="$router.push('/')">
+            <v-icon size="14" color="#993556">mdi-chevron-left</v-icon>
+            Hub
           </button>
         </div>
 
@@ -2095,6 +2093,10 @@ onUnmounted(() => {
   margin: 0 auto;
 }
 
+@media (max-width: 1279px) {
+  .period-column-root { height: 100%; overflow-y: auto; min-height: unset; }
+}
+
 @media (min-width: 769px) {
   .period-wrapper {
     max-width: 540px;
@@ -2103,29 +2105,42 @@ onUnmounted(() => {
   }
 }
 
+@media (max-width: 1279px) {
+  .period-wrapper {
+    max-width: 100%;
+    transform: none;
+    margin: 0;
+  }
+}
+
 /* Header */
 .period-header {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 1rem;
-}
-.back-btn {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  border: 1px solid #F4C0D1;
-  background: #FBEAF0;
-  display: flex;
   align-items: center;
-  justify-content: center;
-  cursor: pointer;
+  gap: 10px;
+  margin-bottom: 1rem;
+  flex-shrink: 0;
 }
+.back-chip {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  background: #fff;
+  color: #993556;
+  border: 1px solid #F4C0D1;
+  border-radius: 99px;
+  padding: 5px 12px 5px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+.back-chip:hover { background: #fdf5f8; }
 
 @media (min-width: 1280px) {
-  .back-btn--mobile-only {
-    display: none;
-  }
+  .back-chip--mobile-only { display: none; }
 }
 
 @media (min-width: 1280px) {
@@ -2135,18 +2150,21 @@ onUnmounted(() => {
     max-width: 100%;
   }
 }
-.period-date { font-size: 12px; color: #888; margin: 0 0 2px; }
-.period-title { font-size: 22px; font-weight: 500; margin: 0; color: #72243E; }
-
-@media (min-width: 1280px) {
-  .period-date { display: none; }
-}
+.period-title { font-size: 22px; font-weight: 700; margin: 0; line-height: 1.2; color: #72243E; }
 
 .settings-icon-btn {
-  width: 34px; height: 34px; border-radius: 50%;
-  border: 1px solid #e0e0e0; background: #f5f5f5;
-  display: flex; align-items: center; justify-content: center; cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  padding: 2px;
+  cursor: pointer;
+  flex-shrink: 0;
+  opacity: 0.65;
+  transition: opacity 0.15s;
 }
+.settings-icon-btn:hover { opacity: 1; }
 
 /* Warnings card */
 .warnings-card {

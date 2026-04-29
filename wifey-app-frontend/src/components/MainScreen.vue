@@ -1,13 +1,6 @@
 <template>
   <div class="ms-root">
 
-    <div v-if="showBack" class="ms-back-row">
-      <button class="ms-back-btn" @click="router.back()">
-        <v-icon size="16">mdi-chevron-left</v-icon>
-        Hub
-      </button>
-    </div>
-
     <!-- Brand -->
     <div class="ms-brand">
       <div class="ms-brand-icon">
@@ -18,6 +11,10 @@
         <p class="ms-brand-greeting">{{ greeting }}</p>
         <p class="ms-brand-date">{{ todayLabel }}</p>
       </div>
+      <button v-if="showBack" class="ms-back-chip" @click="router.back()">
+        <v-icon size="14" color="#993556">mdi-chevron-left</v-icon>
+        Hub
+      </button>
     </div>
 
     <!-- Instance info -->
@@ -109,7 +106,7 @@ const props = defineProps({
 
 const router = useRouter()
 
-const APP_VERSION = 'v0.8.0'
+const APP_VERSION = 'v0.9.0'
 const LAST_SEEN_KEY = 'changelog_last_seen_version'
 
 const cycleCount = ref(null)
@@ -190,6 +187,19 @@ const stats = computed(() => [
 
 const CHANGELOG = [
   {
+    version: 'v0.9.0',
+    title: 'Settings + Mobile Polish',
+    date: 'April 28, 2026',
+    fixes: [49, 50, 51, 83, 84, 85],
+    items: [
+      { type: 'New', plan: 'Free', text: 'Settings page - full routed page with iOS-style layout, replaces the old settings sheet' },
+      { type: 'New', plan: 'Free', text: 'Notification messages now open as a modal inside Settings' },
+      { type: 'New', plan: 'Free', text: 'Mobile UI polish - consistent headers and back navigation across all feature views' },
+      { type: 'Fix', plan: 'Free', text: 'Period calendar no longer zoomed on mobile - scale is now desktop-only' },
+      { type: 'Fix', plan: 'Free', text: 'Mobile swipe panels - horizontal and vertical scroll no longer conflict' },
+    ]
+  },
+  {
     version: 'v0.8.0',
     title: 'Desktop Shell + Pantry',
     date: 'April 26, 2026',
@@ -219,7 +229,7 @@ const CHANGELOG = [
     version: 'v0.6.0',
     title: 'Period Tracking Polish',
     date: 'April 17, 2026',
-    fixes: [22, 24, 26, 28, 24, 33, 25, 35, 27, 35, 37],
+    fixes: [22, 24, 26, 28, 24, 33, 25, 35, 27, 35, 37, 44],
     items: [
       { type: 'New', plan: 'Free', text: 'Flow intensity tinting on the calendar - four levels from spotting to heavy' },
       { type: 'New', plan: 'Premium', text: 'Cycle smart editing - adjust start or end date without deleting logged days' },
@@ -247,7 +257,7 @@ const CHANGELOG = [
 /* ── Root ─────────────────────────────────────────────────────── */
 .ms-root {
   padding: 1.5rem 1.25rem 3rem;
-  background: #fff;
+  background: linear-gradient(160deg, #fff5f8 0%, #fdf0f5 40%, #f5f0fe 100%);
   min-height: 100vh;
   box-sizing: border-box;
 }
@@ -255,29 +265,9 @@ const CHANGELOG = [
 @media (min-width: 1280px) {
   .ms-root {
     padding: 2.5rem 3rem 4rem;
-    background: linear-gradient(160deg, #fff5f8 0%, #fdf0f5 40%, #f5f0fe 100%);
-    min-height: 100vh;
     display: flex;
     flex-direction: column;
   }
-}
-
-/* ── Back nav ─────────────────────────────────────────────────── */
-.ms-back-row {
-  margin-bottom: 1.25rem;
-}
-
-.ms-back-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  font-size: 14px;
-  font-weight: 500;
-  color: #993556;
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0;
 }
 
 /* ── Brand ────────────────────────────────────────────────────── */
@@ -286,6 +276,22 @@ const CHANGELOG = [
   align-items: center;
   gap: 14px;
   margin-bottom: 1rem;
+}
+
+.ms-back-chip {
+  margin-left: auto;
+  display: inline-flex; align-items: center; gap: 1px;
+  background: #fff; color: #993556;
+  border: 1px solid #F4C0D1; border-radius: 99px;
+  padding: 5px 12px 5px 8px;
+  font-size: 12px; font-weight: 600;
+  cursor: pointer; flex-shrink: 0;
+  transition: background 0.15s;
+}
+.ms-back-chip:hover { background: #FBEAF0; }
+
+@media (min-width: 1280px) {
+  .ms-back-chip { display: none; }
 }
 
 .ms-brand-icon {

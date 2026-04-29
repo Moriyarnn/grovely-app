@@ -3,10 +3,11 @@
 
     <!-- Header -->
     <div class="shopping-header">
-      <button class="back-btn back-btn--mobile-only" @click="$router.back()" aria-label="Back">
-        <v-icon size="20" color="#2E7D52">mdi-arrow-left</v-icon>
-      </button>
       <h1 class="shopping-title">Shopping List</h1>
+      <button class="back-chip back-chip--mobile-only" @click="$router.back()">
+        <v-icon size="14" color="#2E7D52">mdi-chevron-left</v-icon>
+        Hub
+      </button>
     </div>
 
     <!-- Add item form -->
@@ -108,6 +109,7 @@
         </button>
       </div>
     </div>
+
 
   </div>
 </template>
@@ -290,6 +292,10 @@ onMounted(load)
   box-sizing: border-box;
 }
 
+@media (max-width: 1279px) {
+  .shopping-root { height: 100%; overflow-y: auto; min-height: unset; }
+}
+
 /* Header */
 .shopping-header {
   display: flex;
@@ -298,23 +304,23 @@ onMounted(load)
   flex-shrink: 0;
 }
 
-.back-btn {
-  background: none;
-  border: none;
-  padding: 4px;
-  cursor: pointer;
-  display: flex;
+.back-chip {
+  margin-left: auto;
+  display: inline-flex;
   align-items: center;
-  border-radius: 8px;
+  gap: 1px;
+  background: #fff;
+  color: #2E7D52;
+  border: 1px solid #B8E6D0;
+  border-radius: 99px;
+  padding: 5px 12px 5px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
   transition: background 0.15s;
 }
-.back-btn:hover {
-  background: #d4f0e4;
-}
-
-.back-btn--mobile-only {
-  display: flex;
-}
+.back-chip:hover { background: #EAF7F0; }
 
 .shopping-title {
   font-size: 22px;
@@ -322,16 +328,17 @@ onMounted(load)
   color: #1A4D35;
   margin: 0;
   line-height: 1.2;
+  flex: 1;
 }
 
 @media (min-width: 1280px) {
-  .back-btn--mobile-only { display: none; }
+  .back-chip--mobile-only { display: none; }
 }
 
 /* Add form */
 .add-form {
-  background: #EAF7F0;
-  border: 1px solid #B8E6D0;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
   border-radius: 14px;
   padding: 14px 16px;
   display: flex;
@@ -348,7 +355,7 @@ onMounted(load)
 
 .add-input {
   flex: 1;
-  border: 1.5px solid #B8E6D0;
+  border: 1.5px solid var(--panel-border);
   border-radius: 10px;
   padding: 9px 12px;
   font-size: 14px;
@@ -393,7 +400,7 @@ onMounted(load)
 
 .meta-input {
   flex: 1;
-  border: 1.5px solid #B8E6D0;
+  border: 1.5px solid var(--panel-border);
   border-radius: 8px;
   padding: 7px 10px;
   font-size: 12px;
@@ -410,7 +417,7 @@ onMounted(load)
 }
 
 .meta-select {
-  border: 1.5px solid #B8E6D0;
+  border: 1.5px solid var(--panel-border);
   border-radius: 8px;
   padding: 7px 10px;
   font-size: 12px;
@@ -497,18 +504,17 @@ onMounted(load)
   align-items: center;
   gap: 10px;
   padding: 10px 12px;
-  background: #EAF7F0;
-  border: 1px solid #C8E8D8;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
   border-radius: 10px;
-  transition: background 0.15s;
+  transition: filter 0.15s;
 }
 .list-item:hover {
-  background: #d4f0e4;
+  filter: brightness(0.96);
 }
 
 .list-item--checked {
-  background: #f4faf7;
-  border-color: #D8EDE3;
+  opacity: 0.7;
 }
 
 .check-btn {

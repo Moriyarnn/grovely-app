@@ -45,7 +45,7 @@
               <button class="settings-icon-btn" @click="router.push('/info')">
                 <v-icon size="18" color="grey-darken-1">mdi-home-outline</v-icon>
               </button>
-              <button class="settings-icon-btn" @click="settingsOpen = true">
+              <button class="settings-icon-btn" @click="router.push('/settings')">
                 <v-icon size="18" color="grey-darken-1">mdi-cog-outline</v-icon>
               </button>
             </div>
@@ -83,7 +83,7 @@
                   </div>
                 </div>
               </div>
-              <button class="settings-icon-btn" @click="settingsOpen = true">
+              <button class="settings-icon-btn" @click="router.push('/settings')">
                 <v-icon size="18" color="grey-darken-1">mdi-cog-outline</v-icon>
               </button>
             </div>
@@ -136,14 +136,12 @@
           </Teleport>
 
         </div>
-    <SettingsSheet v-model="settingsOpen" />
   </div>
 </template>
 
 <script setup>
 import { ref, computed, watch, nextTick, onUnmounted, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import SettingsSheet from '../components/SettingsSheet.vue'
 import SummaryStrip from '../components/SummaryStrip.vue'
 import MainScreen from '../components/MainScreen.vue'
 import { API, getUser, clearToken, clearUser, setToken, setUser, apiFetch } from '../api'
@@ -152,7 +150,6 @@ import { apps } from '../composables/useApps'
 
 const router = useRouter()
 const { preferences, fetchPreferences, updatePreference, resetCache: resetPreferences } = usePreferences()
-const settingsOpen = ref(false)
 const currentUser = ref(getUser())
 const isDev = import.meta.env.DEV
 const showSwitcher = ref(false)

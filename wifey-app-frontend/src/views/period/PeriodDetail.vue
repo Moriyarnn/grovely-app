@@ -58,25 +58,33 @@
       <span class="notice-text">You're viewing as partner — period data is read-only</span>
     </div>
 
-    <!-- Data warnings — self-contained scrollable -->
-    <div v-if="allWarnings.length" class="warnings-card">
-      <button class="warnings-header" @click="warningsOpen = !warningsOpen">
-        <v-icon size="14" color="#b45309">mdi-alert-outline</v-icon>
-        <span class="warnings-title">{{ allWarnings.length }} data issue{{ allWarnings.length > 1 ? 's' : '' }} affecting predictions</span>
-        <v-icon size="14" color="#b45309" :style="{ transform: warningsOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }">mdi-chevron-down</v-icon>
-      </button>
-      <ul v-if="warningsOpen" class="warnings-list">
-        <li
-          v-for="(w, i) in allWarnings"
-          :key="i"
-          class="warning-item"
-          :class="{ 'warning-item-orphan': w.isOrphaned }"
-          @click="goToWarning(w)"
-        >
-          <v-icon v-if="w.isOrphaned" size="11" color="#f97316" style="margin-right:4px;vertical-align:middle">mdi-link-off</v-icon>
-          {{ w.message }}
-        </li>
-      </ul>
+    <!-- Prediction health — always visible -->
+    <div class="warnings-card" :class="{ 'warnings-card--clean': !allWarnings.length }">
+      <template v-if="allWarnings.length">
+        <button class="warnings-header" @click="warningsOpen = !warningsOpen">
+          <v-icon size="14" color="#b45309">mdi-alert-outline</v-icon>
+          <span class="warnings-title">{{ allWarnings.length }} data issue{{ allWarnings.length > 1 ? 's' : '' }} affecting predictions</span>
+          <v-icon size="14" color="#b45309" :style="{ transform: warningsOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }">mdi-chevron-down</v-icon>
+        </button>
+        <ul v-if="warningsOpen" class="warnings-list">
+          <li
+            v-for="(w, i) in allWarnings"
+            :key="i"
+            class="warning-item"
+            :class="{ 'warning-item-orphan': w.isOrphaned }"
+            @click="goToWarning(w)"
+          >
+            <v-icon v-if="w.isOrphaned" size="11" color="#f97316" style="margin-right:4px;vertical-align:middle">mdi-link-off</v-icon>
+            {{ w.message }}
+          </li>
+        </ul>
+      </template>
+      <template v-else>
+        <div class="warnings-clean">
+          <v-icon size="14" color="#16a34a">mdi-check-circle-outline</v-icon>
+          <span class="warnings-clean-text">No issues detected — predictions look healthy</span>
+        </div>
+      </template>
     </div>
 
   </div>
@@ -167,6 +175,10 @@ function formatDateShort(dateStr) {
   box-sizing: border-box;
 }
 
+@media (max-width: 1279px) {
+  .period-detail-root { height: 100%; overflow-y: auto; min-height: unset; }
+}
+
 .col-label {
   font-size: 10px;
   font-weight: 700;
@@ -179,8 +191,8 @@ function formatDateShort(dateStr) {
 
 /* Phase card */
 .phase-card {
-  background: #fdf5f8;
-  border: 1px solid #f0e0e8;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
   border-radius: 14px;
   padding: 14px 16px;
   flex-shrink: 0;
@@ -207,8 +219,8 @@ function formatDateShort(dateStr) {
 
 /* Predictions — expands to fill available space */
 .predictions-card {
-  background: #fdf5f8;
-  border: 1px solid #f0e0e8;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
   border-radius: 14px;
   padding: 18px 20px;
   flex: 1;
@@ -248,7 +260,7 @@ function formatDateShort(dateStr) {
   justify-content: space-between;
   align-items: baseline;
   padding: 8px 0;
-  border-bottom: 1px solid #f0e0e8;
+  border-bottom: 1px solid var(--panel-border);
 }
 .prediction-row:last-of-type {
   border-bottom: none;
@@ -293,7 +305,7 @@ function formatDateShort(dateStr) {
 }
 .notice-text { font-size: 12px; color: #72243E; line-height: 1.4; }
 
-/* Data warnings — self-contained scrollable */
+/* Prediction health card */
 .warnings-card {
   background: #fffbeb;
   border: 1px solid #fcd34d;
@@ -344,5 +356,20 @@ function formatDateShort(dateStr) {
 .warning-item-orphan {
   border-left-color: #fb923c;
   color: #9a3412;
+}
+.warnings-card--clean {
+  background: #f0fdf4;
+  border-color: #86efac;
+}
+.warnings-clean {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px;
+}
+.warnings-clean-text {
+  font-size: 12px;
+  font-weight: 600;
+  color: #16a34a;
 }
 </style>

@@ -1,6 +1,6 @@
 # AppLayout — Column Layout System
 
-`AppLayout.vue` is the multi-column layout wrapper used by every feature view. It provides a responsive column grid: side-by-side on desktop, and (planned) swipeable on mobile (#49). The columns are the same everywhere — only the navigation pattern changes per breakpoint.
+`AppLayout.vue` is the multi-column layout wrapper used by every feature view. It provides a responsive column grid: side-by-side on desktop, and horizontally swipeable on mobile. The columns are the same everywhere — only the navigation pattern changes per breakpoint.
 
 ---
 
@@ -8,7 +8,7 @@
 
 | Breakpoint | Layout |
 |---|---|
-| <1280px | Transparent wrapper — feature view controls its own layout; column scroll planned (#49) |
+| <1280px | Full-height swipe track — each column is a full-screen panel, navigated by horizontal swipe. Dot indicators at the bottom. |
 | ≥1280px | 2-col grid: `minmax(0, 560px)` + `1fr` |
 | ≥1600px | 3-col grid: `minmax(0, 560px)` + `1fr` + `1fr` |
 
@@ -118,6 +118,16 @@ HubView and LogsDashboard are full-width single-column views — they do not use
 
 ---
 
-## Planned: Mobile Column Scroll (#49)
+## Mobile Swipe Behavior
 
-On mobile, the columns will be navigable as a horizontal scroll or swipe carousel — same column components, same data, different navigation. `AppLayout` will own this behavior so individual feature views remain unaware of the navigation pattern.
+On mobile (<1280px), `AppLayout` renders a horizontal `swipe-track` that snaps between columns. Each column becomes a `swipe-panel` that fills the full viewport height. A dot indicator row at the bottom shows position and allows tap-to-jump.
+
+**Height:** Driven by `window.visualViewport.height` (updated via `visualViewport resize` events) rather than `100dvh` or `100svh`, so the layout follows the browser URL bar smoothly during scroll. A `touchend` handler briefly enables a CSS height transition to smooth the final compositor-thread catch-up jump.
+
+**Swipe track touch handling:** The swipe track declares `touch-action: pan-x`. This tells the browser the track only claims horizontal gestures — vertical touches fall through to the column root's scroll container. Without this, the `scroll-snap-type: x mandatory` on the track intercepts vertical swipes and jumps columns instead of scrolling.
+
+**Column component contract on mobile:**
+- Root element must use `height: 100%; overflow-y: auto; min-height: unset` inside a `@media (max-width: 1279px)` override. The swipe-panel is `height: 100%; overflow: hidden` — the component root is the scroll container, not the panel.
+- Do not set a fixed height on the root. Do not use `100vh`-based or `min-height: calc(...)` values on mobile.
+
+See [UI Patterns](ui-patterns.md) for the canonical header and panel root structure every column component must follow.

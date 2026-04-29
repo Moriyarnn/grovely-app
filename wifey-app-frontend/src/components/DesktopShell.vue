@@ -38,7 +38,7 @@
           <button class="shell-icon-btn" title="Home" @click="router.push('/')">
             <v-icon size="18" color="grey-darken-1">mdi-home-outline</v-icon>
           </button>
-          <button class="shell-icon-btn" title="Settings" @click="settingsOpen = true">
+          <button class="shell-icon-btn" title="Settings" @click="router.push('/settings')">
             <v-icon size="18" color="grey-darken-1">mdi-cog-outline</v-icon>
           </button>
         </div>
@@ -107,13 +107,11 @@
 
   </div>
 
-  <SettingsSheet v-model="settingsOpen" />
 </template>
 
 <script setup>
 import { ref, computed, watch, nextTick, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import SettingsSheet from './SettingsSheet.vue'
 import SummaryStrip from './SummaryStrip.vue'
 import { apps } from '../composables/useApps'
 import { API, getToken, getUser, clearToken, clearUser, setToken, setUser } from '../api'
@@ -134,8 +132,6 @@ const greeting = computed(() => {
 })
 const isDev = import.meta.env.DEV
 const showSwitcher = ref(false)
-const settingsOpen = ref(false)
-
 function isActive(app) {
   if (!app.active || !app.route) return false
   return route.path === app.route || route.path.startsWith(app.route + '/')
@@ -338,18 +334,28 @@ async function switchUser(role) {
   position: sticky;
   top: 0;
   height: 100vh;
-  overflow-y: auto;
+  overflow: hidden;
   background: #fff;
   border-right: 1px solid #f0e8ec;
   display: flex;
   flex-direction: column;
   padding: 1.25rem;
   box-sizing: border-box;
+  transition: width 0.3s ease, opacity 0.3s ease, padding 0.3s ease;
 }
 
-/* hide on mobile + tablet */
+/* collapse on mobile + tablet */
 @media (max-width: 1279px) {
-  .shell-nav { display: none; }
+  .shell-nav {
+    width: 0;
+    opacity: 0;
+    padding: 0;
+    pointer-events: none;
+    border-right: none;
+  }
+  .shell-root {
+    background: #fff;
+  }
 }
 
 /* ── Right content ────────────────────────────────────────────── */

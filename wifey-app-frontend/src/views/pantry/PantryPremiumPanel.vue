@@ -44,6 +44,10 @@
   box-sizing: border-box;
 }
 
+@media (max-width: 1279px) {
+  .premium-panel { height: 100%; overflow-y: auto; min-height: unset; }
+}
+
 .premium-panel-title {
   font-size: 10px;
   font-weight: 700;

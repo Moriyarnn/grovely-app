@@ -233,6 +233,10 @@ defineExpose({ reload: load })
   box-sizing: border-box;
 }
 
+@media (max-width: 1279px) {
+  .inventory-root { height: 100%; overflow-y: auto; min-height: unset; }
+}
+
 .inv-header {
   display: flex;
   align-items: center;
@@ -253,18 +257,18 @@ defineExpose({ reload: load })
   display: flex;
   align-items: center;
   gap: 4px;
-  background: #EAF7F0;
-  border: 1px solid #B8E6D0;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
   border-radius: 8px;
   padding: 5px 10px;
   font-size: 11px;
   font-weight: 600;
   color: #2E7D52;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: filter 0.15s;
 }
 .wizard-btn:hover {
-  background: #d4f0e4;
+  filter: brightness(0.95);
 }
 
 /* Banner */
