@@ -3,6 +3,31 @@ const router = express.Router()
 
 const VALID_CATEGORIES = ['produce', 'dairy', 'meat', 'bakery', 'frozen', 'dry_goods', 'other']
 const CATEGORY_ORDER = VALID_CATEGORIES.join("','")
+const VALID_DENSITY_UNITS = ['g/ml', 'g/L', 'kg/L']
+
+function parseDensityFields(body) {
+  const hasDensity = body.density !== undefined
+  const hasDensityUnit = body.density_unit !== undefined
+  if (!hasDensity && !hasDensityUnit) return { skip: true }
+
+  const rawD = body.density
+  const rawU = body.density_unit
+  const dEmpty = rawD === '' || rawD === null || rawD === undefined
+  const uEmpty = rawU === '' || rawU === null || rawU === undefined
+
+  if (dEmpty && uEmpty) return { density: null, density_unit: null }
+  if (dEmpty !== uEmpty) {
+    return { error: 'density and density_unit must be provided together' }
+  }
+  const dNum = parseFloat(rawD)
+  if (!isFinite(dNum) || dNum <= 0) {
+    return { error: 'density must be a positive number' }
+  }
+  if (!VALID_DENSITY_UNITS.includes(rawU)) {
+    return { error: `density_unit must be one of ${VALID_DENSITY_UNITS.join(', ')}` }
+  }
+  return { density: dNum, density_unit: rawU }
+}
 
 module.exports = (db) => {
   // GET all items — unchecked first (by category order), checked last (by checked_at)
@@ -30,13 +55,19 @@ module.exports = (db) => {
 
   // POST add item
   router.post('/', (req, res) => {
-    const { name, quantity, category } = req.body
+    const { name, quantity, category, price, notes, amount, unit } = req.body
     if (!name || !name.trim()) return res.status(400).json({ error: 'name is required' })
     const cat = VALID_CATEGORIES.includes(category) ? category : 'other'
     const userId = req.user?.id ?? null
+    const priceVal = (price !== undefined && price !== '' && price !== null) ? parseFloat(price) : null
+    const amountVal = (amount !== undefined && amount !== null && amount !== '') ? parseFloat(amount) : null
+    const density = parseDensityFields(req.body)
+    if (density.error) return res.status(400).json({ error: density.error })
+    const densityVal = density.skip ? null : density.density
+    const densityUnitVal = density.skip ? null : density.density_unit
     const result = db.prepare(
-      'INSERT INTO shopping_list (name, quantity, category, added_by) VALUES (?, ?, ?, ?)'
-    ).run(name.trim(), quantity?.trim() || null, cat, userId)
+      'INSERT INTO shopping_list (name, quantity, category, added_by, price, notes, amount, unit, density, density_unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    ).run(name.trim(), quantity?.trim() || null, cat, userId, priceVal, notes?.trim() || null, amountVal, unit || null, densityVal, densityUnitVal)
     const item = db.prepare('SELECT * FROM shopping_list WHERE id = ?').get(result.lastInsertRowid)
     res.status(201).json(item)
   })
@@ -53,7 +84,7 @@ module.exports = (db) => {
     const item = db.prepare('SELECT * FROM shopping_list WHERE id = ?').get(id)
     if (!item) return res.status(404).json({ error: 'Item not found' })
 
-    const { name, quantity, category, checked } = req.body
+    const { name, quantity, category, checked, expiry_date, price, notes, amount, unit } = req.body
 
     if (checked !== undefined) {
       const nowChecked = checked ? 1 : 0
@@ -74,6 +105,35 @@ module.exports = (db) => {
     if (category !== undefined) {
       const cat = VALID_CATEGORIES.includes(category) ? category : 'other'
       db.prepare('UPDATE shopping_list SET category = ? WHERE id = ?').run(cat, id)
+    }
+
+    if (expiry_date !== undefined) {
+      db.prepare('UPDATE shopping_list SET expiry_date = ? WHERE id = ?').run(expiry_date || null, id)
+    }
+
+    if (price !== undefined) {
+      const priceVal = (price !== '' && price !== null) ? parseFloat(price) : null
+      db.prepare('UPDATE shopping_list SET price = ? WHERE id = ?').run(priceVal, id)
+    }
+
+    if (notes !== undefined) {
+      db.prepare('UPDATE shopping_list SET notes = ? WHERE id = ?').run(notes?.trim() || null, id)
+    }
+
+    if (amount !== undefined) {
+      const amountVal = (amount !== null && amount !== '') ? parseFloat(amount) : null
+      db.prepare('UPDATE shopping_list SET amount = ? WHERE id = ?').run(amountVal, id)
+    }
+
+    if (unit !== undefined) {
+      db.prepare('UPDATE shopping_list SET unit = ? WHERE id = ?').run(unit || null, id)
+    }
+
+    const density = parseDensityFields(req.body)
+    if (density.error) return res.status(400).json({ error: density.error })
+    if (!density.skip) {
+      db.prepare('UPDATE shopping_list SET density = ?, density_unit = ? WHERE id = ?')
+        .run(density.density, density.density_unit, id)
     }
 
     res.json(db.prepare('SELECT * FROM shopping_list WHERE id = ?').get(id))

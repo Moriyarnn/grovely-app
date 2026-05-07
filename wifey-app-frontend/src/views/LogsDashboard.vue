@@ -296,7 +296,12 @@ onMounted(fetchLogs)
   white-space: pre-wrap; word-break: break-all;
   background: #f9f9f9; border-radius: 6px; padding: 6px 8px;
   max-height: 120px; overflow-y: auto;
+  scrollbar-width: thin; scrollbar-color: #d4d4d4 transparent;
 }
+.log-stack::-webkit-scrollbar       { width: 5px; }
+.log-stack::-webkit-scrollbar-track { background: transparent; }
+.log-stack::-webkit-scrollbar-thumb { border-radius: 99px; background: #d4d4d4; }
+.log-stack::-webkit-scrollbar-thumb:hover { background: #adadad; }
 
 .log-stats {
   display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 3px;

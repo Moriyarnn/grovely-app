@@ -197,6 +197,46 @@
             </div>
           </div>
 
+          <div class="sv-row">
+            <span class="sv-label">Currency</span>
+            <select
+              class="sv-select"
+              :value="preferences.pantry_currency ?? 'USD'"
+              @change="e => updatePreference('pantry_currency', (e.target as HTMLInputElement).value)"
+            >
+              <option v-for="c in CURRENCIES" :key="c.value" :value="c.value">{{ c.label }}</option>
+            </select>
+          </div>
+
+          <template v-if="(preferences.pantry_currency ?? 'USD') === 'OTHER'">
+            <div class="sv-row">
+              <div class="sv-label-group">
+                <span class="sv-label">Custom currency symbol</span>
+                <span class="sv-sublabel">e.g. Kč, zł, kr</span>
+              </div>
+              <input
+                class="sv-symbol-input"
+                maxlength="4"
+                placeholder="$"
+                :value="preferences.pantry_currency_custom_symbol ?? ''"
+                @change="e => updatePreference('pantry_currency_custom_symbol', (e.target as HTMLInputElement).value)"
+              />
+            </div>
+            <div class="sv-row">
+              <div class="sv-label-group">
+                <span class="sv-label">Custom currency name</span>
+                <span class="sv-sublabel">e.g. Czech Koruna, Polish Złoty</span>
+              </div>
+              <input
+                class="sv-symbol-input sv-symbol-input--wide"
+                maxlength="32"
+                placeholder="Currency"
+                :value="preferences.pantry_currency_custom_label ?? ''"
+                @change="e => updatePreference('pantry_currency_custom_label', (e.target as HTMLInputElement).value)"
+              />
+            </div>
+          </template>
+
         </div>
       </div>
 
@@ -232,6 +272,7 @@ import { getUser } from '../api'
 import { useSettings } from '../composables/useSettings'
 import { usePreferences } from '../composables/usePreferences'
 import NotificationMessagesModal from './NotificationMessagesView.vue'
+import { CURRENCIES } from '../constants/currencies'
 
 const router = useRouter()
 const isOwner = getUser()?.role === 'owner'
@@ -243,6 +284,8 @@ onMounted(async () => {
   await fetchSettings()
   await fetchPreferences()
 })
+
+
 
 const FLOW_LEVELS = [
   { value: 'Spotting', short: 'S' },
@@ -411,6 +454,20 @@ function toggleHideEmptyCategories() {
   text-align: right; padding: 2px 0; outline: none; width: 48px;
 }
 .sv-number-input::placeholder { color: #ccc; }
+.sv-select {
+  border: none; border-bottom: 1px solid #e0e0e0;
+  background: transparent; font-size: 13px; color: #333;
+  padding: 2px 0; outline: none; max-width: 180px;
+  appearance: none; -webkit-appearance: none;
+  cursor: pointer;
+}
+.sv-symbol-input {
+  border: none; border-bottom: 1px solid #e0e0e0;
+  background: transparent; font-size: 13px; color: #333;
+  text-align: right; padding: 2px 0; outline: none; width: 60px;
+}
+.sv-symbol-input::placeholder { color: #ccc; }
+.sv-symbol-input--wide { width: 120px; }
 
 /* Flow color */
 .sv-flow-color { width: 100%; max-width: 380px; margin-top: 12px; }

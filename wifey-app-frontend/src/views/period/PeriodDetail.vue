@@ -3,13 +3,40 @@
 
     <p class="col-label">Cycle Details</p>
 
-    <!-- Phase card -->
-    <div v-if="currentPhase" class="phase-card">
-      <div class="phase-header">
-        <v-icon size="15" :color="currentPhase.color">{{ currentPhase.icon }}</v-icon>
-        <span class="phase-name">{{ currentPhase.name }} phase</span>
+    <!-- Phase card — always visible -->
+    <div class="phase-card" :class="{ 'phase-card--empty': !currentPhase }">
+      <p class="phase-section-title">Current Phase</p>
+
+      <!-- Phase bar — always shown -->
+      <div class="phase-bar-wrap">
+        <div class="phase-bar">
+          <div class="phase-seg phase-seg--menstrual" :class="{ 'phase-seg--active': currentPhase?.name === 'Menstrual' }"></div>
+          <div class="phase-seg phase-seg--follicular" :class="{ 'phase-seg--active': currentPhase?.name === 'Follicular' }"></div>
+          <div class="phase-seg phase-seg--ovulatory" :class="{ 'phase-seg--active': currentPhase?.name === 'Ovulatory' }"></div>
+          <div class="phase-seg phase-seg--luteal" :class="{ 'phase-seg--active': currentPhase?.name === 'Luteal' }"></div>
+        </div>
+        <div v-if="currentPhase" class="phase-indicator" :style="{ left: phaseMarkerLeft, borderBottomColor: currentPhase.color }"></div>
+        <div class="phase-bar-labels">
+          <span class="pbl pbl--menstrual" style="flex:5">Men.</span>
+          <span class="pbl pbl--follicular" style="flex:8">Follicular</span>
+          <span class="pbl pbl--ovulatory" style="flex:2">Ov.</span>
+          <span class="pbl pbl--luteal" style="flex:13">Luteal</span>
+        </div>
       </div>
-      <p class="phase-note">{{ currentPhase.note }}</p>
+
+      <template v-if="currentPhase">
+        <div class="phase-header">
+          <v-icon size="15" :color="currentPhase.color">{{ currentPhase.icon }}</v-icon>
+          <span class="phase-name">{{ currentPhase.name }} phase</span>
+        </div>
+        <p class="phase-note">{{ currentPhase.note }}</p>
+      </template>
+      <template v-else>
+        <div class="phase-empty">
+          <v-icon size="14" color="#b0788e">mdi-moon-waning-crescent</v-icon>
+          <span class="phase-empty-text">Start logging to see your current phase</span>
+        </div>
+      </template>
     </div>
 
     <!-- Predictions — fills remaining vertical space -->
@@ -60,13 +87,14 @@
 
     <!-- Prediction health — always visible -->
     <div class="warnings-card" :class="{ 'warnings-card--clean': !allWarnings.length }">
+      <p class="warnings-section-title">Prediction Health</p>
       <template v-if="allWarnings.length">
         <button class="warnings-header" @click="warningsOpen = !warningsOpen">
           <v-icon size="14" color="#b45309">mdi-alert-outline</v-icon>
           <span class="warnings-title">{{ allWarnings.length }} data issue{{ allWarnings.length > 1 ? 's' : '' }} affecting predictions</span>
           <v-icon size="14" color="#b45309" :style="{ transform: warningsOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }">mdi-chevron-down</v-icon>
         </button>
-        <ul v-if="warningsOpen" class="warnings-list">
+        <AppScroller v-if="warningsOpen" theme="pink" class="warnings-list">
           <li
             v-for="(w, i) in allWarnings"
             :key="i"
@@ -77,7 +105,7 @@
             <v-icon v-if="w.isOrphaned" size="11" color="#f97316" style="margin-right:4px;vertical-align:middle">mdi-link-off</v-icon>
             {{ w.message }}
           </li>
-        </ul>
+        </AppScroller>
       </template>
       <template v-else>
         <div class="warnings-clean">
@@ -92,6 +120,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
+import AppScroller from '@/components/ui/AppScroller.vue'
 import { getUser } from '../../api'
 import { usePeriodData } from '../../composables/usePeriodData'
 
@@ -154,6 +183,12 @@ const currentPhase = computed(() => {
   return null
 })
 
+const phaseMarkerLeft = computed(() => {
+  if (!currentPhase.value) return '0%'
+  const map = { Menstrual: 8.93, Follicular: 32.14, Ovulatory: 50, Luteal: 76.79 }
+  return (map[currentPhase.value.name] ?? 50) + '%'
+})
+
 function formatDate(dateStr) {
   if (!dateStr) return '—'
   return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
@@ -197,6 +232,70 @@ function formatDateShort(dateStr) {
   padding: 14px 16px;
   flex-shrink: 0;
 }
+
+@media (min-width: 1280px) {
+  .phase-card { min-height: 160px; }
+}
+.phase-section-title {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #993556;
+  margin: 0 0 10px;
+}
+/* Phase bar */
+.phase-bar-wrap {
+  position: relative;
+  padding-bottom: 22px;
+  margin-bottom: 10px;
+}
+.phase-bar {
+  display: flex;
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.phase-seg {
+  opacity: 0.18;
+  transition: opacity 0.3s;
+}
+.phase-seg--active { opacity: 1; }
+.phase-seg--menstrual  { flex: 5;  background: #993556; }
+.phase-seg--follicular { flex: 8;  background: #c084c6; }
+.phase-seg--ovulatory  { flex: 2;  background: #d4537e; }
+.phase-seg--luteal     { flex: 13; background: #7c6fcd; }
+.phase-indicator {
+  position: absolute;
+  top: 10px;
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-bottom: 6px solid #993556;
+  transform: translateX(-50%);
+}
+.phase-bar-labels {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+}
+.pbl {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.35;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.pbl--menstrual  { color: #993556; }
+.pbl--follicular { color: #c084c6; }
+.pbl--ovulatory  { color: #d4537e; text-align: center; }
+.pbl--luteal     { color: #7c6fcd; }
+
 .phase-header {
   display: flex;
   align-items: center;
@@ -216,13 +315,25 @@ function formatDateShort(dateStr) {
   margin: 0;
   line-height: 1.5;
 }
+.phase-empty {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.phase-empty-text {
+  font-size: 12px;
+  color: #b0788e;
+}
+.phase-card--empty {
+  opacity: 0.75;
+}
 
 /* Predictions — expands to fill available space */
 .predictions-card {
   background: var(--panel-bg);
   border: 1px solid var(--panel-border);
   border-radius: 14px;
-  padding: 18px 20px;
+  padding: 14px 16px;
   flex: 1;
   position: relative;
   overflow: hidden;
@@ -306,6 +417,18 @@ function formatDateShort(dateStr) {
 .notice-text { font-size: 12px; color: #72243E; line-height: 1.4; }
 
 /* Prediction health card */
+.warnings-section-title {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #b45309;
+  margin: 0;
+  padding: 10px 12px 0;
+}
+.warnings-card--clean .warnings-section-title {
+  color: #16a34a;
+}
 .warnings-card {
   background: #fffbeb;
   border: 1px solid #fcd34d;
@@ -338,7 +461,6 @@ function formatDateShort(dateStr) {
   flex-direction: column;
   gap: 6px;
   max-height: 220px;
-  overflow-y: auto;
 }
 .warning-item {
   font-size: 11px;

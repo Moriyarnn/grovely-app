@@ -1,0 +1,56 @@
+# Wifey App TBD — Caddyfile example
+#
+# Same-origin reverse proxy: SPA at /, backend at /api/* and /health.
+# Caddy handles HTTPS automatically via Let's Encrypt — make sure ports 80
+# and 443 reach this host and that DNS for wifey.example.com points here.
+#
+# Usage:
+#   1. Copy this file to /etc/caddy/Caddyfile (or wherever your Caddy reads from), rename it to Caddyfile
+#   2. Replace your.domain.com with your real hostname
+#   3. Replace the (email) text with yours (used for Let's Encrypt notices)
+#   4. Build the frontend with VITE_BACKEND_PORT empty so it routes through
+#      the same origin instead of trying to reach :3000 directly. The override
+#      file docker-compose.proxy.yml does this for you:
+#        docker compose -f docker-compose.yml -f docker-compose.proxy.yml up -d --build
+#   5. Reload Caddy: sudo systemctl reload caddy or caddy start --config C:\caddy\Caddyfile for windows
+
+{
+	email (email)
+}
+
+your.domain.com {
+	encode zstd gzip
+
+	# Backend API and health check
+	handle /api/* {
+		reverse_proxy localhost:3000
+	}
+	handle /health {
+		reverse_proxy localhost:3000
+	}
+
+	# SPA — everything else
+	handle {
+		reverse_proxy localhost:5173
+	}
+
+	# Sensible security headers for a household app
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "SAMEORIGIN"
+	}
+
+	log {
+		output file /var/log/caddy/wifey.log
+		format console
+	}
+}
+
+# If you run Caddy inside the same Docker network as the app, replace
+# localhost:3000 / localhost:5173 with the service names:
+#   reverse_proxy backend:3000
+#   reverse_proxy frontend:5173
+# In that case you can remove the host-published ports from docker-compose.yml
+# so the only public surface is Caddy on 80/443.

@@ -186,3 +186,322 @@ Cards inside a column (detail cards, prediction panels, etc.) share a consistent
 ```
 
 Use `flex: 1` on a card only when it should expand to fill remaining vertical space (e.g. a predictions card that anchors to the bottom of the column). Use `flex-shrink: 0` on cards that should stay a fixed height.
+
+---
+
+## DetailSheet
+
+A reusable bottom sheet (mobile) / centered modal (desktop) for item detail, editing, and action panels. Lives in `src/components/ui/DetailSheet.vue`. Always use this for any "tap to see details" flow — never write one-off sheet CSS per feature.
+
+**On mobile (< 1280px):** slides up from the bottom with a drag handle.  
+**On desktop (≥ 1280px):** renders as a 480px centered modal with a scale-in animation and a backdrop blur.
+
+```vue
+<DetailSheet
+  v-model:open="isOpen"
+  title="Friday, April 25"
+  subtitle="Period day"
+  theme="pink"
+>
+  <!-- main content goes here -->
+  <div>...</div>
+
+  <!-- optional: extra element injected next to the title -->
+  <template #header-extra>
+    <span class="some-pill">Active</span>
+  </template>
+</DetailSheet>
+```
+
+**Props:**
+
+| Prop | Type | Default | Description |
+|---|---|---|---|
+| `open` | `Boolean` | `false` | Sheet visibility (use with `v-model:open`) |
+| `title` | `String` | `''` | Primary heading — date, item name, etc. |
+| `subtitle` | `String` | `''` | Secondary line below title — shown uppercase, accented |
+| `theme` | `String` | `'pink'` | `'pink'` for period tracker, `'green'` for pantry |
+
+**Slots:**
+
+| Slot | Description |
+|---|---|
+| `default` | Main body content |
+| `header-extra` | Optional element injected between the title block and the close button |
+
+**Theme colors:**
+
+| `theme` | Handle | Close border/bg | Title | Subtitle | Backdrop |
+|---|---|---|---|---|---|
+| `pink` | `#F4C0D1` | `#F4C0D1` / `#FBEAF0` | `#72243E` | `#993556` | `rgba(114,36,62,0.22)` |
+| `green` | `#B8E6D0` | `#B8E6D0` / `#EAF7F0` | `#1A4D35` | `#2E7D52` | `rgba(26,77,53,0.22)` |
+
+Future features must add their theme variant to `DetailSheet.vue` when they introduce a detail sheet.
+
+**Canonical usage:** `PeriodCalendar.vue` (day detail/edit panel).
+
+**Footer slot:** Use the `#footer` slot to inject action buttons. `DetailSheet` owns the footer chrome (border, spacing, flex row); the feature component owns all logic. The footer row uses `justify-content: space-between` — put icon actions on the left and primary action buttons (Save / Cancel) on the right.
+
+```vue
+<template #footer>
+  <div class="my-icon-actions">
+    <IconAction icon="mdi-trash-can-outline" label="Delete" color="#c0392b" @click="onDelete" />
+  </div>
+  <div class="my-form-actions">
+    <button class="btn-cancel" @click="mode = 'view'">Cancel</button>
+    <button class="btn-save" @click="onSave">Save</button>
+  </div>
+</template>
+```
+
+---
+
+## IconAction
+
+A reusable round icon button with a label beneath. Lives in `src/components/ui/IconAction.vue`. Use this for all icon-button-with-label patterns — never write the circle/label structure inline.
+
+```vue
+<IconAction
+  icon="mdi-trash-can-outline"
+  label="Remove this day"
+  color="#c0392b"
+  bg="#fff0ee"
+  border="#f5c0b8"
+  :disabled="false"
+  :loading="saving ? 'Saving...' : ''"
+  @click="onDelete"
+/>
+```
+
+**Props:**
+
+| Prop | Type | Default | Description |
+|---|---|---|---|
+| `icon` | `String` | required | MDI icon name |
+| `label` | `String` | required | Text beneath the button |
+| `color` | `String` | `'#993556'` | Icon color (and label color when enabled) |
+| `bg` | `String` | `'#FBEAF0'` | Button background |
+| `border` | `String` | `'#f1a1b0'` | Button border |
+| `disabled` | `Boolean` | `false` | Grays out button and label, disables click |
+| `loading` | `String` | `''` | When non-empty, replaces the label text (e.g. `'Saving...'`) |
+
+**Rules:**
+- Use filled MDI icons (e.g. `mdi-pencil`, `mdi-trash-can-outline`, `mdi-calendar-remove-outline`) — outline-only icons look too thin at 16px in a 36px circle.
+- For destructive actions, use `color="#c0392b"` with a red-tinted `bg`/`border`. For neutral/edit actions, use the feature accent color.
+- When an action is temporarily unavailable (not permanently hidden), use `disabled` rather than `v-if` so the button stays in the layout and communicates its intent.
+- Group related `IconAction` components in a flex row (`gap: 20px; align-items: flex-start`).
+
+**Canonical usage:** `PeriodCalendar.vue` `#footer` slot (Remove this day / Delete cycle / Edit this day).
+
+---
+
+## AppCheckbox
+
+A styled checkbox for multi-select flows. Lives in `src/components/ui/AppCheckbox.vue`. Always use this — never write checkbox styles inline.
+
+```vue
+<AppCheckbox v-model="isSelected" theme="green" />
+```
+
+**Props:**
+
+| Prop | Type | Default | Description |
+|---|---|---|---|
+| `modelValue` | `Boolean` | `false` | Checked state (use with `v-model`) |
+| `theme` | `String` | `'green'` | `'green'` for pantry, `'pink'` for period tracker |
+
+**Themes:**
+
+| `theme` | Unchecked border | Checked fill |
+|---|---|---|
+| `green` | `#B8E6D0` | `#2E7D52` |
+| `pink` | `#f0c8d8` | `#993556` |
+
+The checkmark icon is always white. The box is 20×20px with a 6px border-radius.
+
+Future features must add their theme variant to `AppCheckbox.vue` when they introduce multi-select UI.
+
+---
+
+## AppScroller
+
+A reusable scrollable container with a styled pill scrollbar that matches the app's rounded design. Lives in `src/components/ui/AppScroller.vue`. Use this everywhere you need `overflow-y: auto` on desktop — never write custom scrollbar CSS inline per feature.
+
+```vue
+<AppScroller theme="green" class="my-list">
+  <!-- scrollable content -->
+</AppScroller>
+```
+
+**Props:**
+
+| Prop | Type | Default | Description |
+|---|---|---|---|
+| `theme` | `String` | `'neutral'` | `'pink'` for period tracker, `'green'` for pantry, `'neutral'` for general UI |
+
+**Themes:**
+
+| `theme` | Thumb color | Hover color |
+|---|---|---|
+| `neutral` | `#d4d4d4` | `#adadad` |
+| `pink` | `#F4C0D1` | `#dfa0bb` |
+| `green` | `#B8E6D0` | `#8eceb0` |
+
+**Rules:**
+- Remove `overflow-y: auto` from any CSS block you replace with `<AppScroller>` — the component owns it.
+- When using `ref` on an `<AppScroller>`, access the underlying DOM node via `.$el` for native APIs: `itemsArea.value?.$el?.addEventListener(...)`.
+- For scroll containers that cannot be wrapped (sheet `<div>`s with complex structure, `<pre>` elements, mobile-only overrides), add the scrollbar CSS directly — see `DetailSheet.vue`, `DesktopShell.vue`, `SettingsSheet.vue`, and `LogsDashboard.vue` for the pattern.
+- On mobile, browsers render their own thin overlay scrollbar — `AppScroller` defers to that and does not override it with media queries.
+
+**Canonical usage:** `PantryInventory.vue` (items list, expired items list), `PantryShoppingList.vue` (items area, move-to-pantry list).
+
+---
+
+## Premium & Coming Soon Badges
+
+Two reusable Vue components in `src/components/ui/` for surfacing locked or upcoming features. Always import and use these — never write badge CSS inline.
+
+### Components
+
+**`ComingSoonBadge.vue`** — pill label, no icon. Use for features that aren't released yet, whether or not they are premium.
+
+**`PremiumBadge.vue`** — pill label with lock icon. Use for features that require a license.
+
+Both accept a `theme` prop:
+
+| `theme` | Colors | Use in |
+|---|---|---|
+| `green` (default) | `#f4fbf7` / `#B8D8C8` / `#6BA888` | Pantry |
+| `pink` | `#faf4f7` / `#d4c8d0` / `#b0a8b9` | Period tracker |
+
+Future features must add their theme variant to both components when they introduce premium/coming-soon UI.
+
+The two badges are independent — `ComingSoonBadge` is not always paired with `PremiumBadge`. Use whichever applies. When both apply, render "Coming soon" first, "Premium" second.
+
+---
+
+### Inline teaser row
+
+Used inside a form or settings panel to show a feature that is locked/upcoming. Sits in the natural flow of the form as a non-interactive row.
+
+**HTML:**
+```html
+<!-- PREMIUM GATE (frontend) -->
+<div class="premium-teaser">
+  <span class="premium-teaser-label">Feature name</span>
+  <ComingSoonBadge />
+  <PremiumBadge />
+</div>
+```
+
+**CSS (local to the file — not in the components):**
+```css
+.premium-teaser {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  background: #EAF7F0;
+  border: 1px solid #B8E6D0;
+  border-radius: 10px;
+  cursor: default;
+  opacity: 0.6;
+}
+.premium-teaser-label {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 500;
+  color: #1A4D35;
+}
+```
+
+Rules:
+- The `<!-- PREMIUM GATE (frontend) -->` comment is required on the containing element so gates can be found with `grep -r "PREMIUM GATE" wifey-app-frontend/src`.
+- This is UX only. Enforcement is always on the backend (`/api/premium/` routes + `requireLicense` middleware).
+
+---
+
+### Premium panel card (column 3)
+
+Used to fill col 3 of a feature's desktop layout with a set of locked upcoming features. Each card is a standalone teaser. Canonical reference: `PantryPremiumPanel.vue`.
+
+**HTML:**
+```html
+<div class="premium-panel">
+  <p class="premium-panel-title">Coming Soon</p>
+
+  <div class="premium-card">
+    <div class="premium-badges">
+      <ComingSoonBadge />
+      <PremiumBadge />
+    </div>
+    <p class="premium-card-title">Feature Name</p>
+    <p class="premium-card-desc">One or two sentences describing what the feature does.</p>
+  </div>
+</div>
+```
+
+Pass `theme="pink"` to both components inside period feature panels.
+
+**CSS (local to the panel file):**
+```css
+.premium-panel {
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-height: calc(100vh - 2.5rem);
+  box-sizing: border-box;
+}
+@media (max-width: 1279px) {
+  .premium-panel { height: 100%; overflow-y: auto; min-height: unset; }
+}
+
+.premium-panel-title {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: MUTED_ACCENT; /* e.g. #9ECDB6 pantry, #c8b8c5 period */
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.premium-card {
+  position: relative;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 14px;
+  padding: 20px 20px 18px;
+  opacity: 0.55;
+  flex: 1;
+}
+
+.premium-badges {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: flex;
+  gap: 4px;
+}
+
+.premium-card-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: TITLE_COLOR; /* feature title color */
+  margin: 0 0 6px;
+  padding-right: 150px; /* clear both badges */
+}
+
+.premium-card-desc {
+  font-size: 12px;
+  color: MUTED_ACCENT;
+  margin: 0;
+  line-height: 1.5;
+}
+```
+
+Rules:
+- Add one `premium-card` per locked feature — cards share space equally via `flex: 1`.
+- Title clears both badges with `padding-right: 150px`.
+- The panel itself follows the same root structure as other column components (see Column Panel Root above).

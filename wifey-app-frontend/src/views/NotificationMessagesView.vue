@@ -11,7 +11,7 @@
             <p class="nm-sub">Customize the text sent in email notifications</p>
           </div>
 
-          <div class="nm-body">
+          <AppScroller class="nm-body">
 
             <!-- General -->
             <div class="nm-section">
@@ -111,7 +111,7 @@
               </div>
             </div>
 
-          </div>
+          </AppScroller>
 
           <div class="nm-footer">
             <button class="nm-close-btn" @click="$emit('update:modelValue', false)">Close</button>
@@ -125,6 +125,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import AppScroller from '@/components/ui/AppScroller.vue'
 import { useSettings } from '../composables/useSettings'
 
 const props = defineProps<{ modelValue: boolean }>()
@@ -219,7 +220,7 @@ const periodNotificationsLive = computed(() =>
 
 /* Body */
 .nm-body {
-  flex: 1; overflow-y: auto;
+  flex: 1;
   padding: 4px 16px 8px;
   display: flex; flex-direction: column; gap: 16px;
 }

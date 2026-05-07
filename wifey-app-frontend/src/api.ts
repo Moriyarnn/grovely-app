@@ -1,5 +1,8 @@
-const port = import.meta.env.VITE_BACKEND_PORT ?? '3000'
-export const API_BASE = `${window.location.protocol}//${window.location.hostname}:${port}`
+const rawPort = import.meta.env.VITE_BACKEND_PORT
+const port = rawPort !== undefined ? rawPort : '3000'
+export const API_BASE = port
+  ? `${window.location.protocol}//${window.location.hostname}:${port}`
+  : window.location.origin
 export const API = `${API_BASE}/api`
 
 export function getToken(): string | null {

@@ -153,7 +153,11 @@ const flowSwatches = computed(() => [
 
 <style scoped>
 .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 200; display: flex; align-items: flex-end; justify-content: center; touch-action: none; }
-.sheet { background: white; border-radius: 20px 20px 0 0; width: 100%; max-width: 480px; padding: 1.25rem 1.25rem 2.5rem; max-height: 85vh; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; }
+.sheet { background: white; border-radius: 20px 20px 0 0; width: 100%; max-width: 480px; padding: 1.25rem 1.25rem 2.5rem; max-height: 85vh; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; scrollbar-width: thin; scrollbar-color: #d4d4d4 transparent; }
+.sheet::-webkit-scrollbar       { width: 5px; }
+.sheet::-webkit-scrollbar-track { background: transparent; }
+.sheet::-webkit-scrollbar-thumb { border-radius: 99px; background: #d4d4d4; }
+.sheet::-webkit-scrollbar-thumb:hover { background: #adadad; }
 .handle { width: 36px; height: 4px; background: #e0e0e0; border-radius: 2px; margin: 0 auto 1.25rem; }
 .sheet-title { font-size: 18px; font-weight: 500; margin: 0 0 1.25rem; }
 .sheet-section-label { font-size: 10px; font-weight: 600; color: #bbb; letter-spacing: 0.07em; text-transform: uppercase; margin: 0 0 10px; }

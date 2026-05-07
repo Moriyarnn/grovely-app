@@ -220,7 +220,7 @@ const rootStyle = computed(() => ({
 @media (min-width: 1280px) {
   .app-layout {
     display: grid;
-    grid-template-columns: minmax(0, 560px) 1fr;
+    grid-template-columns: minmax(0, 560px) minmax(0, 1fr);
     gap: 1rem;
     align-items: start;
     min-height: 100vh;
@@ -267,7 +267,7 @@ const rootStyle = computed(() => ({
 /* ── Large desktop (≥1600px): 3-col grid ───────────────────── */
 @media (min-width: 1600px) {
   .app-layout {
-    grid-template-columns: minmax(0, 560px) 1fr 1fr;
+    grid-template-columns: minmax(0, 560px) minmax(0, 1fr) minmax(0, 1fr);
   }
 
   .app-side-panel--third {

@@ -11,10 +11,15 @@ export default defineConfig({
   ],
   server: {
     host: true,
+    allowedHosts: true,
     watch: {
       usePolling: true,
       interval: 1000
     }
+  },
+  preview: {
+    host: true,
+    allowedHosts: true,
   },
   resolve: {
     alias: {

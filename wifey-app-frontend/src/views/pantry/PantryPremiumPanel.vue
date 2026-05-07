@@ -3,27 +3,27 @@
     <p class="premium-panel-title">Coming Soon</p>
 
     <div class="premium-card">
-      <div class="premium-badge">
-        <v-icon size="11" color="#b0a8b9">mdi-lock</v-icon>
-        <span>Premium</span>
+      <div class="premium-badges">
+        <ComingSoonBadge />
+        <PremiumBadge />
       </div>
       <p class="premium-card-title">Waste Tracking</p>
       <p class="premium-card-desc">Items marked as wasted are logged — monthly summary shows your most-wasted categories</p>
     </div>
 
     <div class="premium-card">
-      <div class="premium-badge">
-        <v-icon size="11" color="#b0a8b9">mdi-lock</v-icon>
-        <span>Premium</span>
+      <div class="premium-badges">
+        <ComingSoonBadge />
+        <PremiumBadge />
       </div>
       <p class="premium-card-title">Reorder Suggestions</p>
       <p class="premium-card-desc">Detects your average repurchase interval per item and nudges when you're likely running low</p>
     </div>
 
     <div class="premium-card">
-      <div class="premium-badge">
-        <v-icon size="11" color="#b0a8b9">mdi-lock</v-icon>
-        <span>Premium</span>
+      <div class="premium-badges">
+        <ComingSoonBadge />
+        <PremiumBadge />
       </div>
       <p class="premium-card-title">Recipe Crossover</p>
       <p class="premium-card-desc">Scores pantry items against available recipes, weighted toward what's expiring soonest</p>
@@ -32,6 +32,8 @@
 </template>
 
 <script setup>
+import ComingSoonBadge from '@/components/ui/ComingSoonBadge.vue'
+import PremiumBadge from '@/components/ui/PremiumBadge.vue'
 </script>
 
 <style scoped>
@@ -68,22 +70,12 @@
   flex: 1;
 }
 
-.premium-badge {
+.premium-badges {
   position: absolute;
   top: 14px;
   right: 14px;
-  display: inline-flex;
-  align-items: center;
+  display: flex;
   gap: 4px;
-  padding: 3px 8px 3px 6px;
-  border: 1.5px solid #B8D8C8;
-  border-radius: 999px;
-  font-size: 10px;
-  font-weight: 600;
-  color: #6BA888;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  background: #f4fbf7;
 }
 
 .premium-card-title {
@@ -91,7 +83,7 @@
   font-weight: 600;
   color: #1A4D35;
   margin: 0 0 6px;
-  padding-right: 80px;
+  padding-right: 150px;
 }
 
 .premium-card-desc {

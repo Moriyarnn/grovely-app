@@ -113,54 +113,38 @@
     <OnboardingTutorial :force-open="tutorialOpen" @close="tutorialOpen = false" />
 
     <!-- Delete cycle dialog -->
-    <div class="confirm-backdrop" :class="{ visible: showDeleteCycleDialog }" @click="showDeleteCycleDialog = false" />
-    <div class="confirm-modal" :class="{ open: showDeleteCycleDialog }">
-      <div class="confirm-inner">
-        <div class="confirm-icon">
-          <v-icon size="28" color="#c0392b">mdi-calendar-remove-outline</v-icon>
-        </div>
-        <p class="confirm-title">Delete this cycle?</p>
-        <p class="confirm-desc">{{ selectedCycleLabel }}<br><span style="font-size:11px;color:#c0392b;">All logged data for this cycle will be removed.</span></p>
-        <div class="confirm-actions">
-          <button class="confirm-cancel" @click="showDeleteCycleDialog = false">Cancel</button>
-          <button class="confirm-delete" @click="deleteCycle" :disabled="deletingCycle">
-            {{ deletingCycle ? 'Deleting...' : 'Yes, delete' }}
-          </button>
-        </div>
-      </div>
-    </div>
+    <ConfirmDialog
+      :open="showDeleteCycleDialog"
+      @update:open="showDeleteCycleDialog = $event"
+      icon="mdi-calendar-remove-outline"
+      title="Delete this cycle?"
+      :loading="deletingCycle"
+      @confirm="deleteCycle"
+    >{{ selectedCycleLabel }}<br><span style="font-size:11px;color:#c0392b;">All logged data for this cycle will be removed.</span></ConfirmDialog>
 
     <!-- Long cycle warning dialog -->
-    <div class="confirm-backdrop" :class="{ visible: showLongCycleDialog }" @click="showLongCycleDialog = false" />
-    <div class="confirm-modal" :class="{ open: showLongCycleDialog }">
-      <div class="confirm-inner">
-        <div class="confirm-icon">
-          <v-icon size="28" color="#b45309">mdi-calendar-alert-outline</v-icon>
-        </div>
-        <p class="confirm-title">Unusually long cycle</p>
-        <p class="confirm-desc">This would make the period <strong>{{ longCycleDays }} days</strong> long — most periods last 3–7 days.<br><span style="font-size:11px;color:#b45309;">Are you sure you want to apply this change?</span></p>
-        <div class="confirm-actions">
-          <button class="confirm-cancel" @click="cancelLongCycleAdjust">Cancel</button>
-          <button class="confirm-delete" style="background:#b45309" @click="confirmLongCycleAdjust">Yes, apply</button>
-        </div>
-      </div>
-    </div>
+    <ConfirmDialog
+      :open="showLongCycleDialog"
+      @update:open="showLongCycleDialog = $event"
+      icon="mdi-calendar-alert-outline"
+      icon-color="#b45309"
+      title="Unusually long cycle"
+      confirm-label="Yes, apply"
+      confirm-color="#b45309"
+      @confirm="confirmLongCycleAdjust"
+    >This would make the period <strong>{{ longCycleDays }} days</strong> long — most periods last 3–7 days.<br><span style="font-size:11px;color:#b45309;">Are you sure you want to apply this change?</span></ConfirmDialog>
 
     <!-- Short gap warning dialog -->
-    <div class="confirm-backdrop" :class="{ visible: showShortGapDialog }" @click="cancelShortGap" />
-    <div class="confirm-modal" :class="{ open: showShortGapDialog }">
-      <div class="confirm-inner">
-        <div class="confirm-icon">
-          <v-icon size="28" color="#b45309">mdi-calendar-clock-outline</v-icon>
-        </div>
-        <p class="confirm-title">Short gap since last period</p>
-        <p class="confirm-desc">This new cycle is only <strong>{{ shortGapDays }} day{{ shortGapDays === 1 ? '' : 's' }}</strong> away from an existing one. Starting a cycle this close may affect your predictions.<br><span style="font-size:11px;color:#b45309;">Are you sure?</span></p>
-        <div class="confirm-actions">
-          <button class="confirm-cancel" @click="cancelShortGap">Cancel</button>
-          <button class="confirm-delete" style="background:#b45309" @click="confirmShortGap">Continue anyway</button>
-        </div>
-      </div>
-    </div>
+    <ConfirmDialog
+      :open="showShortGapDialog"
+      @update:open="val => { if (!val) cancelShortGap() }"
+      icon="mdi-calendar-clock-outline"
+      icon-color="#b45309"
+      title="Short gap since last period"
+      confirm-label="Continue anyway"
+      confirm-color="#b45309"
+      @confirm="confirmShortGap"
+    >This new cycle is only <strong>{{ shortGapDays }} day{{ shortGapDays === 1 ? '' : 's' }}</strong> away from an existing one. Starting a cycle this close may affect your predictions.<br><span style="font-size:11px;color:#b45309;">Are you sure?</span></ConfirmDialog>
 
     <!-- Adjacency dialog — tapped date sits right next to an existing cycle (owner only) -->
     <div v-if="!isPartner" class="confirm-backdrop" :class="{ visible: adjacencyDialog.show }" @click="!adjacencyDialog.working && (adjacencyDialog.show = false)" />
@@ -201,24 +185,15 @@
       </div>
     </div>
 
-    <!-- Day panel bottom sheet -->
-    <div class="sheet-backdrop" :class="{ visible: !!selectedCell }" @click="closePanel" />
-    <div class="day-sheet" :class="{ open: !!selectedCell }">
-      <div v-if="selectedCell" class="sheet-inner">
-
-        <!-- Sheet handle -->
-        <div class="sheet-handle" />
-
-        <!-- Sheet header -->
-        <div class="sheet-header">
-          <div>
-            <p class="sheet-date-label">{{ selectedDateLabel }}</p>
-            <p class="sheet-day-type">{{ selectedDayType }}</p>
-          </div>
-          <button class="sheet-close" @click="closePanel">
-            <v-icon size="18" color="#993556">mdi-close</v-icon>
-          </button>
-        </div>
+    <!-- Day panel -->
+    <DetailSheet
+      :open="!!selectedCell"
+      @update:open="closePanel"
+      :title="selectedDateLabel"
+      :subtitle="selectedDayType"
+      theme="pink"
+    >
+      <div v-if="selectedCell" class="day-sheet-content">
 
         <!-- VIEW mode content -->
         <template v-if="mode === 'view'">
@@ -236,7 +211,7 @@
           <div v-else-if="selectedLoggedDay || tapContext === 'open-cycle-day'" class="view-content">
             <!-- Flow intensity -->
             <div class="view-section">
-              <p class="view-section-label">Flow</p>
+              <p class="view-section-label">Flow intensity</p>
               <div class="flow-chips">
                 <span
                   v-for="level in ['spotting','light','medium','heavy']"
@@ -248,62 +223,30 @@
             </div>
 
             <!-- Symptoms -->
-            <div class="view-section" v-if="selectedSymptoms.length">
+            <div class="view-section">
               <p class="view-section-label">Symptoms</p>
               <div class="symptom-chips">
-                <span v-for="s in selectedSymptoms" :key="s" class="symptom-chip">{{ s }}</span>
+                <span
+                  v-for="s in symptomOptions"
+                  :key="s"
+                  class="symptom-chip"
+                  :class="{ 'symptom-chip-active': selectedSymptoms.includes(s) }"
+                >{{ s }}</span>
               </div>
             </div>
 
             <!-- Notes -->
-            <div class="view-section" v-if="selectedLoggedDay?.notes && (!isPartner || partnerCanReadNotes)">
+            <div class="view-section" v-if="!isPartner || partnerCanReadNotes">
               <p class="view-section-label">Notes</p>
-              <p class="view-notes">{{ selectedLoggedDay.notes }}</p>
+              <NotesField mode="view" :model-value="selectedLoggedDay?.notes ?? ''" :max="NOTES_MAX" />
             </div>
 
-            <div v-if="!isPartner" class="view-actions">
-              <button class="edit-btn" @click="switchToEdit">
-                <v-icon size="14" color="#993556">mdi-pencil-outline</v-icon>
-                Edit this day
-              </button>
-            </div>
-            <div v-if="!isPartner && selectedCycle" class="cycle-action-row">
-              <div class="cycle-icon-actions">
-                <div class="cycle-icon-action">
-                  <button
-                    class="cycle-icon-btn"
-                    :class="{ 'cycle-icon-btn--disabled': !isEdgeDay }"
-                    :disabled="!isEdgeDay || removingDay"
-                    @click="removeDay"
-                  >
-                    <v-icon size="16" :color="isEdgeDay ? '#c0392b' : '#94a3b8'">mdi-trash-can-outline</v-icon>
-                  </button>
-                  <span class="cycle-icon-label" :class="{ 'cycle-icon-label--muted': !isEdgeDay }">
-                    {{ removingDay ? 'Removing...' : 'Remove this day' }}
-                  </span>
-                </div>
-                <div class="cycle-icon-action">
-                  <button class="cycle-icon-btn cycle-icon-btn--delete" @click="showDeleteCycleDialog = true">
-                    <v-icon size="16" color="#c0392b">mdi-calendar-remove-outline</v-icon>
-                  </button>
-                  <span class="cycle-icon-label">Delete cycle</span>
-                </div>
-              </div>
-              <p v-if="!isEdgeDay" class="remove-day-hint">Only the first or last day can be removed</p>
-            </div>
           </div>
 
           <div v-else class="view-empty">
             <v-icon size="36" color="#F4C0D1">mdi-calendar-blank-outline</v-icon>
             <template v-if="selectedCycle">
               <p>No data logged for this day.</p>
-              <template v-if="!isPartner">
-                <button class="log-prompt-btn" @click="mode = 'log'">Add entry</button>
-                <button class="delete-cycle-btn delete-cycle-btn-solo" @click="showDeleteCycleDialog = true">
-                  <v-icon size="12" color="#c0392b">mdi-calendar-remove-outline</v-icon>
-                  Delete entire cycle
-                </button>
-              </template>
             </template>
             <template v-else>
               <template v-if="ovulationCycle">
@@ -361,34 +304,49 @@
             <!-- Notes -->
             <div class="form-section">
               <p class="form-label">Notes</p>
-              <textarea
-                class="notes-input"
-                v-model="form.notes"
-                placeholder="How are you feeling today?"
-                rows="3"
-              />
+              <NotesField v-model="form.notes" mode="edit" :max="NOTES_MAX" placeholder="How are you feeling today?" />
             </div>
 
-            <!-- Actions -->
-            <div class="form-actions">
-              <button class="btn-cancel" @click="closePanel">Cancel</button>
-              <button class="btn-save" @click="saveDay" :disabled="saving">
-                {{ saving ? 'Saving...' : 'Save' }}
-              </button>
-            </div>
-
-            <!-- Delete cycle from log form -->
-            <div v-if="selectedCycle" class="form-delete-cycle-row">
-              <button class="delete-cycle-btn delete-cycle-btn-solo" @click="showDeleteCycleDialog = true">
-                <v-icon size="12" color="#c0392b">mdi-calendar-remove-outline</v-icon>
-                Delete entire cycle
-              </button>
-            </div>
           </div>
         </template>
 
       </div>
-    </div>
+
+      <template v-if="selectedCell && !isPartner && selectedCycle && tapContext !== 'orphaned'" #footer>
+        <!-- Icon actions (left) -->
+        <div class="cycle-icon-actions">
+          <IconAction
+            icon="mdi-trash-can-outline"
+            label="Delete day"
+            color="#c0392b"
+            :loading="removingDay ? 'Deleting...' : ''"
+            :disabled="!isEdgeDay || removingDay"
+            :hoverMessage="!isEdgeDay && !removingDay ? 'Only the first or last day of a period can be removed' : ''"
+            @click="removeDay"
+          />
+          <IconAction
+            icon="mdi-calendar-remove-outline"
+            label="Delete cycle"
+            color="#c0392b"
+            @click="showDeleteCycleDialog = true"
+          />
+          <IconAction
+            v-if="mode === 'view'"
+            :icon="selectedLoggedDay || tapContext === 'open-cycle-day' ? 'mdi-pencil' : 'mdi-plus'"
+            :label="selectedLoggedDay || tapContext === 'open-cycle-day' ? 'Edit day' : 'Log day'"
+            color="#993556"
+            @click="selectedLoggedDay || tapContext === 'open-cycle-day' ? switchToEdit() : mode = 'log'"
+          />
+        </div>
+        <!-- Save / Cancel (right, edit mode only) -->
+        <div v-if="mode !== 'view'" class="form-actions">
+          <button class="btn-cancel" @click="mode = 'view'">Cancel</button>
+          <button class="btn-save" @click="saveDay" :disabled="saving">
+            {{ saving ? 'Saving...' : 'Save' }}
+          </button>
+        </div>
+      </template>
+    </DetailSheet>
 
     <!-- Future-date speech bubble -->
     <Transition name="hint-bubble-fade">
@@ -408,6 +366,10 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import OnboardingTutorial from '../../components/OnboardingTutorial.vue'
+import DetailSheet from '../../components/ui/DetailSheet.vue'
+import NotesField from '../../components/ui/NotesField.vue'
+import IconAction from '../../components/ui/IconAction.vue'
+import ConfirmDialog from '../../components/ui/ConfirmDialog.vue'
 import { API, apiFetch, getUser } from '../../api'
 import { useSettings } from '../../composables/useSettings'
 import { usePreferences } from '../../composables/usePreferences'
@@ -420,6 +382,8 @@ const isPartner = computed(() => currentUser.value?.role === 'partner')
 const { settings, fetchSettings } = useSettings()
 const { fetchPreferences, resetCache: resetPreferences } = usePreferences()
 const partnerCanReadNotes = computed(() => settings.value.partner_can_read_notes === '1')
+
+const NOTES_MAX = 500
 
 const tutorialOpen = ref(false)
 const mode = ref('view') // set automatically on day click
@@ -457,6 +421,8 @@ const isDragging = ref(false)
 const dragStart = ref(null)
 const dragEnd = ref(null)
 const dragMoved = ref(false)
+
+
 
 // Future-date speech bubble
 const hintBubble = ref({ visible: false, x: 0, y: 0, message: '', variant: 'dark' })
@@ -532,6 +498,7 @@ const adjustingCycleId = ref(null)
 const adjustHandle = ref(null)       // 'start' | 'end'
 const adjustHoldTimer = ref(null)
 const adjustVibrateTimer = ref(null)  // fires at 250ms to start vibrate feedback
+const periodHoldTouchStart = ref(null) // {x, y} recorded when a period hold begins
 const adjustDragActive = ref(false)
 const adjustPreviewDate = ref(null)
 const holdPendingCycleId = ref(null) // cycle being "charged" during a hold-to-adjust gesture
@@ -844,7 +811,7 @@ function getCellClass(cell, i) {
   // Drag anchor: scale up the first and last cell of the current drag range
   // Suppress when hold-pending is active on this cell — avoid competing border styles
   const isHoldPending = (holdPendingCycleId.value && dateToCycleId.value.get(cell.dateStr) === holdPendingCycleId.value) || gapHoldPendingDate.value === cell.dateStr
-  if (!isHoldPending && dragStart.value && dragEnd.value) {
+  if (!isHoldPending && !periodDates.value.has(cell.dateStr) && dragStart.value && dragEnd.value) {
     const ds = dragStart.value <= dragEnd.value ? dragStart.value : dragEnd.value
     const de = dragStart.value <= dragEnd.value ? dragEnd.value : dragStart.value
     if (cell.dateStr === ds || cell.dateStr === de) classes.push('cal-drag-anchor')
@@ -1127,6 +1094,10 @@ function exitAdjustMode() {
   adjustHandle.value = null
   adjustDragActive.value = false
   adjustPreviewDate.value = null
+  isDragging.value = false
+  dragStart.value = null
+  dragEnd.value = null
+  dragMoved.value = false
 }
 
 async function commitAdjust() {
@@ -1184,6 +1155,7 @@ async function commitAdjust() {
   adjustHandle.value = null
   adjustPreviewDate.value = null
   await applyAdjust({ cycleId, newStart, newEnd, emptyDays, handle, newDates })
+  if (newStart === newEnd) exitAdjustMode()
 }
 
 async function applyAdjust({ cycleId, newStart, newEnd, emptyDays, handle, newDates = [] }) {
@@ -1286,6 +1258,7 @@ function onAdjustKeydown(ev) {
 
 // ── Drag-to-select ───────────────────────────────────────────
 function onCellMouseDown(cell, ev) {
+  if (isTouchInteraction) return
   // If in adjust mode, clicking a handle starts a resize drag;
   // clicking inside the same cycle does nothing; clicking elsewhere exits
   if (adjustingCycleId.value) {
@@ -1398,6 +1371,7 @@ function onDocumentMouseUp(ev = {}) {
     adjustHoldTimer.value = null
     if (adjustVibrateTimer.value) { clearTimeout(adjustVibrateTimer.value); adjustVibrateTimer.value = null }
     holdPendingCycleId.value = null
+    periodHoldTouchStart.value = null
     const startDate = dragStart.value
     dragStart.value = null
     const cell = calendarCells.value.find(c => c.dateStr === startDate)
@@ -1458,8 +1432,15 @@ function hasOverlap(start, end) {
   })
 }
 
+// Prevent synthetic mousedown/mouseup fired by the browser after a touch sequence
+// from being double-processed by the mouse handlers.
+let isTouchInteraction = false
+let touchResetTimer = null
+
 // Touch equivalents
 function onTouchStart(e) {
+  isTouchInteraction = true
+  if (touchResetTimer) { clearTimeout(touchResetTimer); touchResetTimer = null }
   const touch = e.touches[0]
   const el = document.elementFromPoint(touch.clientX, touch.clientY)
   const cellEl = el?.closest('[data-date]')
@@ -1497,6 +1478,7 @@ function onTouchStart(e) {
     const cycleEnd = cycle?.end_date || cycle?.last_logged_day
     if (cycleId && cycle && cycle.start_date !== cycleEnd) {
       dragStart.value = dateStr
+      periodHoldTouchStart.value = { x: touch.clientX, y: touch.clientY }
       adjustVibrateTimer.value = setTimeout(() => {
         adjustVibrateTimer.value = null
         holdPendingCycleId.value = cycleId
@@ -1505,9 +1487,11 @@ function onTouchStart(e) {
         adjustHoldTimer.value = null
         holdPendingCycleId.value = null
         dragStart.value = null
+        periodHoldTouchStart.value = null
         adjustingCycleId.value = cycleId
       }, 500)
-      return
+      // Fall through to set isDragging=true so onDocumentMouseUp has a fallback
+      // tap path (!dragMoved branch) if Android prematurely clears adjustHoldTimer.
     }
   }
 
@@ -1547,6 +1531,11 @@ function onTouchMove(e) {
   const cellEl = el?.closest('[data-date]')
   if (!cellEl) return
   const dateStr = cellEl.dataset.date
+  if (adjustHoldTimer.value) {
+    const ps = periodHoldTouchStart.value
+    const dx = ps ? Math.abs(touch.clientX - ps.x) : 0
+    const dy = ps ? Math.abs(touch.clientY - ps.y) : 0
+  }
 
   // Propagate adjust drag on touch
   if (adjustDragActive.value) {
@@ -1554,13 +1543,18 @@ function onTouchMove(e) {
     return
   }
 
-  // Cancel period hold on movement to a different cell — no drag-to-log fallback
-  if (adjustHoldTimer.value && dateStr !== dragStart.value) {
-    clearTimeout(adjustHoldTimer.value)
-    adjustHoldTimer.value = null
-    if (adjustVibrateTimer.value) { clearTimeout(adjustVibrateTimer.value); adjustVibrateTimer.value = null }
-    holdPendingCycleId.value = null
-    dragStart.value = null
+  // Cancel period hold only on intentional movement (>10px) — not micro-movements from Android touch jitter
+  if (adjustHoldTimer.value) {
+    const ps = periodHoldTouchStart.value
+    const moved = ps && (Math.abs(touch.clientX - ps.x) > 10 || Math.abs(touch.clientY - ps.y) > 10)
+    if (moved) {
+      clearTimeout(adjustHoldTimer.value)
+      adjustHoldTimer.value = null
+      if (adjustVibrateTimer.value) { clearTimeout(adjustVibrateTimer.value); adjustVibrateTimer.value = null }
+      holdPendingCycleId.value = null
+      periodHoldTouchStart.value = null
+      dragStart.value = null
+    }
     return
   }
   if (gapHoldTimer.value && dateStr !== dragStart.value) {
@@ -1579,6 +1573,7 @@ function onTouchMove(e) {
 }
 
 function onTouchEnd(e) {
+  touchResetTimer = setTimeout(() => { isTouchInteraction = false; touchResetTimer = null }, 500)
   const touch = e.changedTouches[0]
   onDocumentMouseUp(touch ? { clientX: touch.clientX, clientY: touch.clientY } : {})
 }
@@ -1742,7 +1737,7 @@ async function saveDay() {
       next.delete(ds)
       justSaved.value = next
     }, 1500)
-    closePanel()
+    mode.value = 'view'
     await loadData()
   } finally {
     saving.value = false
@@ -2065,13 +2060,16 @@ onMounted(() => {
   loadData()
   fetchSettings()
   document.addEventListener('mouseup', onDocumentMouseUp)
+  document.addEventListener('touchend', onTouchEnd, { passive: true })
   document.addEventListener('keydown', onAdjustKeydown)
 })
 
 onUnmounted(() => {
   document.removeEventListener('mouseup', onDocumentMouseUp)
+  document.removeEventListener('touchend', onTouchEnd)
   document.removeEventListener('keydown', onAdjustKeydown)
   if (hintBubbleTimer) clearTimeout(hintBubbleTimer)
+  if (touchResetTimer) clearTimeout(touchResetTimer)
   if (adjustHoldTimer.value) clearTimeout(adjustHoldTimer.value)
   if (gapHoldTimer.value) clearTimeout(gapHoldTimer.value)
   if (gapVibrateTimer.value) clearTimeout(gapVibrateTimer.value)
@@ -2086,7 +2084,6 @@ onUnmounted(() => {
   min-height: calc(100vh - 2.5rem);
   box-sizing: border-box;
 }
-
 .period-wrapper {
   padding: 1.25rem;
   max-width: 480px;
@@ -2313,6 +2310,7 @@ onUnmounted(() => {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 2px;
+  touch-action: none;
 }
 .cal-cell {
   aspect-ratio: 1;
@@ -2349,11 +2347,11 @@ onUnmounted(() => {
 }
 
 @keyframes check-pulse {
-  0%   { opacity: 0; transform: scale(0.6); }
+  0%   { opacity: 0; transform: scale(0.85); }
   20%  { opacity: 1; transform: scale(1.15); }
   40%  { transform: scale(1); }
   75%  { opacity: 1; }
-  100% { opacity: 0; transform: scale(1); }
+  100% { opacity: 0; }
 }
 @keyframes warning-pulse {
   0%   { box-shadow: 0 0 0 0px rgba(245, 158, 11, 0); }
@@ -2570,52 +2568,12 @@ onUnmounted(() => {
 .nav-label { font-size: 10px; color: #bbb; }
 .active-label { color: #D4537E; font-weight: 500; }
 
-/* Backdrop */
-.sheet-backdrop {
-  position: fixed; inset: 0;
-  background: rgba(114,36,62,0.18);
-  z-index: 100;
-  opacity: 0; pointer-events: none;
-  transition: opacity 0.3s;
-}
-.sheet-backdrop.visible { opacity: 1; pointer-events: all; }
-
-/* Day sheet */
-.day-sheet {
-  position: fixed;
-  bottom: 0; left: 0; right: 0;
-  background: #fff;
-  border-radius: 20px 20px 0 0;
-  z-index: 101;
-  transform: translateY(100%);
-  transition: transform 0.35s cubic-bezier(.4,0,.2,1);
-  max-height: 85vh;
-  overflow-y: auto;
-}
-.day-sheet.open { transform: translateY(0); }
-.sheet-inner { padding: 0 1.25rem 2rem; }
-.sheet-handle {
-  width: 36px; height: 4px;
-  background: #F4C0D1; border-radius: 2px;
-  margin: 12px auto 16px;
-}
-.sheet-header {
-  display: flex; justify-content: space-between; align-items: flex-start;
-  margin-bottom: 1.25rem;
-}
-.sheet-date-label { font-size: 15px; font-weight: 500; color: #72243E; margin: 0 0 2px; }
-.sheet-day-type { font-size: 11px; color: #993556; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; margin: 0; }
-.sheet-close {
-  width: 28px; height: 28px; border-radius: 50%;
-  border: 1px solid #F4C0D1; background: #FBEAF0;
-  display: flex; align-items: center; justify-content: center; cursor: pointer;
-}
-
 /* View content */
-.view-content { display: flex; flex-direction: column; gap: 1rem; }
-.view-section {}
-.view-section-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: #993556; margin: 0 0 6px; }
-.view-notes { font-size: 13px; color: #72243E; background: #FBEAF0; border-radius: 10px; padding: 10px 12px; margin: 0; }
+.day-sheet-content { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.view-content { display: flex; flex-direction: column; gap: 1.1rem; flex: 1; min-height: 0; }
+.view-section { flex-shrink: 0; }
+.view-section:last-child { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.view-section-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: #993556; margin: 0 0 8px; }
 .view-empty { text-align: center; padding: 2rem 0; color: #bbb; display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .view-empty p { font-size: 13px; margin: 0; }
 .view-empty-hint { font-size: 11px !important; color: #c0899b !important; }
@@ -2645,28 +2603,6 @@ onUnmounted(() => {
 }
 .irregular-text { font-size: 12px; color: #72243E; line-height: 1.4; }
 
-.log-prompt-btn {
-  font-size: 12px; color: #D4537E; background: #FBEAF0;
-  border: 1px solid #F4C0D1; border-radius: 20px;
-  padding: 6px 14px; cursor: pointer;
-}
-.view-actions { display: flex; gap: 8px; align-items: center; }
-.delete-cycle-btn {
-  display: inline-flex; align-items: center; gap: 5px;
-  font-size: 11px; color: #c0392b;
-  background: transparent; border: none;
-  padding: 4px 0; cursor: pointer; opacity: 0.75;
-  letter-spacing: 0.01em;
-}
-.delete-cycle-btn:hover { opacity: 1; }
-.delete-cycle-btn-solo { margin-top: 4px; }
-.edit-btn {
-  display: flex; align-items: center; gap: 5px;
-  font-size: 12px; color: #993556;
-  background: #FBEAF0; border: 1px solid #F4C0D1;
-  border-radius: 20px; padding: 6px 14px;
-  cursor: pointer;
-}
 
 /* Confirm modal */
 .confirm-backdrop {
@@ -2726,29 +2662,6 @@ onUnmounted(() => {
   font-size: 13px; color: #a0667a;
   margin: 0; text-align: center; line-height: 1.5;
 }
-.confirm-actions {
-  display: flex; gap: 8px; margin-top: 0.75rem; width: 100%;
-}
-.confirm-cancel {
-  flex: 1; padding: 10px;
-  border-radius: 20px; border: 1px solid #F4C0D1;
-  background: #fff; font-size: 13px; color: #993556;
-  cursor: pointer; font-weight: 500;
-}
-.confirm-delete {
-  flex: 1; padding: 10px;
-  border-radius: 20px; border: none;
-  background: #c0392b; font-size: 13px; color: #fff;
-  cursor: pointer; font-weight: 500;
-}
-.confirm-delete:disabled { opacity: 0.6; cursor: default; }
-.confirm-save {
-  flex: 1; padding: 10px;
-  border-radius: 20px; border: none;
-  background: #D4537E; font-size: 13px; color: #fff;
-  cursor: pointer; font-weight: 500;
-}
-.confirm-save:disabled { opacity: 0.6; cursor: default; }
 
 /* Adjacency dialog action buttons */
 .adj-actions {
@@ -2776,6 +2689,8 @@ onUnmounted(() => {
   padding: 5px 14px; border-radius: 20px; font-size: 12px; font-weight: 500;
   background: #F4C0D1; color: #993556;
   border: none; text-transform: capitalize;
+  display: inline-flex; align-items: center;
+  box-sizing: border-box; font-family: inherit; line-height: 1.4;
 }
 .flow-chip-btn { cursor: pointer; transition: background 0.15s; }
 .flow-chip-active { background: #D4537E; color: #fff; }
@@ -2786,25 +2701,19 @@ onUnmounted(() => {
   padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 500;
   background: #FBEAF0; color: #993556;
   border: 1px solid #F4C0D1;
+  display: inline-flex; align-items: center;
+  box-sizing: border-box; font-family: inherit; line-height: 1.4;
 }
-.symptom-chip-btn { cursor: pointer; transition: background 0.15s; border: none; }
+.symptom-chip-btn { cursor: pointer; transition: background 0.15s; }
 .symptom-chip-active { background: #D4537E; color: #fff; border-color: #D4537E; }
 
 /* Log form */
-.log-form { display: flex; flex-direction: column; gap: 1.1rem; }
-.form-section {}
+.log-form { display: flex; flex-direction: column; gap: 1.1rem; flex: 1; min-height: 0; }
+.form-section { flex-shrink: 0; }
+.form-section:last-child { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 .form-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: #993556; margin: 0 0 8px; }
-.notes-input {
-  width: 100%; border: 1px solid #F4C0D1; border-radius: 12px;
-  background: #FBEAF0; padding: 10px 12px;
-  font-size: 13px; color: #72243E; resize: none;
-  outline: none; font-family: inherit; box-sizing: border-box;
-}
-.notes-input::placeholder { color: #cca7b8; }
-.notes-input:focus { border-color: #D4537E; }
 
-/* Form actions */
-.form-actions { display: flex; gap: 8px; justify-content: flex-end; padding-top: 4px; }
+.form-actions { display: flex; gap: 8px; margin-left: auto; }
 .btn-cancel {
   padding: 8px 18px; border-radius: 20px;
   border: 1px solid #F4C0D1; background: #fff;
@@ -2818,35 +2727,14 @@ onUnmounted(() => {
 .btn-save:disabled { opacity: 0.6; cursor: default; }
 
 
-.cycle-action-row { margin-top: 10px; }
+
 .cycle-icon-actions { display: flex; gap: 20px; align-items: flex-start; }
-.cycle-icon-action { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-.cycle-icon-btn {
-  width: 36px; height: 36px; border-radius: 50%;
-  border: 1px solid #f1a1b0; background: #FBEAF0;
-  display: flex; align-items: center; justify-content: center; cursor: pointer;
-}
-.cycle-icon-btn--disabled {
-  border-color: #e2e8f0; background: #f8fafc; cursor: default;
-}
-.cycle-icon-btn--delete { border-color: #f1a1b0; background: #FBEAF0; }
-.cycle-icon-label { font-size: 10px; color: #993556; text-align: center; }
-.cycle-icon-label--muted { color: #94a3b8; }
 .remove-day-hint {
   font-size: 10px; color: #94a3b8;
   margin: 4px 0 0; padding: 0;
 }
-.form-delete-cycle-row {
-  margin-top: 6px;
-  display: flex;
-  justify-content: center;
-}
+
 /* ── Hold-to-adjust charging indicator ──────────────────────── */
-@keyframes hold-vibrate {
-  0%, 100% { transform: translateX(0); }
-  25%       { transform: translateX(-1.5px); }
-  75%       { transform: translateX(1.5px); }
-}
 .cal-cell-hold-pending {
   border-top: 2px solid rgba(0, 0, 0, 0.65) !important;
   border-bottom: 2px solid rgba(0, 0, 0, 0.65) !important;

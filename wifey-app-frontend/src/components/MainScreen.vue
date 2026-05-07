@@ -63,7 +63,7 @@
         What's new
         <span v-if="hasUnread" class="ms-unread-dot" />
       </p>
-      <div class="ms-changelog">
+      <AppScroller class="ms-changelog">
         <div v-for="entry in CHANGELOG" :key="entry.version" class="ms-cl-entry">
           <div class="ms-cl-head">
             <div class="ms-cl-head-left">
@@ -89,7 +89,7 @@
             >#{{ n }}</a>
           </div>
         </div>
-      </div>
+      </AppScroller>
     </div>
 
   </div>
@@ -97,6 +97,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import AppScroller from '@/components/ui/AppScroller.vue'
 import { useRouter } from 'vue-router'
 import { API, apiFetch } from '../api'
 
@@ -106,7 +107,7 @@ const props = defineProps({
 
 const router = useRouter()
 
-const APP_VERSION = 'v0.9.0'
+const APP_VERSION = 'v0.10.0'
 const LAST_SEEN_KEY = 'changelog_last_seen_version'
 
 const cycleCount = ref(null)
@@ -186,6 +187,19 @@ const stats = computed(() => [
 ])
 
 const CHANGELOG = [
+  {
+    version: 'v0.10.0',
+    title: 'Pantry Polish + Reverse Proxy',
+    date: 'May 7, 2026',
+    fixes: [29, 61, 62, 63, 64, 65, 68, 88, 93, 95, 96, 99, 100, 101, 102, 104, 107, 108, 109, 111, 112, 113, 114, 115, 116],
+    items: [
+      { type: 'New', plan: 'Free', text: 'Pantry inventory - tap any item to view, edit, mark as used, or mark as wasted' },
+      { type: 'New', plan: 'Free', text: 'Shopping list - edit name, price, quantity, category, expiry, and notes; cart total pill shows the running sum of priced items' },
+      { type: 'New', plan: 'Free', text: 'Move to pantry - unified sheet for single and bulk moves with per-item expiry; renders as a centered modal on desktop' },
+      { type: 'New', plan: 'Free', text: 'Item categories on shopping list and inventory - Produce, Dairy, Meat, Bakery, Frozen, Dry Goods, Other' },
+      { type: 'New', plan: 'Free', text: 'Reverse proxy support - serve the app under one hostname via reference Caddyfile and a single docker compose override' },
+    ]
+  },
   {
     version: 'v0.9.0',
     title: 'Settings + Mobile Polish',
@@ -466,7 +480,6 @@ const CHANGELOG = [
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
-  overflow-y: auto;
   padding-right: 4px;
 }
 

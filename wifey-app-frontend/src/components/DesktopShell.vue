@@ -364,7 +364,14 @@ async function switchUser(role) {
   min-width: 0;
   height: 100vh;
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #d4d4d4 transparent;
 }
+
+.shell-content::-webkit-scrollbar       { width: 5px; }
+.shell-content::-webkit-scrollbar-track { background: transparent; }
+.shell-content::-webkit-scrollbar-thumb { border-radius: 99px; background: #d4d4d4; }
+.shell-content::-webkit-scrollbar-thumb:hover { background: #adadad; }
 
 @media (max-width: 1279px) {
   .shell-content {

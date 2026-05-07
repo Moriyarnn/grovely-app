@@ -1,0 +1,50 @@
+/* item-scale-in: shared entrance keyframe for newly added list items.
+   Usage: <TransitionGroup name="item-scale"> — do not set appear, mount loads must not animate.
+   Note: check-pulse in PeriodCalendar uses the same entrance values (scale 0.85, opacity 0) for consistency,
+   but as one continuous animation to preserve momentum into its overshoot. */
+@keyframes item-scale-in {
+  from { transform: scale(0.85); opacity: 0; }
+  to   { transform: scale(1);    opacity: 1; }
+}
+
+.item-scale-enter-active {
+  animation: item-scale-in 0.18s ease-out both;
+}
+
+.item-scale-leave-active {
+  animation: item-scale-out 0.15s ease-in forwards;
+}
+
+@keyframes item-scale-out {
+  from { transform: scale(1);    opacity: 1; }
+  to   { transform: scale(0.85); opacity: 0; }
+}
+
+.item-scale-move {
+  transition: transform 0.2s ease;
+}
+
+/* hold-vibrate: long-press charging feedback. Apply .hold-pending to any element
+   that is mid-hold at 250ms. Feature-specific border/background styles stay local. */
+@keyframes hold-vibrate {
+  0%, 100% { transform: translateX(0); }
+  25%       { transform: translateX(-1.5px); }
+  75%       { transform: translateX(1.5px); }
+}
+
+.hold-pending {
+  animation: hold-vibrate 0.12s ease-in-out infinite;
+}
+
+/* cat-slide: category group enter/exit. Uses CSS transitions (not keyframes) so
+   Vue's TransitionGroup reliably detects transitionend in nested animation contexts. */
+.cat-slide-enter-active,
+.cat-slide-leave-active {
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.cat-slide-enter-from,
+.cat-slide-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
+}
