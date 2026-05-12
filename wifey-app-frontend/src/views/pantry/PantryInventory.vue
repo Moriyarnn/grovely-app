@@ -23,15 +23,30 @@
     <!-- Inventory card — scrollable, fills available space -->
     <div class="inventory-card">
       <p class="inventory-title">Inventory</p>
+      <ListControls
+        v-model="controls"
+        :items="items"
+        :filter-options="CATEGORIES"
+        :sort-options="SORT_OPTIONS"
+        layout="compact"
+        theme="green"
+        placeholder="Search pantry…"
+        class="inventory-controls"
+      />
       <AppScroller theme="green" class="items-area" ref="itemsArea">
         <div v-if="!loading && items.length === 0" class="empty-state">
           <v-icon size="32" color="#a8c5b0">mdi-fridge-outline</v-icon>
           <p class="empty-title">Pantry is empty</p>
           <p class="empty-sub">Check items off your shopping list to stock it up</p>
         </div>
+        <div v-else-if="!loading && displayedItems.length === 0" class="empty-state">
+          <v-icon size="32" color="#a8c5b0">mdi-magnify</v-icon>
+          <p class="empty-title">No items found</p>
+          <p class="empty-sub">Try a different search or filter</p>
+        </div>
         <TransitionGroup :name="animEnabled ? 'item-scale' : ''">
           <SwipeableListItem
-            v-for="item in items"
+            v-for="item in displayedItems"
             :key="item.id"
             :actions="itemActions(item)"
             :itemId="item.id"
@@ -40,7 +55,9 @@
           >
             <div class="pantry-item" :class="expiryClass(item)" @click="openItemSheet(item)">
               <div class="pantry-item-main">
-                <span class="pantry-name">{{ item.name }}</span>
+                <div class="pantry-name-wrap">
+                  <span class="pantry-name">{{ item.name }}</span>
+                </div>
                 <span class="pantry-item-right">
                   <span v-if="item.category" class="cat-chip" :style="{ background: catChipBg(item.category), color: catChipColor(item.category) }">{{ catLabel(item.category) }}</span>
                   <span class="pantry-qty-col">{{ displayQty(item) }}</span>
@@ -65,7 +82,7 @@
       :open="sheetOpen"
       @update:open="closeItemSheet"
       :title="sheetItem?.name ?? ''"
-      :subtitle="sheetItem ? (catLabel(sheetItem.category) + (displayQty(sheetItem) ? ' · ' + displayQty(sheetItem) : '')) : ''"
+      :subtitle="sheetItem ? (catLabel(sheetItem.category) + (sheetItem.amount != null ? ' · ' + clampQty(sheetItem.amount, sheetItem.unit, 10) : (sheetItem.pieces != null ? ' · ' + sheetItem.pieces + ' pcs' : ''))) : ''"
       theme="green"
     >
       <div v-if="sheetItem" class="item-sheet-body">
@@ -80,21 +97,21 @@
             <div class="view-section view-section--price">
               <span class="view-section-label">Price</span>
               <div class="view-value-box" :class="{ 'view-value-empty': sheetItem.price == null }">
-                {{ sheetItem.price != null ? `${pantrySymbol} ${clampPrice(sheetItem.price, 7)}` : '—' }}
+                {{ sheetItem.price != null ? `${pantrySymbol} ${clampPrice(sheetItem.price, 7, pantryDecimals)}` : '—' }}
               </div>
             </div>
           </div>
-          <div class="view-inline-row">
-            <div class="view-section">
+          <div class="view-inline-row view-inline-row--qty-density">
+            <div class="view-section view-section--qty-wide">
               <span class="view-section-label">Quantity</span>
-              <div class="view-value-box" :class="{ 'view-value-empty': sheetItem.amount == null }">
-                {{ sheetItem.amount != null ? clampQty(sheetItem.amount, sheetItem.unit, 14) : '—' }}
+              <div class="view-value-box" :class="{ 'view-value-empty': sheetItem.amount == null && sheetItem.pieces == null }">
+                {{ sheetItem.amount != null ? clampQty(sheetItem.amount, sheetItem.unit, 14) : (sheetItem.pieces != null ? sheetItem.pieces + ' pcs' : '—') }}
               </div>
             </div>
             <div class="view-section">
               <span class="view-section-label">Density</span>
               <div class="view-value-box" :class="{ 'view-value-empty': sheetItem.density == null }">
-                {{ sheetItem.density != null ? clampQty(sheetItem.density, sheetItem.density_unit, 14) : '—' }}
+                {{ sheetItem.density != null ? clampQty(sheetItem.density, sheetItem.density_unit, 13) : '—' }}
               </div>
             </div>
           </div>
@@ -139,12 +156,24 @@
                   step="0.01"
                   min="0"
                   class="item-price-input"
-                  placeholder="0.00"
+                  :placeholder="pricePlaceholder"
                 />
               </div>
             </div>
           </div>
-          <div class="edit-inline-row">
+          <div v-if="isPiecesItem" class="item-edit-field">
+            <label class="item-edit-label">Pieces</label>
+            <input
+              v-model="sheetForm.pieces"
+              type="number"
+              min="1"
+              step="1"
+              class="item-edit-input"
+              placeholder="1"
+              autocomplete="off"
+            />
+          </div>
+          <div v-else class="edit-inline-row edit-row--qty-density">
             <div class="item-edit-field">
               <label class="item-edit-label">Quantity <span class="item-edit-optional">(optional)</span></label>
               <div class="item-qty-row">
@@ -162,7 +191,7 @@
                 </select>
               </div>
             </div>
-            <div class="item-edit-field">
+            <div class="item-edit-field" :style="!sheetForm.unit ? { opacity: 0.4, pointerEvents: 'none' } : {}">
               <label class="item-edit-label">Density <span class="item-edit-optional">(optional)</span></label>
               <div class="item-qty-row">
                 <input
@@ -315,6 +344,19 @@
             <option v-for="u in compatibleUnits(consumeItem.unit, consumeItem.density, consumeItem.density_unit)" :key="u" :value="u">{{ u }}</option>
           </select>
         </div>
+        <div v-else-if="consumeItem?.pieces != null" class="consume-row">
+          <input
+            v-model="consumeAmount"
+            type="number"
+            min="1"
+            :max="consumeItem.pieces"
+            step="1"
+            class="consume-amount-input"
+            placeholder="All"
+            autocomplete="off"
+          />
+          <span class="consume-pieces-label">of {{ consumeItem.pieces }} pcs</span>
+        </div>
         <div v-if="consumeItem?.amount != null" class="consume-density-hint" :class="consumeItem.density ? 'consume-density-hint--set' : 'consume-density-hint--unset'">
           <v-icon v-if="consumeItem.density" size="12" color="#2E7D52">mdi-check-circle-outline</v-icon>
           <v-icon v-else size="12" color="#6BA888">mdi-information-outline</v-icon>
@@ -336,7 +378,8 @@ import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
 import AppScroller from '@/components/ui/AppScroller.vue'
 import SwipeableListItem from '@/components/ui/SwipeableListItem.vue'
 import NotesField from '@/components/ui/NotesField.vue'
-import { usePreferences } from '../../composables/usePreferences'
+import ListControls from '@/components/ui/ListControls.vue'
+import { useSettings } from '../../composables/useSettings'
 import { CURRENCIES } from '../../constants/currencies'
 import { PANTRY_UNITS, DENSITY_UNITS, convertToUnit, compatibleUnits } from '@/constants/units'
 import { clampNumber, clampPrice, clampQty } from '@/constants/format'
@@ -348,7 +391,15 @@ const CATEGORIES = [
   { value: 'bakery',    label: 'Bakery' },
   { value: 'frozen',    label: 'Frozen' },
   { value: 'dry_goods', label: 'Dry Goods' },
+  { value: 'beverages', label: 'Beverages' },
   { value: 'other',     label: 'Other' },
+]
+
+const SORT_OPTIONS = [
+  { key: 'expiry',   label: 'Expiry',   defaultDir: 'asc'  },
+  { key: 'name',     label: 'Name',     defaultDir: 'asc'  },
+  { key: 'category', label: 'Category', defaultDir: 'asc'  },
+  { key: 'added',    label: 'Added',    defaultDir: 'desc' },
 ]
 const CAT_COLORS = {
   produce:   { bg: '#e8f5ec', text: '#2e7d52' },
@@ -357,29 +408,81 @@ const CAT_COLORS = {
   bakery:    { bg: '#fdf3e7', text: '#e65100' },
   frozen:    { bg: '#ede7f6', text: '#4527a0' },
   dry_goods: { bg: '#efebe9', text: '#4e342e' },
+  beverages: { bg: '#e0f7fa', text: '#00838f' },
   other:     { bg: '#f5f5f5', text: '#616161' },
 }
 function catLabel(val) { return CATEGORIES.find(c => c.value === val)?.label ?? val }
 
 function catChipBg(val)    { return CAT_COLORS[val]?.bg    ?? '#f5f5f5' }
 function catChipColor(val) { return CAT_COLORS[val]?.text  ?? '#616161' }
-function displayQty(item, budget = 8) {
-  if (!item || item.amount == null) return ''
-  return clampQty(item.amount, item.unit, budget)
+function displayQty(item, budget = 6) {
+  if (!item) return ''
+  if (item.amount != null) return clampQty(item.amount, item.unit, budget)
+  if (item.pieces != null) return `×${item.pieces}`
+  return ''
+}
+function displayPieces(pieces) {
+  if (!pieces || pieces < 2) return null
+  return pieces > 999 ? '×999+' : `×${pieces}`
 }
 
-const { preferences, fetchPreferences } = usePreferences()
+const { settings, fetchSettings } = useSettings()
 
 const pantrySymbol = computed(() => {
-  const cur = preferences.value.pantry_currency ?? 'USD'
-  if (cur === 'OTHER') return preferences.value.pantry_currency_custom_symbol ?? ''
+  const cur = settings.value.pantry_currency ?? 'USD'
+  if (cur === 'OTHER') return settings.value.pantry_currency_custom_symbol ?? ''
   return CURRENCIES.find(c => c.value === cur)?.symbol ?? '$'
 })
+const pantryDecimals = computed(() => {
+  const cur = settings.value.pantry_currency ?? 'USD'
+  return CURRENCIES.find(c => c.value === cur)?.decimals ?? 2
+})
+const pricePlaceholder = computed(() => pantryDecimals.value === 0 ? '0' : '0.00')
 
 const items = ref([])
 const loading = ref(true)
 const animEnabled = ref(false)
 const itemsArea = ref(null)
+
+const controls = ref({ search: '', filter: null, sort: 'expiry', sortDir: 'asc' })
+
+const displayedItems = computed(() => {
+  let result = items.value
+  const { search, filter, sort, sortDir } = controls.value
+
+  if (search.trim()) {
+    const q = search.toLowerCase()
+    result = result.filter(i => i.name.toLowerCase().includes(q))
+  }
+
+  if (filter) {
+    result = result.filter(i => i.category === filter)
+  }
+
+  const mul = sortDir === 'asc' ? 1 : -1
+
+  switch (sort) {
+    case 'name':
+      return [...result].sort((a, b) => mul * a.name.localeCompare(b.name))
+    case 'category':
+      return [...result].sort((a, b) => {
+        const cc = mul * (a.category ?? 'zzz').localeCompare(b.category ?? 'zzz')
+        return cc !== 0 ? cc : a.name.localeCompare(b.name)
+      })
+    case 'added':
+      return [...result].sort((a, b) => mul * (a.id - b.id))
+    default: { // expiry — nulls always last regardless of direction
+      return [...result].sort((a, b) => {
+        const da = a.expiry_date ? new Date(a.expiry_date).getTime() : Infinity
+        const db = b.expiry_date ? new Date(b.expiry_date).getTime() : Infinity
+        if (da === Infinity && db === Infinity) return 0
+        if (da === Infinity) return 1
+        if (db === Infinity) return -1
+        return mul * (da - db)
+      })
+    }
+  }
+})
 
 let touchStartY = 0
 function onItemsAreaTouchStart(e) { touchStartY = e.touches[0].clientY }
@@ -402,10 +505,11 @@ function daysUntilExpiry(item) {
 function expiryClass(item) {
   const days = daysUntilExpiry(item)
   if (days === null) return ''
+  const warn = Math.max(1, parseInt(settings.value.pantry_expiry_warning_days ?? '3', 10))
   if (days < 0)  return 'expiry--expired'
   if (days === 0) return 'expiry--today'
-  if (days <= 3)  return 'expiry--very-soon'
-  if (days <= 7)  return 'expiry--soon'
+  if (days <= Math.min(2, warn - 1)) return 'expiry--very-soon'
+  if (days <= warn) return 'expiry--soon'
   return ''
 }
 
@@ -421,10 +525,11 @@ function expiryBorderColor(item) {
 function expiryIconColor(item) {
   const days = daysUntilExpiry(item)
   if (days === null) return '#a8c5b0'
+  const warn = Math.max(1, parseInt(settings.value.pantry_expiry_warning_days ?? '3', 10))
   if (days < 0)  return '#9e9e9e'
   if (days === 0) return '#dc2626'
-  if (days <= 3)  return '#ea580c'
-  if (days <= 7)  return '#d97706'
+  if (days <= Math.min(2, warn - 1)) return '#ea580c'
+  if (days <= warn) return '#d97706'
   return '#a8c5b0'
 }
 
@@ -450,12 +555,13 @@ const expiredItems = computed(() =>
   })
 )
 const expiredCount = computed(() => expiredItems.value.length)
-const expiringSoonCount = computed(() =>
-  items.value.filter(i => {
+const expiringSoonCount = computed(() => {
+  const warn = Math.max(1, parseInt(settings.value.pantry_expiry_warning_days ?? '3', 10))
+  return items.value.filter(i => {
     const days = daysUntilExpiry(i)
-    return days !== null && days >= 0 && days <= 7
+    return days !== null && days >= 0 && days <= warn
   }).length
-)
+})
 
 async function load() {
   animEnabled.value = false
@@ -469,7 +575,7 @@ async function load() {
 
 onMounted(() => {
   load()
-  fetchPreferences()
+  fetchSettings()
   itemsArea.value?.$el?.addEventListener('touchstart', onItemsAreaTouchStart, { passive: true })
   itemsArea.value?.$el?.addEventListener('touchmove', onItemsAreaTouchMove, { passive: false })
 })
@@ -484,7 +590,7 @@ defineExpose({ reload: load })
 const sheetItem = ref(null)
 const sheetOpen = ref(false)
 const sheetMode = ref('view')
-const sheetForm = ref({ name: '', quantity: '', category: 'other', expiry_date: '', notes: '', price: '', amount: '', unit: '', density: '', density_unit: 'g/ml' })
+const sheetForm = ref({ name: '', quantity: '', category: 'other', expiry_date: '', notes: '', price: '', amount: '', unit: '', pieces: '', density: '', density_unit: 'g/ml' })
 const sheetSaving = ref(false)
 const sheetDeleting = ref(false)
 const showDeleteConfirm = ref(false)
@@ -496,6 +602,9 @@ const consumeAmount = ref('')
 const consumeUnit = ref('g')
 const consumeLoading = ref(false)
 
+
+const isPiecesItem = computed(() => sheetItem.value?.amount == null && sheetItem.value?.pieces != null)
+
 const consumeRemainder = computed(() => {
   if (!consumeItem.value || consumeItem.value.amount == null) return null
   const consumed = parseFloat(consumeAmount.value) || 0
@@ -505,11 +614,15 @@ const consumeRemainder = computed(() => {
   if (convertedConsumed === null) return null
   return parseFloat((consumeItem.value.amount - convertedConsumed).toPrecision(8))
 })
-const consumeIsAll = computed(() =>
-  consumeItem.value?.amount == null || consumeAmount.value === '' || consumeAmount.value === null
-)
+const consumeIsAll = computed(() => {
+  if (consumeItem.value?.pieces != null && consumeItem.value?.amount == null) {
+    const n = parseInt(consumeAmount.value)
+    return !n || n >= consumeItem.value.pieces
+  }
+  return consumeItem.value?.amount == null || consumeAmount.value === '' || consumeAmount.value === null
+})
 const consumeWillRemove = computed(() => {
-  if (consumeItem.value?.amount == null) return true
+  if (consumeItem.value?.amount == null) return consumeIsAll.value
   if (consumeIsAll.value) return true
   return consumeRemainder.value !== null && consumeRemainder.value <= 0
 })
@@ -517,7 +630,14 @@ const consumeDescription = computed(() => {
   if (!consumeItem.value) return ''
   const verb = consumeAction.value === 'use' ? 'used' : 'wasted'
   if (consumeItem.value.amount == null) {
-    return `No tracked amount set — this will mark the item as ${verb} and remove it from your pantry.`
+    if (consumeItem.value.pieces != null) {
+      const n = parseInt(consumeAmount.value)
+      if (!n || n >= consumeItem.value.pieces) {
+        return `All ${consumeItem.value.pieces} pieces will be marked as ${verb} and removed from your pantry.`
+      }
+      return `${n} of ${consumeItem.value.pieces} pieces marked as ${verb}. ${consumeItem.value.pieces - n} remaining.`
+    }
+    return `No tracked amount — this will mark the item as ${verb} and remove it from your pantry.`
   }
   if (consumeIsAll.value) {
     const totalStr = clampNumber(consumeItem.value.amount, 8)
@@ -564,6 +684,7 @@ function openItemSheet(item) {
     price:        item.price ?? '',
     amount:       item.amount != null ? item.amount : '',
     unit:         item.unit ?? '',
+    pieces:       item.pieces != null ? String(item.pieces) : '',
     density:      item.density != null ? String(item.density) : '',
     density_unit: item.density_unit ?? 'g/ml',
   }
@@ -592,6 +713,7 @@ function cancelEdit() {
     price:        sheetItem.value.price ?? '',
     amount:       sheetItem.value.amount != null ? sheetItem.value.amount : '',
     unit:         sheetItem.value.unit ?? '',
+    pieces:       sheetItem.value.pieces != null ? String(sheetItem.value.pieces) : '',
     density:      sheetItem.value.density != null ? String(sheetItem.value.density) : '',
     density_unit: sheetItem.value.density_unit ?? 'g/ml',
   }
@@ -600,22 +722,29 @@ function cancelEdit() {
 async function saveItem() {
   if (!sheetForm.value.name.trim() || sheetSaving.value) return
   sheetSaving.value = true
-  const densityProvided = sheetForm.value.density !== '' && parseFloat(sheetForm.value.density) > 0
+  const base = {
+    name:        sheetForm.value.name.trim(),
+    quantity:    sheetForm.value.quantity.trim() || null,
+    category:    sheetForm.value.category,
+    expiry_date: sheetForm.value.expiry_date || null,
+    notes:       sheetForm.value.notes.trim() || null,
+    price:       sheetForm.value.price !== '' ? parseFloat(sheetForm.value.price) : null,
+  }
+  const fields = isPiecesItem.value
+    ? { pieces: sheetForm.value.pieces !== '' ? parseInt(sheetForm.value.pieces) : null }
+    : (() => {
+        const densityProvided = sheetForm.value.density !== '' && parseFloat(sheetForm.value.density) > 0
+        return {
+          amount:       sheetForm.value.amount !== '' ? parseFloat(sheetForm.value.amount) : null,
+          unit:         sheetForm.value.unit || null,
+          density:      densityProvided ? parseFloat(sheetForm.value.density) : null,
+          density_unit: densityProvided ? sheetForm.value.density_unit : null,
+        }
+      })()
   const res = await apiFetch(`${API}/pantry/${sheetItem.value.id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      name:         sheetForm.value.name.trim(),
-      quantity:     sheetForm.value.quantity.trim() || null,
-      category:     sheetForm.value.category,
-      expiry_date:  sheetForm.value.expiry_date || null,
-      notes:        sheetForm.value.notes.trim() || null,
-      price:        sheetForm.value.price !== '' ? parseFloat(sheetForm.value.price) : null,
-      amount:       sheetForm.value.amount !== '' ? parseFloat(sheetForm.value.amount) : null,
-      unit:         sheetForm.value.unit || null,
-      density:      densityProvided ? parseFloat(sheetForm.value.density) : null,
-      density_unit: densityProvided ? sheetForm.value.density_unit : null,
-    }),
+    body: JSON.stringify({ ...base, ...fields }),
   })
   if (res.ok) {
     const updated = await res.json()
@@ -660,8 +789,12 @@ async function confirmConsume() {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      consumed: consumeIsAll.value ? consumeItem.value.amount : (parseFloat(consumeAmount.value) || 0),
-      consumedUnit: consumeIsAll.value ? consumeItem.value.unit : consumeUnit.value,
+      consumed: consumeItem.value.pieces != null && consumeItem.value.amount == null
+        ? (consumeIsAll.value ? consumeItem.value.pieces : parseInt(consumeAmount.value))
+        : (consumeIsAll.value ? consumeItem.value.amount : (parseFloat(consumeAmount.value) || 0)),
+      consumedUnit: consumeItem.value.amount != null
+        ? (consumeIsAll.value ? consumeItem.value.unit : consumeUnit.value)
+        : undefined,
       action: consumeAction.value,
     }),
   })
@@ -674,8 +807,30 @@ async function confirmConsume() {
     } else {
       const idx = items.value.findIndex(i => i.id === consumeItem.value.id)
       if (idx !== -1) items.value[idx] = data.item
-      if (sheetItem.value?.id === consumeItem.value.id) sheetItem.value = data.item
+      if (sheetItem.value?.id === consumeItem.value.id) {
+        sheetItem.value = data.item
+        sheetForm.value.pieces = data.item.pieces != null ? String(data.item.pieces) : ''
+        sheetForm.value.amount = data.item.amount != null ? data.item.amount : ''
+      }
     }
+  }
+  consumeLoading.value = false
+}
+
+async function confirmMarkOne() {
+  if (consumeLoading.value || !consumeItem.value) return
+  consumeLoading.value = true
+  const res = await apiFetch(`${API}/pantry/${consumeItem.value.id}/consume`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'mark_one' }),
+  })
+  if (res.ok) {
+    const data = await res.json()
+    consumeOpen.value = false
+    const idx = items.value.findIndex(i => i.id === consumeItem.value.id)
+    if (idx !== -1) items.value[idx] = data.item
+    if (sheetItem.value?.id === consumeItem.value.id) sheetItem.value = data.item
   }
   consumeLoading.value = false
 }
@@ -802,6 +957,8 @@ function formatExpiry(date) {
   flex-shrink: 0;
 }
 
+.inventory-controls { margin-bottom: 6px; }
+
 /* Items area */
 .items-area {
   flex: 1;
@@ -896,8 +1053,15 @@ function formatExpiry(date) {
   min-width: 0;
 }
 
-.pantry-name {
+.pantry-name-wrap {
   flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.pantry-name {
   min-width: 0;
   font-size: 14px;
   color: #1A4D35;
@@ -919,7 +1083,7 @@ function formatExpiry(date) {
 }
 
 .pantry-qty-col {
-  width: 52px;
+  width: 42px;
   flex-shrink: 0;
   text-align: right;
   font-size: 12px;
@@ -927,6 +1091,17 @@ function formatExpiry(date) {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.pieces-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: #2E7D52;
+  background: #d4f0e4;
+  border-radius: 99px;
+  padding: 1px 6px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .pantry-meta {
@@ -1102,6 +1277,9 @@ function formatExpiry(date) {
   min-width: 0;
 }
 
+.view-inline-row--qty-density .view-section           { flex: 1; min-width: 0; }
+.view-inline-row--qty-density .view-section--qty-wide { flex: 0 0 57%; min-width: 0; }
+
 .view-name-row {
   display: flex;
   gap: 8px;
@@ -1174,6 +1352,7 @@ function formatExpiry(date) {
 .edit-inline-row {
   display: flex;
   gap: 8px;
+  align-items: flex-end;
 }
 
 .edit-inline-row .item-edit-field {
@@ -1181,6 +1360,27 @@ function formatExpiry(date) {
   min-width: 0;
 }
 
+.edit-row--qty-density > .item-edit-field {
+  flex: 0 0 calc(50% - 4px);
+  min-width: 0;
+}
+
+.edit-density-group {
+  flex: 0 0 calc(50% - 4px);
+  min-width: 0;
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.edit-density-group .item-edit-field--pieces {
+  flex: 0 0 auto;
+}
+
+.edit-density-group .item-edit-field:not(.item-edit-field--pieces) {
+  flex: 1;
+  min-width: 0;
+}
 
 .item-edit-field {
   display: flex;
@@ -1260,6 +1460,49 @@ function formatExpiry(date) {
   display: flex;
   flex-direction: column;
 }
+
+.item-edit-field--pieces {
+  flex: 0 0 56px !important;
+  min-width: 0;
+}
+
+.item-pieces-box {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border: 1.5px solid #B8E6D0;
+  border-radius: 12px;
+  padding: 10px 8px;
+  background: #EAF7F0;
+  width: 100%;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+.item-pieces-box:focus-within { border-color: #2E7D52; }
+
+.item-pieces-prefix {
+  font-size: 13px;
+  font-weight: 700;
+  color: #2E7D52;
+  flex-shrink: 0;
+}
+
+.item-pieces-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 13px;
+  font-weight: 500;
+  color: #1A4D35;
+  padding: 0;
+  width: 28px;
+}
+.item-pieces-input::placeholder { color: #9ECDB6; }
+.item-pieces-input::-webkit-outer-spin-button,
+.item-pieces-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.item-pieces-input { -moz-appearance: textfield; }
 
 .item-sheet-footer-left {
   display: flex;
@@ -1400,6 +1643,14 @@ function formatExpiry(date) {
 }
 .consume-unit-select:focus { border-color: #2E7D52; }
 
+.consume-pieces-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #6BA888;
+  white-space: nowrap;
+  align-self: center;
+}
+
 .consume-desc-text {
   font-size: 12px;
   color: #6BA888;
@@ -1434,5 +1685,29 @@ function formatExpiry(date) {
   color: #2E7D52;
   font-weight: 500;
 }
+
+.consume-mark-one-btn {
+  flex: 1;
+  padding: 10px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+.consume-mark-one-btn--green {
+  border: 1px solid #B8E6D0;
+  background: #fff;
+  color: #2E7D52;
+}
+.consume-mark-one-btn--green:hover:not(:disabled) { background: #EAF7F0; }
+.consume-mark-one-btn--amber {
+  border: 1px solid #F5D78A;
+  background: #fff;
+  color: #8B5A00;
+}
+.consume-mark-one-btn--amber:hover:not(:disabled) { background: #FFF8E7; }
+.consume-mark-one-btn:disabled { opacity: 0.4; cursor: default; }
 
 </style>

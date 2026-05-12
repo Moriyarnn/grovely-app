@@ -1,0 +1,15 @@
+CREATE TABLE IF NOT EXISTS gap_day_logs (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id    INTEGER NOT NULL REFERENCES users(id),
+  date       DATE NOT NULL,
+  notes      TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(user_id, date)
+);
+
+CREATE TABLE IF NOT EXISTS gap_day_symptoms (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  gap_day_id INTEGER NOT NULL REFERENCES gap_day_logs(id) ON DELETE CASCADE,
+  symptom    TEXT NOT NULL
+);

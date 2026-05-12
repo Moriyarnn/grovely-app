@@ -11,7 +11,7 @@ const app = express()
 const PORT = process.env.PORT || 3000
 
 app.use(cors())
-app.use(express.json())
+app.use(express.json({ limit: '50mb' }))
 
 // Database setup
 const dbPath = path.join(__dirname, 'data', 'wifey.db')
@@ -90,16 +90,22 @@ app.use('/api/auth', authRouter)
 const cyclesRouter = require('./routes/period/cycles')(db)
 const cycleDaysRouter = require('./routes/period/cycle_days')(db)
 const calculationsRouter = require('./routes/period/calculations')(db)
+const gapDaysRouter = require('./routes/period/gap_days')(db)
 
 app.use('/api/period/cycles', requireAuth, cyclesRouter)
 app.use('/api/period/cycle-days', requireAuth, cycleDaysRouter)
 app.use('/api/period/calculations', requireAuth, calculationsRouter)
+app.use('/api/period/gap-days', requireAuth, gapDaysRouter)
 
 // Pantry
 const pantryListRouter = require('./routes/pantry/list')(db)
 const pantryItemsRouter = require('./routes/pantry/pantry')(db)
 app.use('/api/pantry/list', requireAuth, pantryListRouter)
 app.use('/api/pantry', requireAuth, pantryItemsRouter)
+
+// Backup / restore
+const backupRouter = require('./routes/backup')(db)
+app.use('/api/backup', requireAuth, backupRouter)
 
 // Settings
 const settingsRouter = require('./routes/settings')(db)

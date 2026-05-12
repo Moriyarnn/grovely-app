@@ -33,4 +33,10 @@ defineProps({
   border-color: #d4c8d0;
   color: #b0a8b9;
 }
+
+.coming-soon-badge--neutral {
+  background: #f5f5f5;
+  border-color: #e0e0e0;
+  color: #999;
+}
 </style>

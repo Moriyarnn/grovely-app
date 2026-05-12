@@ -54,20 +54,40 @@
             >
               <span v-if="cell.day" class="cal-day-num">{{ cell.day }}</span>
               <span v-if="cell.dateStr && justSaved.has(cell.dateStr)" class="cal-saved-check">✓</span>
-              <span v-if="cell.day && (hasDataWarning(cell) || hasOrphanedData(cell) || (hasNote(cell) && (!isPartner || partnerCanReadNotes)))" class="cal-cell-badges">
+              <span v-if="cell.day && (hasDataWarning(cell) || hasOrphanedData(cell) || (hasInfo(cell) && (!isPartner || partnerCanReadNotes)))" class="cal-cell-badges">
                 <span v-if="hasDataWarning(cell)" class="cal-cell-badge cal-cell-badge-warn">
                   <v-icon size="18" color="#f59e0b">mdi-alert</v-icon>
                 </span>
                 <span v-if="hasOrphanedData(cell)" class="cal-cell-badge cal-cell-badge-orphan">
                   <v-icon size="18" color="#f97316">mdi-link-off</v-icon>
                 </span>
-                <span v-if="hasNote(cell) && (!isPartner || partnerCanReadNotes)" class="cal-cell-badge cal-cell-badge-note">
+                <span v-if="hasInfo(cell) && (!isPartner || partnerCanReadNotes)" class="cal-cell-badge cal-cell-badge-note">
                   <v-icon size="18" color="#94a3b8">mdi-note-text</v-icon>
                 </span>
               </span>
             </div>
           </div>
           </Transition>
+          </div>
+        </div>
+
+        <!-- Legend -->
+        <div class="legend">
+          <div class="legend-item">
+            <span class="legend-dot period-dot" />
+            <span class="legend-text">Period</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-dot predicted-dot" />
+            <span class="legend-text">Predicted</span>
+          </div>
+          <div v-if="preferences.period_show_fertile_window !== '0'" class="legend-item">
+            <span class="legend-dot fertile-dot" />
+            <span class="legend-text">Fertile</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-dot ovulation-dot" />
+            <span class="legend-text">Ovulation</span>
           </div>
         </div>
 
@@ -86,26 +106,6 @@
             Hold any empty day to mark ovulation or log notes
           </p>
         </template>
-
-        <!-- Legend -->
-        <div class="legend">
-          <div class="legend-item">
-            <span class="legend-dot period-dot" />
-            <span class="legend-text">Period</span>
-          </div>
-          <div class="legend-item">
-            <span class="legend-dot predicted-dot" />
-            <span class="legend-text">Predicted</span>
-          </div>
-          <div class="legend-item">
-            <span class="legend-dot fertile-dot" />
-            <span class="legend-text">Fertile</span>
-          </div>
-          <div class="legend-item">
-            <span class="legend-dot ovulation-dot" />
-            <span class="legend-text">Ovulation</span>
-          </div>
-        </div>
 
       </div>
 
@@ -243,29 +243,72 @@
 
           </div>
 
+          <!-- Gap day: view mode — same structure as period day view -->
+          <div v-else-if="ovulationCycle && gapMode === 'view'" class="view-content">
+            <div class="view-section">
+              <p class="view-section-label">Ovulation</p>
+              <span class="ovulation-status" :class="{ 'ovulation-status--active': isMarkedOvulation }">
+                <v-icon size="13" :color="isMarkedOvulation ? '#854F0B' : '#aaa'">mdi-egg-outline</v-icon>
+                {{ isMarkedOvulation ? 'Marked as ovulation day' : 'Not marked as ovulation day' }}
+              </span>
+            </div>
+            <div class="view-section">
+              <p class="view-section-label">Symptoms</p>
+              <div class="symptom-chips">
+                <span
+                  v-for="s in symptomOptions"
+                  :key="s"
+                  class="symptom-chip"
+                  :class="{ 'symptom-chip-active': gapSelectedSymptoms.includes(s) }"
+                >{{ s }}</span>
+              </div>
+            </div>
+            <div class="view-section" v-if="!isPartner || partnerCanReadNotes">
+              <p class="view-section-label">Notes</p>
+              <NotesField mode="view" :model-value="gapDayLog?.notes ?? ''" :max="NOTES_MAX" />
+            </div>
+          </div>
+
+          <!-- Gap day: edit mode — same structure as period day log form -->
+          <div v-else-if="ovulationCycle && gapMode === 'edit' && !isPartner" class="log-form">
+            <div class="form-section">
+              <p class="form-label">Ovulation</p>
+              <button
+                class="ovulation-btn"
+                :class="{ 'ovulation-btn--active': gapForm.ovulation }"
+                @click="gapForm.ovulation = !gapForm.ovulation"
+              >
+                <v-icon size="13" :color="gapForm.ovulation ? '#854F0B' : '#993556'">mdi-egg-outline</v-icon>
+                {{ gapForm.ovulation ? 'Marked as ovulation day' : 'Mark as ovulation day' }}
+              </button>
+            </div>
+            <div class="form-section">
+              <p class="form-label">Symptoms</p>
+              <div class="symptom-chips">
+                <button
+                  v-for="s in symptomOptions"
+                  :key="s"
+                  class="symptom-chip symptom-chip-btn"
+                  :class="{ 'symptom-chip-active': gapForm.symptoms.includes(s) }"
+                  @click="toggleGapSymptom(s)"
+                >{{ s }}</button>
+              </div>
+            </div>
+            <div class="form-section">
+              <p class="form-label">Notes</p>
+              <NotesField v-model="gapForm.notes" mode="edit" :max="NOTES_MAX" placeholder="How are you feeling today?" />
+            </div>
+          </div>
+
+          <!-- Empty: in a cycle but no data, or no cycle at all -->
           <div v-else class="view-empty">
             <v-icon size="36" color="#F4C0D1">mdi-calendar-blank-outline</v-icon>
             <template v-if="selectedCycle">
               <p>No data logged for this day.</p>
             </template>
-            <template v-else>
-              <template v-if="ovulationCycle">
-                <p class="view-ovulation-label">
-                  {{ isMarkedOvulation ? 'Ovulation day marked' : 'Between cycles' }}
-                </p>
-                <button v-if="!isPartner" class="ovulation-btn" :class="{ 'ovulation-btn--active': isMarkedOvulation }" @click="markOvulation" :disabled="markingOvulation">
-                  <v-icon size="14" :color="isMarkedOvulation ? '#854F0B' : '#993556'">mdi-egg-outline</v-icon>
-                  {{ markingOvulation ? 'Saving...' : isMarkedOvulation ? 'Remove ovulation mark' : 'Mark as ovulation day' }}
-                </button>
-                <div v-if="!isPartner" class="gap-day-coming-soon">
-                  <v-icon size="13" color="#cca7b8">mdi-flask-outline</v-icon>
-                  <span>Symptoms &amp; notes coming soon</span>
-                </div>
-              </template>
-              <template v-else>
-                <p>Not part of a cycle.</p>
-                <p class="view-empty-hint">Drag on the calendar to log a completed period</p>
-              </template>
+            <template v-else-if="!ovulationCycle">
+              <p>Not part of a cycle.</p>
+              <p class="view-empty-hint">Drag on the calendar to log a completed period</p>
             </template>
           </div>
         </template>
@@ -278,11 +321,11 @@
               <p class="form-label">Flow intensity</p>
               <div class="flow-chips">
                 <button
-                  v-for="level in ['spotting','light','medium','heavy']"
+                  v-for="level in ['spotting','light','medium','heavy','none']"
                   :key="level"
                   class="flow-chip flow-chip-btn"
-                  :class="{ 'flow-chip-active': form.flow_intensity === level }"
-                  @click="form.flow_intensity = form.flow_intensity === level ? '' : level"
+                  :class="{ 'flow-chip-active': level === 'none' ? form.flow_intensity === '' : form.flow_intensity === level }"
+                  @click="form.flow_intensity = level === 'none' ? '' : (form.flow_intensity === level ? '' : level)"
                 >{{ level }}</button>
               </div>
             </div>
@@ -312,39 +355,77 @@
 
       </div>
 
-      <template v-if="selectedCell && !isPartner && selectedCycle && tapContext !== 'orphaned'" #footer>
-        <!-- Icon actions (left) -->
-        <div class="cycle-icon-actions">
-          <IconAction
-            icon="mdi-trash-can-outline"
-            label="Delete day"
-            color="#c0392b"
-            :loading="removingDay ? 'Deleting...' : ''"
-            :disabled="!isEdgeDay || removingDay"
-            :hoverMessage="!isEdgeDay && !removingDay ? 'Only the first or last day of a period can be removed' : ''"
-            @click="removeDay"
-          />
-          <IconAction
-            icon="mdi-calendar-remove-outline"
-            label="Delete cycle"
-            color="#c0392b"
-            @click="showDeleteCycleDialog = true"
-          />
-          <IconAction
-            v-if="mode === 'view'"
-            :icon="selectedLoggedDay || tapContext === 'open-cycle-day' ? 'mdi-pencil' : 'mdi-plus'"
-            :label="selectedLoggedDay || tapContext === 'open-cycle-day' ? 'Edit day' : 'Log day'"
-            color="#993556"
-            @click="selectedLoggedDay || tapContext === 'open-cycle-day' ? switchToEdit() : mode = 'log'"
-          />
-        </div>
-        <!-- Save / Cancel (right, edit mode only) -->
-        <div v-if="mode !== 'view'" class="form-actions">
-          <button class="btn-cancel" @click="mode = 'view'">Cancel</button>
-          <button class="btn-save" @click="saveDay" :disabled="saving">
-            {{ saving ? 'Saving...' : 'Save' }}
-          </button>
-        </div>
+      <template v-if="selectedCell && !isPartner && ((selectedCycle && tapContext !== 'orphaned') || ovulationCycle)" #footer>
+        <!-- Period day footer -->
+        <template v-if="selectedCycle && tapContext !== 'orphaned'">
+          <!-- Icon actions (left) -->
+          <div class="cycle-icon-actions">
+            <IconAction
+              icon="mdi-trash-can-outline"
+              label="Delete day"
+              color="#c0392b"
+              :loading="removingDay ? 'Deleting...' : ''"
+              :disabled="!isEdgeDay || removingDay"
+              :hoverMessage="!isEdgeDay && !removingDay ? 'Only the first or last day of a period can be removed' : ''"
+              @click="removeDay"
+            />
+            <IconAction
+              icon="mdi-calendar-remove-outline"
+              label="Delete cycle"
+              color="#c0392b"
+              @click="showDeleteCycleDialog = true"
+            />
+            <IconAction
+              v-if="mode === 'view'"
+              :icon="selectedLoggedDay || tapContext === 'open-cycle-day' ? 'mdi-pencil' : 'mdi-plus'"
+              :label="selectedLoggedDay || tapContext === 'open-cycle-day' ? 'Edit day' : 'Log day'"
+              color="#993556"
+              @click="selectedLoggedDay || tapContext === 'open-cycle-day' ? switchToEdit() : mode = 'log'"
+            />
+            <WarningReviewActions
+              v-if="mode === 'view' && selectedCycleWarnings.length > 0"
+              :itemId="selectedCycle.id"
+              :reviewState="selectedCycle.review_state ?? null"
+              :endpoint="`period/cycles/${selectedCycle.id}/review`"
+              :itemLabel="selectedCycleStartLabel"
+              @reviewed="loadData"
+            />
+          </div>
+          <!-- Save / Cancel (right, edit mode only) -->
+          <div v-if="mode !== 'view'" class="form-actions">
+            <button class="btn-cancel" @click="mode = 'view'">Cancel</button>
+            <button class="btn-save" @click="saveDay" :disabled="saving">
+              {{ saving ? 'Saving...' : 'Save' }}
+            </button>
+          </div>
+        </template>
+
+        <!-- Gap day footer -->
+        <template v-else-if="ovulationCycle">
+          <div class="cycle-icon-actions">
+            <IconAction
+              v-if="gapMode === 'view' && (gapDayLog || isMarkedOvulation)"
+              icon="mdi-trash-can-outline"
+              label="Delete entry"
+              color="#c0392b"
+              :loading="deletingGapDay ? 'Deleting...' : ''"
+              @click="deleteGapDay"
+            />
+            <IconAction
+              v-if="gapMode === 'view'"
+              :icon="gapDayLog ? 'mdi-pencil' : 'mdi-plus'"
+              :label="gapDayLog ? 'Edit' : 'Log symptoms'"
+              color="#993556"
+              @click="gapMode = 'edit'; gapForm = { symptoms: [...gapSelectedSymptoms], notes: gapDayLog?.notes ?? '', ovulation: isMarkedOvulation }"
+            />
+          </div>
+          <div v-if="gapMode === 'edit'" class="form-actions">
+            <button class="btn-cancel" @click="gapMode = 'view'">Cancel</button>
+            <button class="btn-save" @click="saveGapDay" :disabled="savingGap">
+              {{ savingGap ? 'Saving...' : 'Save' }}
+            </button>
+          </div>
+        </template>
       </template>
     </DetailSheet>
 
@@ -370,17 +451,18 @@ import DetailSheet from '../../components/ui/DetailSheet.vue'
 import NotesField from '../../components/ui/NotesField.vue'
 import IconAction from '../../components/ui/IconAction.vue'
 import ConfirmDialog from '../../components/ui/ConfirmDialog.vue'
+import WarningReviewActions from '../../components/ui/WarningReviewActions.vue'
 import { API, apiFetch, getUser } from '../../api'
 import { useSettings } from '../../composables/useSettings'
 import { usePreferences } from '../../composables/usePreferences'
 import { usePeriodData } from '../../composables/usePeriodData'
 
-const { allCycleDays, allCycles, summary, viewYear, viewMonth, pulseDates, warningDateSet, orphanedDaySet, loadData } = usePeriodData()
+const { allCycleDays, allCycles, summary, gapDayLogs, viewYear, viewMonth, pulseDates, warningDateSet, orphanedDaySet, cycleWarningMap, loadData } = usePeriodData()
 
 const currentUser = ref(getUser())
 const isPartner = computed(() => currentUser.value?.role === 'partner')
 const { settings, fetchSettings } = useSettings()
-const { fetchPreferences, resetCache: resetPreferences } = usePreferences()
+const { preferences, fetchPreferences, resetCache: resetPreferences } = usePreferences()
 const partnerCanReadNotes = computed(() => settings.value.partner_can_read_notes === '1')
 
 const NOTES_MAX = 500
@@ -514,6 +596,12 @@ const selectedCell = ref(null)
 // Form state
 const form = ref({ flow_intensity: '', symptoms: [], notes: '' })
 
+// Gap day state
+const gapMode = ref('view') // 'view' | 'edit'
+const gapForm = ref({ symptoms: [], notes: '', ovulation: false })
+const savingGap = ref(false)
+const deletingGapDay = ref(false)
+
 const symptomOptions = ['Cramps', 'Headache', 'Bloating', 'Mood swings', 'Fatigue', 'Back pain', 'Nausea', 'Tender breasts']
 
 // ── Computed labels ──────────────────────────────────────────
@@ -643,6 +731,7 @@ const predictedDates = computed(() => {
 
 const fertileDates = computed(() => {
   const set = new Set()
+  if (preferences.value.period_show_fertile_window === '0') return set
   const s = summary.value
   if (!s) return set
 
@@ -674,6 +763,7 @@ const fertileDates = computed(() => {
 
 const predictedOvulationDates = computed(() => {
   const set = new Set()
+  if (preferences.value.period_show_fertile_window === '0') return set
   const s = summary.value
   if (!s) return set
 
@@ -710,6 +800,21 @@ const ovulationCycle = computed(() => {
 const isMarkedOvulation = computed(() =>
   !!(selectedCell.value && ovulationCycle.value?.ovulation_date === selectedCell.value.dateStr)
 )
+
+const gapDayLogMap = computed(() => {
+  const map = {}
+  gapDayLogs.value.forEach(g => { map[g.date] = g })
+  return map
+})
+
+const gapDayLog = computed(() =>
+  selectedCell.value ? gapDayLogMap.value[selectedCell.value.dateStr] ?? null : null
+)
+
+const gapSelectedSymptoms = computed(() => {
+  if (!gapDayLog.value?.symptoms) return []
+  return gapDayLog.value.symptoms.split(',').map(s => s.trim()).filter(Boolean)
+})
 
 // Returns the active cycle relevant to a given date.
 // A cycle is considered active if its end_date is today or yesterday (end_date always equals MAX logged day via #36).
@@ -790,8 +895,13 @@ const adjustHasOverlap = computed(() => {
   return false
 })
 
-function hasNote(cell) {
-  return !!(cell.dateStr && loggedDayMap.value[cell.dateStr]?.notes)
+function hasInfo(cell) {
+  if (!cell.dateStr) return false
+  const pd = loggedDayMap.value[cell.dateStr]
+  if (pd?.notes || (pd?.symptoms && pd.symptoms.trim())) return true
+  const gd = gapDayLogMap.value[cell.dateStr]
+  if (gd?.notes || (gd?.symptoms && gd.symptoms.trim())) return true
+  return false
 }
 
 function hasDataWarning(cell) {
@@ -835,6 +945,7 @@ function getCellClass(cell, i) {
     else if (markedOvulationDates.value.has(cell.dateStr)) classes.push('cal-ovulation')
     else if (predictedOvulationDates.value.has(cell.dateStr)) classes.push('cal-ovulation')
     else if (fertileDates.value.has(cell.dateStr)) classes.push('cal-fertile')
+    if (gapDayLogMap.value[cell.dateStr]) classes.push('cal-gap-logged')
     if (adjustingCycleId.value && adjustDragActive.value && adjustPreviewDate.value) {
       const fadedCellCycleId = dateToCycleId.value.get(cell.dateStr)
       const fadedIsOverlap = fadedCellCycleId && fadedCellCycleId !== adjustingCycleId.value
@@ -867,6 +978,7 @@ function getCellClass(cell, i) {
   else if (markedOvulationDates.value.has(cell.dateStr)) classes.push('cal-ovulation')
   else if (predictedOvulationDates.value.has(cell.dateStr)) classes.push('cal-ovulation')
   else if (fertileDates.value.has(cell.dateStr)) classes.push('cal-fertile')
+  if (gapDayLogMap.value[cell.dateStr]) classes.push('cal-gap-logged')
   if (cell.day) classes.push('cal-cell-day')
   if (pulseDates.value.has(cell.dateStr)) classes.push('cal-cell-pulse')
   if (fadingOut.value.has(cell.dateStr)) classes.push('cal-cell-fading')
@@ -930,6 +1042,16 @@ function onDayClick(cell) {
     selectedCell.value = cell
     mode.value = 'view'
     form.value = { flow_intensity: '', symptoms: [], notes: '' }
+    return
+  }
+
+  // Gap day with logged data: open panel directly, skip period creation flow
+  if (gapDayLogMap.value[ds] && !periodDates.value.has(ds) && !orphanedDaySet.value.has(ds)) {
+    tapContext.value = null
+    gapMode.value = 'view'
+    gapForm.value = { symptoms: [], notes: '', ovulation: false }
+    selectedCell.value = cell
+    mode.value = 'view'
     return
   }
 
@@ -1322,6 +1444,8 @@ function onCellMouseDown(cell, ev) {
       dragMoved.value = false
       tapContext.value = null
       form.value = { flow_intensity: '', symptoms: [], notes: '' }
+      gapMode.value = 'view'
+      gapForm.value = { symptoms: [], notes: '' }
       selectedCell.value = cell
       mode.value = 'view'
     }, 500)
@@ -1513,6 +1637,8 @@ function onTouchStart(e) {
         dragMoved.value = false
         tapContext.value = null
         form.value = { flow_intensity: '', symptoms: [], notes: '' }
+        gapMode.value = 'view'
+        gapForm.value = { symptoms: [], notes: '' }
         selectedCell.value = cell
         mode.value = 'view'
       }, 500)
@@ -1685,6 +1811,15 @@ const selectedCycleLabel = computed(() => {
   return `${fmt(c.start_date)} → ${fmt(end)}`
 })
 
+const selectedCycleWarnings = computed(() =>
+  selectedCycle.value ? (cycleWarningMap.value.get(selectedCycle.value.id) ?? []) : []
+)
+
+const selectedCycleStartLabel = computed(() => {
+  if (!selectedCycle.value) return ''
+  return new Date(selectedCycle.value.start_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+})
+
 const selectedSymptoms = computed(() => {
   if (!selectedLoggedDay.value?.symptoms) return []
   return selectedLoggedDay.value.symptoms.split(',').map(s => s.trim()).filter(Boolean)
@@ -1722,6 +1857,76 @@ function toggleSymptom(s) {
   const idx = form.value.symptoms.indexOf(s)
   if (idx === -1) form.value.symptoms.push(s)
   else form.value.symptoms.splice(idx, 1)
+}
+
+function toggleGapSymptom(s) {
+  const idx = gapForm.value.symptoms.indexOf(s)
+  if (idx === -1) gapForm.value.symptoms.push(s)
+  else gapForm.value.symptoms.splice(idx, 1)
+}
+
+async function saveGapDay() {
+  if (!selectedCell.value) return
+  savingGap.value = true
+  const ds = selectedCell.value.dateStr
+  try {
+    const hasData = gapForm.value.symptoms.length > 0 || !!gapForm.value.notes
+    if (!hasData && gapDayLog.value) {
+      await apiFetch(`${API}/period/gap-days/${gapDayLog.value.id}`, { method: 'DELETE' })
+    } else if (hasData) {
+      if (gapDayLog.value) {
+        await apiFetch(`${API}/period/gap-days/${gapDayLog.value.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ notes: gapForm.value.notes || null, symptoms: gapForm.value.symptoms })
+        })
+      } else {
+        await apiFetch(`${API}/period/gap-days`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ date: ds, notes: gapForm.value.notes || null, symptoms: gapForm.value.symptoms })
+        })
+      }
+    }
+    if (gapForm.value.ovulation !== isMarkedOvulation.value) {
+      await apiFetch(`${API}/period/cycles/${ovulationCycle.value.id}/ovulation`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ovulation_date: gapForm.value.ovulation ? ds : null })
+      })
+    }
+    await loadData()
+    if (!hasData && !gapForm.value.ovulation) {
+      selectedCell.value = null
+    } else {
+      gapMode.value = 'view'
+      flashDates([ds])
+    }
+  } finally {
+    savingGap.value = false
+  }
+}
+
+async function deleteGapDay() {
+  if (!gapDayLog.value && !isMarkedOvulation.value) return
+  deletingGapDay.value = true
+  const ds = selectedCell.value?.dateStr
+  try {
+    if (gapDayLog.value) {
+      await apiFetch(`${API}/period/gap-days/${gapDayLog.value.id}`, { method: 'DELETE' })
+    }
+    if (isMarkedOvulation.value && ovulationCycle.value) {
+      await apiFetch(`${API}/period/cycles/${ovulationCycle.value.id}/ovulation`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ovulation_date: null })
+      })
+    }
+    await loadData()
+    selectedCell.value = null
+  } finally {
+    deletingGapDay.value = false
+  }
 }
 
 async function saveDay() {
@@ -2524,6 +2729,13 @@ onUnmounted(() => {
 }
 .cal-fertile .cal-day-num { color: #0F6E56; }
 
+/* Gap day with logged data — border only, no fill */
+.cal-gap-logged {
+  border: 1.5px solid #D4537E;
+  border-radius: 10px;
+}
+.cal-gap-logged .cal-day-num { color: #993556; font-weight: 600; }
+
 /* Ovulation */
 .cal-ovulation {
   background: #FFE4B5;
@@ -2584,10 +2796,17 @@ onUnmounted(() => {
   font-size: 12px; color: #993556;
   background: #FBEAF0; border: 1px solid #F4C0D1;
   border-radius: 20px; padding: 6px 16px;
-  cursor: pointer; margin-top: 4px;
+  cursor: pointer;
 }
 .ovulation-btn:disabled { opacity: 0.6; cursor: default; }
 .ovulation-btn--active { background: #FFF0D6; border-color: #FAC775; color: #854F0B; }
+.ovulation-status {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; color: #bbb;
+  background: #f7f7f7; border: 1px solid #e0e0e0;
+  border-radius: 20px; padding: 6px 16px;
+}
+.ovulation-status.ovulation-status--active { background: #FFF0D6; border-color: #FAC775; color: #854F0B; }
 .gap-day-coming-soon {
   display: flex; align-items: center; gap: 5px;
   font-size: 11px; color: #cca7b8; margin-top: 10px;

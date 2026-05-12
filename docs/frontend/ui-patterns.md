@@ -357,6 +357,92 @@ A reusable scrollable container with a styled pill scrollbar that matches the ap
 
 ---
 
+## WarningReviewActions
+
+A reusable inline action component for letting users resolve data warnings without deleting data. Lives in `src/components/ui/WarningReviewActions.vue`.
+
+Drop it wherever a warning-flagged item can be actioned — today in the period cycle DetailSheet footer, and in pantry item sheets when expiry warnings are wired up.
+
+### Behaviour
+
+- **Unreviewed (`reviewState = null`):** renders two `IconAction` buttons — "Exclude" (amber) and "Confirm" (pink) — each gated by a `ConfirmDialog`. Selecting either PATCHes the item and emits `@reviewed`.
+- **Reviewed (`reviewState = 'confirmed'` or `'excluded'`):** replaces the buttons with a small status chip ("Confirmed" / "Excluded") and an "Undo" link that clears the review state.
+
+The component owns its own `ConfirmDialog` instances — no dialog wiring needed in the parent.
+
+```vue
+<WarningReviewActions
+  :itemId="selectedCycle.id"
+  :reviewState="selectedCycle.review_state ?? null"
+  endpoint="period/cycles/5/review"
+  itemLabel="Aug 8"
+  @reviewed="loadData"
+/>
+```
+
+**Props:**
+
+| Prop | Type | Description |
+|---|---|---|
+| `itemId` | `Number` | ID of the item being reviewed (passed for context, not used in the request) |
+| `reviewState` | `String \| null` | Current state: `'confirmed'`, `'excluded'`, or `null` |
+| `endpoint` | `String` | Path after `/api/` for the PATCH request, e.g. `period/cycles/5/review`. The component prepends `API` automatically |
+| `itemLabel` | `String` | Short label for the item used in dialog body text, e.g. `'Aug 8'` or `'Oat milk'` |
+
+**Emits:**
+
+| Event | When |
+|---|---|
+| `reviewed` | After any successful PATCH (confirm, exclude, or undo) — reload your data here |
+
+**Expected backend contract:**
+
+```
+PATCH /api/<endpoint>
+Body: { reviewState: 'confirmed' | 'excluded' | null }
+Response: { success: true }
+```
+
+### Placement rules
+
+- Place inside the `#footer` slot of a `DetailSheet`, within the left `cycle-icon-actions` flex group.
+- Show only in **view mode** — hide when a form is open (check `mode === 'view'` or equivalent).
+- Show only when the item actually has an actionable warning (`v-if="itemWarnings.length > 0"`).
+- Never show for `FUTURE_CYCLE` warnings — those are always data entry mistakes, not reviewable.
+
+### Period tracker wiring (current)
+
+`PeriodCalendar.vue` exposes `selectedCycleWarnings` (computed from `cycleWarningMap` in `usePeriodData`) and passes them to the footer condition. After `@reviewed`, it calls `loadData()` which refreshes `allCycles` and `summary` in one shot — the warning card in `PeriodDetail.vue` updates automatically.
+
+### Pantry wiring (planned)
+
+When pantry expiry warnings are introduced, wire the same component into the pantry item `DetailSheet` footer:
+
+```vue
+<!-- inside the pantry item DetailSheet #footer, view mode only -->
+<WarningReviewActions
+  v-if="mode === 'view' && itemHasExpiryWarning"
+  :itemId="sheetItem.id"
+  :reviewState="sheetItem.review_state ?? null"
+  :endpoint="`pantry/${sheetItem.id}/review`"
+  :itemLabel="sheetItem.name"
+  @reviewed="loadItems"
+/>
+```
+
+The backend will need:
+1. A `review_state` column on the `pantry` table (migration).
+2. `PATCH /api/pantry/:id/review` with the same `{ reviewState }` contract.
+3. Expiry warning logic to skip `review_state = 'excluded'` items and include `'confirmed'` ones.
+
+The "Exclude" and "Confirm" dialog copy should be overridden for pantry context — pantry items do not currently support custom dialog labels, but if needed the component can be extended with `confirmCopy` / `excludeCopy` props.
+
+### Future: replacing Mark as used / Mark as wasted
+
+The `WarningReviewActions` binary (confirm vs exclude) maps directly onto the used/wasted pattern. When pantry consumption flows are unified, consider replacing the standalone "Mark used" / "Mark wasted" `IconAction` buttons with a variant of this component that fires the consume endpoint instead of the review endpoint — keeping the `ConfirmDialog`-gated pattern consistent.
+
+---
+
 ## Premium & Coming Soon Badges
 
 Two reusable Vue components in `src/components/ui/` for surfacing locked or upcoming features. Always import and use these — never write badge CSS inline.

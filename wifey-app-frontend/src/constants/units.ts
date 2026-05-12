@@ -1,4 +1,4 @@
-export const PANTRY_UNITS = ['g', 'kg', 'ml', 'L', 'pcs', 'cup', 'tbsp', 'tsp']
+export const PANTRY_UNITS = ['g', 'kg', 'ml', 'L', 'cup', 'tbsp', 'tsp']
 
 export const DENSITY_UNITS = ['g/ml', 'g/L', 'kg/L'] as const
 export type DensityUnit = typeof DENSITY_UNITS[number]
@@ -10,7 +10,7 @@ export const UNIT_ALIASES: Record<string, string> = {
   Tsp: 'tsp', TSP: 'tsp',
   Tbsp: 'tbsp', TBSP: 'tbsp',
   Cup: 'cup', CUP: 'cup',
-  Pcs: 'pcs', PCS: 'pcs', pc: 'pcs',
+
 }
 
 export const UNIT_TO_BASE: Record<string, number> = {

@@ -63,7 +63,7 @@
               type="time"
               class="sv-time-input"
               :value="settings.notification_time ?? '08:00'"
-              @change="e => updateSetting('notification_time', (e.target as HTMLInputElement).value)"
+              @change="e => saveSetting('notification_time', (e.target as HTMLInputElement).value)"
             />
           </div>
           <div class="sv-row sv-row--link" @click="notifMessagesOpen = true" style="cursor:pointer">
@@ -108,36 +108,23 @@
           </div>
 
           <div class="sv-row" @click="toggleFertileWindow" style="cursor:pointer">
-            <span class="sv-label">Show fertile window</span>
+            <span class="sv-label">Show fertile window on calendar</span>
             <div class="sv-toggle" :class="{ on: preferences.period_show_fertile_window !== '0' }">
               <div class="sv-knob" />
             </div>
           </div>
 
-          <div class="sv-row">
-            <span class="sv-label">Default flow intensity</span>
-            <div class="sv-segmented">
-              <button
-                v-for="f in FLOW_LEVELS"
-                :key="f.value"
-                class="sv-seg-btn"
-                :class="{ active: (preferences.period_default_flow ?? 'Medium') === f.value }"
-                @click="updatePreference('period_default_flow', f.value)"
-              >{{ f.short }}</button>
-            </div>
-          </div>
-
-          <div class="sv-row" @click="toggleIrregular" style="cursor:pointer">
+<div v-if="isOwner" class="sv-row" @click="toggleIrregular" style="cursor:pointer">
             <div class="sv-label-group">
               <span class="sv-label">Irregular cycles</span>
               <span class="sv-sublabel">Widens predictions, suppresses overdue alerts</span>
             </div>
-            <div class="sv-toggle" :class="{ on: settings.period_irregular === '1' }">
+            <div class="sv-toggle" :class="{ on: preferences.period_irregular === '1' }">
               <div class="sv-knob" />
             </div>
           </div>
 
-          <div class="sv-row">
+          <div v-if="isOwner" class="sv-row">
             <div class="sv-label-group">
               <span class="sv-label">Cycle length seed</span>
               <span class="sv-sublabel">Optional - used until 4+ cycles are logged</span>
@@ -148,8 +135,8 @@
               min="15"
               max="60"
               placeholder="—"
-              :value="settings.period_cycle_seed ?? ''"
-              @change="e => updateSetting('period_cycle_seed', (e.target as HTMLInputElement).value)"
+              :value="preferences.period_cycle_seed ?? ''"
+              @change="e => updatePreference('period_cycle_seed', (e.target as HTMLInputElement).value)"
             />
           </div>
 
@@ -185,8 +172,28 @@
                 :key="d"
                 class="sv-seg-btn"
                 :class="{ active: parseInt(settings.pantry_expiry_warning_days ?? '3') === d }"
-                @click="updateSetting('pantry_expiry_warning_days', String(d))"
+                @click="saveSetting('pantry_expiry_warning_days', String(d))"
               >{{ d }}</button>
+              <button
+                class="sv-seg-btn"
+                :class="{ active: isCustomExpiry }"
+                @click="selectCustomExpiry"
+              >Custom</button>
+            </div>
+          </div>
+
+          <div v-if="isCustomExpiry" class="sv-row">
+            <span class="sv-label">Custom days</span>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <input
+                type="number"
+                min="1"
+                max="60"
+                class="sv-number-input"
+                :value="settings.pantry_expiry_warning_days"
+                @change="e => saveSetting('pantry_expiry_warning_days', String(Math.max(1, parseInt((e.target as HTMLInputElement).value) || 1)))"
+              />
+              <span style="font-size:12px;color:#aaa;">days</span>
             </div>
           </div>
 
@@ -201,14 +208,14 @@
             <span class="sv-label">Currency</span>
             <select
               class="sv-select"
-              :value="preferences.pantry_currency ?? 'USD'"
-              @change="e => updatePreference('pantry_currency', (e.target as HTMLInputElement).value)"
+              :value="settings.pantry_currency ?? 'USD'"
+              @change="e => saveSetting('pantry_currency', (e.target as HTMLInputElement).value)"
             >
               <option v-for="c in CURRENCIES" :key="c.value" :value="c.value">{{ c.label }}</option>
             </select>
           </div>
 
-          <template v-if="(preferences.pantry_currency ?? 'USD') === 'OTHER'">
+          <template v-if="(settings.pantry_currency ?? 'USD') === 'OTHER'">
             <div class="sv-row">
               <div class="sv-label-group">
                 <span class="sv-label">Custom currency symbol</span>
@@ -218,8 +225,8 @@
                 class="sv-symbol-input"
                 maxlength="4"
                 placeholder="$"
-                :value="preferences.pantry_currency_custom_symbol ?? ''"
-                @change="e => updatePreference('pantry_currency_custom_symbol', (e.target as HTMLInputElement).value)"
+                :value="settings.pantry_currency_custom_symbol ?? ''"
+                @change="e => saveSetting('pantry_currency_custom_symbol', (e.target as HTMLInputElement).value)"
               />
             </div>
             <div class="sv-row">
@@ -231,8 +238,8 @@
                 class="sv-symbol-input sv-symbol-input--wide"
                 maxlength="32"
                 placeholder="Currency"
-                :value="preferences.pantry_currency_custom_label ?? ''"
-                @change="e => updatePreference('pantry_currency_custom_label', (e.target as HTMLInputElement).value)"
+                :value="settings.pantry_currency_custom_label ?? ''"
+                @change="e => saveSetting('pantry_currency_custom_label', (e.target as HTMLInputElement).value)"
               />
             </div>
           </template>
@@ -260,7 +267,61 @@
 
     </div>
 
+    <div class="sv-divider" />
+
+    <!-- DATA & BACKUPS -->
+    <div class="sv-section">
+      <p class="sv-section-label">Data &amp; Backups</p>
+
+      <div class="sv-subgroup">
+        <p class="sv-sub-label">Manual</p>
+        <div class="sv-list">
+
+          <div class="sv-row sv-row--action" @click="onExport" style="cursor:pointer">
+            <div class="sv-label-group">
+              <span class="sv-label">Back up now</span>
+              <span class="sv-sublabel">Download a full JSON snapshot of all your data</span>
+            </div>
+            <v-icon size="18" color="#bbb">mdi-download-outline</v-icon>
+          </div>
+
+          <div class="sv-row sv-row--action" @click="triggerRestore" style="cursor:pointer">
+            <div class="sv-label-group">
+              <span class="sv-label">Restore from backup</span>
+              <span class="sv-sublabel">Your current data is saved automatically before restoring</span>
+            </div>
+            <v-icon size="18" color="#bbb">mdi-upload-outline</v-icon>
+          </div>
+          <input ref="restoreInput" type="file" accept=".json,application/json" style="display:none" @change="onRestoreFile" />
+
+        </div>
+      </div>
+
+      <div class="sv-subgroup">
+        <p class="sv-sub-label">Automatic</p>
+        <div class="sv-list">
+          <!-- PREMIUM GATE (frontend) -->
+          <div class="sv-row sv-row--stub">
+            <div class="sv-label-group">
+              <span class="sv-label">Scheduled backups</span>
+              <span class="sv-sublabel">Daily, weekly, or monthly — runs automatically</span>
+            </div>
+            <div style="display:flex;gap:4px;flex-shrink:0;">
+              <ComingSoonBadge theme="neutral" />
+              <PremiumBadge theme="neutral" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
     <NotificationMessagesModal v-model="notifMessagesOpen" />
+
+    <!-- Backup result snackbar -->
+    <div v-if="backupMsg" class="sv-snackbar" :class="backupMsgError ? 'sv-snackbar--error' : 'sv-snackbar--ok'">
+      {{ backupMsg }}
+    </div>
 
   </div>
 </template>
@@ -268,17 +329,62 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { getUser } from '../api'
+import { getUser, exportBackup, restoreBackup } from '../api'
 import { useSettings } from '../composables/useSettings'
 import { usePreferences } from '../composables/usePreferences'
 import NotificationMessagesModal from './NotificationMessagesView.vue'
 import { CURRENCIES } from '../constants/currencies'
+import ComingSoonBadge from '../components/ui/ComingSoonBadge.vue'
+import PremiumBadge from '../components/ui/PremiumBadge.vue'
 
 const router = useRouter()
 const isOwner = getUser()?.role === 'owner'
 const { settings, fetchSettings, updateSetting } = useSettings()
+
+async function saveSetting(key: string, value: string) {
+  const err = await updateSetting(key, value)
+  if (err) showMsg(err, true)
+}
 const { preferences, fetchPreferences, updatePreference } = usePreferences()
 const notifMessagesOpen = ref(false)
+const restoreInput = ref<HTMLInputElement | null>(null)
+const backupMsg = ref('')
+const backupMsgError = ref(false)
+
+function showMsg(msg: string, isError = false) {
+  backupMsg.value = msg
+  backupMsgError.value = isError
+  setTimeout(() => { backupMsg.value = '' }, 4000)
+}
+
+async function onExport() {
+  try {
+    await exportBackup()
+    showMsg('Backup downloaded.')
+  } catch {
+    showMsg('Export failed — check your connection.', true)
+  }
+}
+
+function triggerRestore() {
+  restoreInput.value?.click()
+}
+
+async function onRestoreFile(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  if (!file) return
+  ;(e.target as HTMLInputElement).value = ''
+  try {
+    const text = await file.text()
+    const parsed = JSON.parse(text)
+    const result = await restoreBackup(parsed)
+    const warn = result.warnings?.length ? ` (${result.warnings[0]})` : ''
+    showMsg(`Restore complete.${warn}`)
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Restore failed.'
+    showMsg(msg, true)
+  }
+}
 
 onMounted(async () => {
   await fetchSettings()
@@ -313,19 +419,26 @@ function toggleReorder() {
   updatePreference('app_reorder_enabled', preferences.value.app_reorder_enabled === '1' ? '0' : '1')
 }
 function togglePeriodNotifications() {
-  updateSetting('period_notifications_enabled', settings.value.period_notifications_enabled !== '0' ? '0' : '1')
+  saveSetting('period_notifications_enabled', settings.value.period_notifications_enabled !== '0' ? '0' : '1')
 }
 function toggleFertileWindow() {
   updatePreference('period_show_fertile_window', preferences.value.period_show_fertile_window !== '0' ? '0' : '1')
 }
 function toggleIrregular() {
-  updateSetting('period_irregular', settings.value.period_irregular === '1' ? '0' : '1')
+  updatePreference('period_irregular', preferences.value.period_irregular === '1' ? '0' : '1')
 }
 function togglePartnerNotes() {
-  updateSetting('partner_can_read_notes', settings.value.partner_can_read_notes === '1' ? '0' : '1')
+  saveSetting('partner_can_read_notes', settings.value.partner_can_read_notes === '1' ? '0' : '1')
 }
 function togglePantryNotifications() {
-  updateSetting('pantry_notifications_enabled', settings.value.pantry_notifications_enabled === '1' ? '0' : '1')
+  saveSetting('pantry_notifications_enabled', settings.value.pantry_notifications_enabled === '1' ? '0' : '1')
+}
+const isCustomExpiry = computed(() =>
+  ![3, 5, 7].includes(parseInt(settings.value.pantry_expiry_warning_days ?? '3', 10))
+)
+function selectCustomExpiry() {
+  if (isCustomExpiry.value) return
+  saveSetting('pantry_expiry_warning_days', '14')
 }
 function toggleHideEmptyCategories() {
   updatePreference('pantry_hide_empty_categories', preferences.value.pantry_hide_empty_categories === '1' ? '0' : '1')
@@ -468,6 +581,16 @@ function toggleHideEmptyCategories() {
 }
 .sv-symbol-input::placeholder { color: #ccc; }
 .sv-symbol-input--wide { width: 120px; }
+
+/* Snackbar */
+.sv-snackbar {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+  padding: 10px 18px; border-radius: 10px; font-size: 13px; font-weight: 500;
+  white-space: nowrap; z-index: 9999; pointer-events: none;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+}
+.sv-snackbar--ok { background: #1a4d35; color: #fff; }
+.sv-snackbar--error { background: #c0392b; color: #fff; }
 
 /* Flow color */
 .sv-flow-color { width: 100%; max-width: 380px; margin-top: 12px; }

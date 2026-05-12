@@ -22,6 +22,7 @@
         <slot name="content" />
         <div class="cd-actions">
           <button class="cd-cancel" :class="`cd-cancel--${theme}`" @click="$emit('update:open', false)">Cancel</button>
+          <slot name="extra-action" />
           <button
             class="cd-confirm"
             :style="{ background: confirmColor }"
@@ -142,6 +143,7 @@ defineEmits(['update:open', 'confirm'])
   border-radius: 20px;
   background: #fff; font-size: 13px;
   cursor: pointer; font-weight: 500;
+  white-space: nowrap;
 }
 .cd-cancel--pink  { border: 1px solid #F4C0D1; color: #993556; }
 .cd-cancel--green { border: 1px solid #B8E6D0; color: #2E7D52; }
@@ -153,6 +155,7 @@ defineEmits(['update:open', 'confirm'])
   font-size: 13px; color: #fff;
   cursor: pointer; font-weight: 500;
   transition: opacity 0.15s;
+  white-space: nowrap;
 }
 .cd-confirm:disabled { opacity: 0.6; cursor: default; }
 </style>

@@ -86,6 +86,18 @@ module.exports = (db) => {
     setImmediate(() => recomputeAllPredictions(db))
   })
 
+  // Set or clear review state for a flagged cycle
+  router.patch('/:id/review', requireOwner, (req, res) => {
+    const { reviewState } = req.body
+    const valid = [null, 'confirmed', 'excluded']
+    if (!valid.includes(reviewState ?? null)) return res.status(400).json({ error: 'reviewState must be confirmed, excluded, or null' })
+    const id = Number(req.params.id)
+    if (!db.prepare('SELECT id FROM cycles WHERE id = ?').get(id)) return res.status(404).json({ error: 'Cycle not found' })
+    db.prepare('UPDATE cycles SET review_state = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(reviewState ?? null, id)
+    res.json({ success: true })
+    setImmediate(() => recomputeAllPredictions(db))
+  })
+
   // Set or clear ovulation date for a cycle
   router.patch('/:id/ovulation', requireOwner, (req, res) => {
     const { ovulation_date } = req.body

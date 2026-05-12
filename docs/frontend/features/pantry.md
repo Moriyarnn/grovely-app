@@ -26,8 +26,10 @@ The default tab. Shows items to buy, grouped by category.
 - Tap checked item → prompt: "Add to pantry?" with optional expiry date entry → moves to Pantry tab
 - "Clear checked" button — bulk-remove all checked items without moving to pantry (for items that were already home)
 
+**Search:** A search bar above the item list filters across both unchecked and checked sections in real time. Category groups that have no matching items collapse automatically. Uses the `ListControls` component with `layout="expanded"` (search only — no filter chips or sort row).
+
 **Category grouping:**
-Items grouped by category with collapsible headers. Order: produce → dairy → meat → bakery → frozen → dry goods → other. Checked items sink to a "Done" section at the bottom regardless of category.
+Items grouped by category with collapsible headers. Order: produce → dairy → meat → bakery → frozen → dry goods → beverages → other. Checked items sink to a "Done" section at the bottom regardless of category.
 
 ## Pantry Tab
 
@@ -60,7 +62,12 @@ Items with no expiry date set are shown normally with no color state applied.
 - Swipe right → add back to shopping list (replenish flow)
 - "Add to pantry" FAB — add items directly without going through shopping list
 
-**Sorting options:** by expiry date (default), by category, by name, by bought date.
+**Search and filter:**
+- A search bar embedded in the inventory card filters items by name in real time (client-side, no API call)
+- Category filter chips below the search bar narrow to a single category; chips are dynamic — only categories present in the current inventory are shown
+- Controls use the `ListControls` component (`src/components/ui/ListControls.vue`) with `layout="compact"` and `theme="green"`
+
+**Sorting options:** Expiry (default — soonest first, no-expiry items always last), Name (A → Z), Category (A → Z, then by name within group), Added (newest first). A direction arrow toggles ascending/descending for the active sort. Sort state is session-only and resets to Expiry on reload.
 
 **Empty state:** First-time empty pantry shows a friendly prompt: "Nothing here yet — check items off your shopping list to stock it up, or tap + to add directly."
 
@@ -125,4 +132,4 @@ Both roles have full access — Pantry is a shared household feature.
 
 ## Status
 
-Planned — not yet implemented. Backend spec: [Pantry — Backend](../../backend/pantry.md)
+Shopping list live. Inventory live. Search, filter, and sort live. Move-to-pantry flow live. Backend spec: [Pantry — Backend](../../backend/pantry.md)

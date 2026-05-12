@@ -4,6 +4,7 @@ import { API, apiFetch } from '../api'
 const allCycleDays = ref<any[]>([])
 const allCycles = ref<any[]>([])
 const summary = ref<any>(null)
+const gapDayLogs = ref<any[]>([])
 const viewYear = ref(new Date().getFullYear())
 const viewMonth = ref(new Date().getMonth())
 const pulseDates = ref(new Set<string>())
@@ -44,6 +45,18 @@ const allWarnings = computed(() => [
   ...orphanedWarnings.value
 ])
 
+// Map from cycleId → list of reviewable warnings (SHORT_CYCLE_GAP, LONG_PERIOD)
+const cycleWarningMap = computed(() => {
+  const map = new Map<number, any[]>()
+  summary.value?.dataWarnings?.forEach((w: any) => {
+    if (w.cycleId && (w.code === 'SHORT_CYCLE_GAP' || w.code === 'LONG_PERIOD')) {
+      if (!map.has(w.cycleId)) map.set(w.cycleId, [])
+      map.get(w.cycleId)!.push(w)
+    }
+  })
+  return map
+})
+
 function goToWarning(w: any) {
   if (!w.targetDate) return
   const d = new Date(w.targetDate + 'T00:00:00')
@@ -78,14 +91,16 @@ function goToWarning(w: any) {
 }
 
 async function loadData() {
-  const [daysRes, summaryRes, cyclesRes] = await Promise.all([
+  const [daysRes, summaryRes, cyclesRes, gapRes] = await Promise.all([
     apiFetch(`${API}/period/cycle-days/all`),
     apiFetch(`${API}/period/calculations/summary`),
-    apiFetch(`${API}/period/cycles`)
+    apiFetch(`${API}/period/cycles`),
+    apiFetch(`${API}/period/gap-days`)
   ])
   allCycleDays.value = await daysRes.json()
   summary.value = await summaryRes.json()
   allCycles.value = await cyclesRes.json()
+  gapDayLogs.value = await gapRes.json()
 }
 
 export function usePeriodData() {
@@ -93,12 +108,14 @@ export function usePeriodData() {
     allCycleDays,
     allCycles,
     summary,
+    gapDayLogs,
     viewYear,
     viewMonth,
     pulseDates,
     warningDateSet,
     orphanedDaySet,
     allWarnings,
+    cycleWarningMap,
     goToWarning,
     loadData,
   }

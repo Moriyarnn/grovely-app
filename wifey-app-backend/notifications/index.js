@@ -2,10 +2,12 @@
  * Email Notification System
  *
  * Architecture:
- *   - Each notification type has: id, dateKey(), check(), subject(), html()
+ *   - Each notification type has: id, category, dateKey(), check(), subject(), html()
  *   - runNotifications(db) checks every type and sends if condition is met and not already sent today
- *   - startNotifications(db) schedules the daily 08:00 cron AND runs a catch-up on startup
- *     (catch-up fires immediately if the computer was off at the scheduled cron time)
+ *   - startNotifications(db) schedules the daily cron (time from notification_time setting) AND runs a
+ *     catch-up on startup (catch-up fires immediately if the computer was off at the scheduled cron time)
+ *   - rescheduleNotifications(db) rebuilds the cron job from the current notification_time setting;
+ *     call this whenever notification_time is updated via PATCH /api/settings/notification_time
  *
  * Adding a new notification type: register a new entry in NOTIFICATION_TYPES. No structural changes needed.
  */
@@ -70,6 +72,25 @@ function mondayOfWeek (today) {
 }
 
 // ---------------------------------------------------------------------------
+// Cron scheduling helpers
+// ---------------------------------------------------------------------------
+
+// Parses HH:MM → cron expression. Falls back to 08:00 on invalid input.
+function buildCronExpr (timeStr, db) {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(timeStr ?? '')
+  if (match) {
+    const h = parseInt(match[1], 10)
+    const m = parseInt(match[2], 10)
+    if (h >= 0 && h <= 23 && m >= 0 && m <= 59) return `${m} ${h} * * *`
+  }
+  if (timeStr !== undefined && timeStr !== null) {
+    logSystemError(db, { source: 'notification', message: `Invalid notification_time "${timeStr}" — falling back to 08:00`, stack: '' })
+    console.warn(`⚠️  Invalid notification_time "${timeStr}" — falling back to 08:00`)
+  }
+  return '0 8 * * *'
+}
+
+// ---------------------------------------------------------------------------
 // Maintenance — auto-close stale open cycles
 // ---------------------------------------------------------------------------
 
@@ -130,6 +151,9 @@ function getSummary (db) {
 
   const isIrregular = cycleStdDev !== null && cycleStdDev > 7
 
+  const prefRow = db.prepare("SELECT value FROM settings WHERE key = 'period_irregular'").get()
+  const irregularSetting = prefRow?.value === '1'
+
   // Most recent cycle with data
   const lastCycle = db.prepare(`
     SELECT c.* FROM cycles c
@@ -179,7 +203,7 @@ function getSummary (db) {
     ORDER BY c.start_date DESC LIMIT 1
   `).get(today, today) || null
 
-  return { today, avgCycleLength, cycleStdDev, isIrregular, lastCycle, nextPeriodDate, fertileWindow, ovulationDate, currentCycle }
+  return { today, avgCycleLength, cycleStdDev, isIrregular, irregularSetting, lastCycle, nextPeriodDate, fertileWindow, ovulationDate, currentCycle }
 }
 
 // ---------------------------------------------------------------------------
@@ -205,6 +229,7 @@ const wrap = (body) => `
 /**
  * Each entry:
  *   id        — unique string identifier
+ *   category  — 'period' | 'pantry' — used to gate per-category toggles
  *   dateKey   — fn(today, db?) => string used as the unique date_key in notification_log
  *               Default is today's date. Weekly types return monday of the week.
  *   onSent    — optional fn(today, db). Called after a successful send. Use for post-send state writes
@@ -217,6 +242,7 @@ const NOTIFICATION_TYPES = [
 
   {
     id: 'period_due_3d',
+    category: 'period',
     dateKey: (today) => today,
     check: ({ nextPeriodDate, currentCycle, today }) =>
       !currentCycle && !!nextPeriodDate && daysBetween(nextPeriodDate, today) === 3,
@@ -229,6 +255,7 @@ const NOTIFICATION_TYPES = [
 
   {
     id: 'period_due_2d',
+    category: 'period',
     dateKey: (today) => today,
     check: ({ nextPeriodDate, currentCycle, today }) =>
       !currentCycle && !!nextPeriodDate && daysBetween(nextPeriodDate, today) === 2,
@@ -241,6 +268,7 @@ const NOTIFICATION_TYPES = [
 
   {
     id: 'period_due_1d',
+    category: 'period',
     dateKey: (today) => today,
     check: ({ nextPeriodDate, currentCycle, today }) =>
       !currentCycle && !!nextPeriodDate && daysBetween(nextPeriodDate, today) === 1,
@@ -253,9 +281,10 @@ const NOTIFICATION_TYPES = [
 
   {
     id: 'period_overdue_3d',
+    category: 'period',
     dateKey: (today) => today,
-    check: ({ nextPeriodDate, currentCycle, today }) =>
-      !currentCycle && !!nextPeriodDate && daysBetween(today, nextPeriodDate) === 3,
+    check: ({ nextPeriodDate, currentCycle, today, irregularSetting }) =>
+      !irregularSetting && !currentCycle && !!nextPeriodDate && daysBetween(today, nextPeriodDate) === 3,
     subject: () => '🌷 Period is a few days late',
     html: () => wrap(`
       <h2 style="color:#c06;">Hey ${_runContext.greeting} 🌷</h2>
@@ -265,6 +294,7 @@ const NOTIFICATION_TYPES = [
 
   {
     id: 'irregular_cycle',
+    category: 'period',
     // Weekly — sends once per week while cycles remain irregular
     dateKey: (today) => mondayOfWeek(today),
     check: ({ isIrregular }) => isIrregular === true,
@@ -277,6 +307,7 @@ const NOTIFICATION_TYPES = [
 
   {
     id: 'fertile_window_tomorrow',
+    category: 'period',
     dateKey: (today) => today,
     check: ({ fertileWindow, today }) =>
       !!fertileWindow && daysBetween(fertileWindow.start, today) === -1,
@@ -289,6 +320,7 @@ const NOTIFICATION_TYPES = [
 
   {
     id: 'fertile_window_start',
+    category: 'period',
     dateKey: (today) => today,
     check: ({ fertileWindow, today }) =>
       !!fertileWindow && fertileWindow.start === today,
@@ -301,6 +333,7 @@ const NOTIFICATION_TYPES = [
 
   {
     id: 'ovulation_today',
+    category: 'period',
     dateKey: (today) => today,
     check: ({ ovulationDate, today }) => !!ovulationDate && ovulationDate === today,
     subject: () => '🌟 Today is your predicted ovulation day',
@@ -312,6 +345,7 @@ const NOTIFICATION_TYPES = [
 
   {
     id: 'fertile_window_ending',
+    category: 'period',
     dateKey: (today) => today,
     check: ({ fertileWindow, today }) =>
       !!fertileWindow && fertileWindow.end === today,
@@ -324,6 +358,7 @@ const NOTIFICATION_TYPES = [
 
   {
     id: 'pms_window',
+    category: 'period',
     dateKey: (today) => today,
     check: ({ nextPeriodDate, currentCycle, today }) =>
       !currentCycle && !!nextPeriodDate && daysBetween(nextPeriodDate, today) === 5,
@@ -337,6 +372,7 @@ const NOTIFICATION_TYPES = [
 
   {
     id: 'period_ended',
+    category: 'period',
     // Dedup is handled by cycles.period_ended_notified (set in onSent), NOT by the notification_log
     // date_key. This makes it immune to start_date edits (issue #27) — the flag lives on the row
     // and survives any field change to that cycle.
@@ -386,6 +422,7 @@ const NOTIFICATION_TYPES = [
 
   {
     id: 'pantry_expiry_today',
+    category: 'pantry',
     dateKey: (today) => today,
     check: (_summary, db) => {
       const items = db.prepare(
@@ -407,7 +444,39 @@ const NOTIFICATION_TYPES = [
   },
 
   {
+    id: 'pantry_expiry_soon',
+    category: 'pantry',
+    dateKey: (today) => today,
+    check: (_summary, db) => {
+      const row = db.prepare("SELECT value FROM settings WHERE key = 'pantry_expiry_warning_days'").get()
+      const warningDays = Math.max(1, parseInt(row?.value ?? '3', 10))
+      const items = db.prepare(
+        "SELECT id FROM pantry WHERE status = 'active' AND expiry_date > date('now') AND expiry_date <= date('now', '+' || ? || ' days')"
+      ).all(String(warningDays))
+      return items.length > 0
+    },
+    subject: () => '🧊 Items expiring soon',
+    html: (_summary, db) => {
+      const row = db.prepare("SELECT value FROM settings WHERE key = 'pantry_expiry_warning_days'").get()
+      const warningDays = Math.max(1, parseInt(row?.value ?? '3', 10))
+      const items = db.prepare(
+        "SELECT name, quantity, expiry_date FROM pantry WHERE status = 'active' AND expiry_date > date('now') AND expiry_date <= date('now', '+' || ? || ' days') ORDER BY expiry_date ASC, name ASC"
+      ).all(String(warningDays))
+      const list = items.map(i => {
+        const days = Math.round((new Date(i.expiry_date) - new Date()) / 86400000)
+        const when = days === 1 ? 'tomorrow' : `in ${days} days`
+        return `<li>${i.name}${i.quantity ? ` (${i.quantity})` : ''} — expires <strong>${when}</strong></li>`
+      }).join('')
+      return wrap(`
+        <h2 style="color:#c45309;">Items expiring soon 🧊</h2>
+        <p>These pantry items will expire within the next ${warningDays} day${warningDays !== 1 ? 's' : ''}:</p>
+        <ul style="padding-left:1.5em;line-height:1.8;">${list}</ul>`)
+    }
+  },
+
+  {
     id: 'cycle_summary',
+    category: 'period',
     dateKey: (today) => today,
     check: ({ today }, db) => {
       // Fires when a new period is logged today (by created_at), meaning the previous cycle just completed
@@ -470,6 +539,8 @@ async function runNotifications (db, trigger = 'scheduled') {
   settingRows.forEach(r => { appSettings[r.key] = r.value })
 
   const notificationsEnabled = appSettings.notifications_enabled !== '0'
+  const periodEnabled = appSettings.period_notifications_enabled !== '0'
+  const pantryEnabled = appSettings.pantry_notifications_enabled !== '0'
   const reminderDays = parseInt(appSettings.reminder_days ?? '3', 10)
 
   _runContext = {
@@ -500,6 +571,16 @@ async function runNotifications (db, trigger = 'scheduled') {
   let total_errors = 0
 
   for (const type of NOTIFICATION_TYPES) {
+    // Category-level toggles (checked after global toggle, before individual type logic)
+    if (type.category === 'period' && !periodEnabled) {
+      total_skipped++
+      continue
+    }
+    if (type.category === 'pantry' && !pantryEnabled) {
+      total_skipped++
+      continue
+    }
+
     // Skip period_due types suppressed by reminder_days setting
     if (PERIOD_DUE_LEAD_DAYS[type.id] !== undefined && PERIOD_DUE_LEAD_DAYS[type.id] > reminderDays) {
       total_skipped++
@@ -559,15 +640,31 @@ async function runNotifications (db, trigger = 'scheduled') {
 // Startup + cron scheduler
 // ---------------------------------------------------------------------------
 
+let _cronJob = null
+
+function rescheduleNotifications (db) {
+  if (!_cronJob) return
+  const row = db.prepare("SELECT value FROM settings WHERE key = 'notification_time'").get()
+  const expr = buildCronExpr(row?.value, db)
+  _cronJob.stop()
+  _cronJob = cron.schedule(expr, () => {
+    runNotifications(db).catch(err => console.error('Scheduled notification run failed:', err))
+  })
+  console.log(`🕗 Notification cron rescheduled: ${expr}`)
+}
+
 function startNotifications (db) {
   // Maintenance always runs on startup regardless of email settings
   autoCloseStale(db)
 
+  const timeRow = db.prepare("SELECT value FROM settings WHERE key = 'notification_time'").get()
+  const cronExpr = buildCronExpr(timeRow?.value, db)
+
   if (process.env.DISABLE_EMAIL === 'true') {
     console.log('📵 DISABLE_EMAIL=true — notification cron disabled')
     // Still schedule daily maintenance so auto-close runs even without email
-    cron.schedule('0 8 * * *', () => autoCloseStale(db))
-    console.log('🕗 Maintenance-only cron scheduled at 08:00 daily')
+    cron.schedule(cronExpr, () => autoCloseStale(db))
+    console.log(`🕗 Maintenance-only cron scheduled: ${cronExpr}`)
     return
   }
 
@@ -586,12 +683,12 @@ function startNotifications (db) {
     console.log('✅ Notifications already ran today — skipping startup catch-up')
   }
 
-  // Schedule daily at 08:00
-  cron.schedule('0 8 * * *', () => {
+  // Schedule daily at the configured time
+  _cronJob = cron.schedule(cronExpr, () => {
     runNotifications(db).catch(err => console.error('Scheduled notification run failed:', err))
   })
 
-  console.log('🕗 Notification cron scheduled at 08:00 daily')
+  console.log(`🕗 Notification cron scheduled: ${cronExpr}`)
 }
 
-module.exports = { startNotifications }
+module.exports = { startNotifications, rescheduleNotifications }

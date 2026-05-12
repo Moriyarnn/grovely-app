@@ -72,10 +72,10 @@
         Irregular cycles — predictions may shift as more data is recorded
       </div>
 
-      <!-- Lock overlay: shown until 3 cycles are tracked -->
+      <!-- Lock overlay: shown until minCyclesRequired cycles are tracked -->
       <div v-if="predictionsLocked" class="predictions-lock">
         <v-icon size="20" color="#b0788e">mdi-lock-outline</v-icon>
-        <p class="lock-msg">Track {{ 3 - summary.totalCyclesTracked }} more cycle{{ 3 - summary.totalCyclesTracked === 1 ? '' : 's' }} to unlock predictions</p>
+        <p class="lock-msg">Track {{ (summary.minCyclesRequired ?? 3) - summary.totalCyclesTracked }} more cycle{{ (summary.minCyclesRequired ?? 3) - summary.totalCyclesTracked === 1 ? '' : 's' }} to unlock predictions</p>
       </div>
     </div>
 
@@ -86,17 +86,17 @@
     </div>
 
     <!-- Prediction health — always visible -->
-    <div class="warnings-card" :class="{ 'warnings-card--clean': !allWarnings.length }">
+    <div class="warnings-card" :class="{ 'warnings-card--clean': !activeWarnings.length }">
       <p class="warnings-section-title">Prediction Health</p>
-      <template v-if="allWarnings.length">
+      <template v-if="activeWarnings.length">
         <button class="warnings-header" @click="warningsOpen = !warningsOpen">
           <v-icon size="14" color="#b45309">mdi-alert-outline</v-icon>
-          <span class="warnings-title">{{ allWarnings.length }} data issue{{ allWarnings.length > 1 ? 's' : '' }} affecting predictions</span>
+          <span class="warnings-title">{{ activeWarnings.length }} data issue{{ activeWarnings.length > 1 ? 's' : '' }} affecting predictions</span>
           <v-icon size="14" color="#b45309" :style="{ transform: warningsOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }">mdi-chevron-down</v-icon>
         </button>
         <AppScroller v-if="warningsOpen" theme="pink" class="warnings-list">
           <li
-            v-for="(w, i) in allWarnings"
+            v-for="(w, i) in activeWarnings"
             :key="i"
             class="warning-item"
             :class="{ 'warning-item-orphan': w.isOrphaned }"
@@ -104,14 +104,38 @@
           >
             <v-icon v-if="w.isOrphaned" size="11" color="#f97316" style="margin-right:4px;vertical-align:middle">mdi-link-off</v-icon>
             {{ w.message }}
+            <span class="warning-item-review">Review →</span>
           </li>
         </AppScroller>
+        <p v-if="warningsOpen && activeWarnings.some(w => w.cycleId)" class="warnings-tap-hint">
+          <v-icon size="11" color="#b45309">mdi-gesture-tap</v-icon>
+          Tap the highlighted cycle on the calendar to resolve
+        </p>
       </template>
       <template v-else>
         <div class="warnings-clean">
           <v-icon size="14" color="#16a34a">mdi-check-circle-outline</v-icon>
           <span class="warnings-clean-text">No issues detected — predictions look healthy</span>
         </div>
+      </template>
+      <!-- Acknowledged warnings — audit trail, always collapsed -->
+      <template v-if="acknowledgedWarnings.length">
+        <button class="warnings-header warnings-header--ack" @click="acknowledgedOpen = !acknowledgedOpen">
+          <v-icon size="13" color="#94a3b8">mdi-eye-outline</v-icon>
+          <span class="warnings-title warnings-title--ack">{{ acknowledgedWarnings.length }} acknowledged</span>
+          <v-icon size="13" color="#94a3b8" :style="{ transform: acknowledgedOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }">mdi-chevron-down</v-icon>
+        </button>
+        <AppScroller v-if="acknowledgedOpen" theme="pink" class="warnings-list">
+          <li
+            v-for="(w, i) in acknowledgedWarnings"
+            :key="i"
+            class="warning-item warning-item--ack"
+            @click="goToWarning(w)"
+          >
+            <span class="warning-ack-badge">{{ w.reviewState === 'confirmed' ? 'Confirmed' : 'Excluded' }}</span>
+            {{ w.message }}
+          </li>
+        </AppScroller>
       </template>
     </div>
 
@@ -126,13 +150,17 @@ import { usePeriodData } from '../../composables/usePeriodData'
 
 const { summary, allWarnings, goToWarning } = usePeriodData()
 
+const activeWarnings = computed(() => allWarnings.value.filter(w => !w.reviewState))
+const acknowledgedWarnings = computed(() => allWarnings.value.filter(w => w.reviewState))
+
 const currentUser = ref(getUser())
 const isPartner = computed(() => currentUser.value?.role === 'partner')
 
 const warningsOpen = ref(false)
+const acknowledgedOpen = ref(false)
 
 const predictionsLocked = computed(() =>
-  summary.value !== null && (summary.value.totalCyclesTracked ?? 0) < 3
+  summary.value !== null && (summary.value.totalCyclesTracked ?? 0) < (summary.value.minCyclesRequired ?? 3)
 )
 
 const cycleDayNum = computed(() => {
@@ -493,5 +521,55 @@ function formatDateShort(dateStr) {
   font-size: 12px;
   font-weight: 600;
   color: #16a34a;
+}
+.warning-item-review {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #993556;
+  opacity: 0.7;
+}
+.warnings-tap-hint {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  color: #b45309;
+  opacity: 0.7;
+  margin: 0;
+  padding: 0 12px 10px;
+}
+.warnings-header--ack {
+  border-top: 1px solid #fcd34d;
+  margin-top: 2px;
+}
+.warnings-card--clean .warnings-header--ack {
+  border-top-color: #86efac;
+}
+.warnings-title--ack {
+  color: #94a3b8;
+}
+.warning-item--ack {
+  opacity: 0.5;
+  border-left-color: #cbd5e1;
+  color: #64748b;
+  cursor: pointer;
+}
+.warning-item--ack:hover {
+  background: #f8fafc;
+}
+.warning-ack-badge {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #92400e;
+  background: #fef3c7;
+  border-radius: 4px;
+  padding: 1px 5px;
+  margin-right: 5px;
+  vertical-align: middle;
 }
 </style>

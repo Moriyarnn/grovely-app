@@ -107,7 +107,7 @@ const props = defineProps({
 
 const router = useRouter()
 
-const APP_VERSION = 'v0.10.0'
+const APP_VERSION = 'v0.11.0'
 const LAST_SEEN_KEY = 'changelog_last_seen_version'
 
 const cycleCount = ref(null)
@@ -187,6 +187,19 @@ const stats = computed(() => [
 ])
 
 const CHANGELOG = [
+  {
+    version: 'v0.11.0',
+    title: 'Settings + Pantry + Period polish',
+    date: 'May 12, 2026',
+    fixes: [32, 46, 56, 69, 70, 73, 74, 75, 81, 89, 97, 118, 119, 120, 122, 123, 124, 127],
+    items: [
+      { type: 'New', plan: 'Free', text: 'Data backup and restore - full JSON export and one-tap restore from Settings, with automatic pre-restore snapshot before any overwrite' },
+      { type: 'New', plan: 'Free', text: 'Settings fully wired - notification time, period and pantry toggles, and expiry warning window now save to the database and take effect immediately' },
+      { type: 'New', plan: 'Free', text: 'Pantry search, filter, and sort - real-time search on both lists, dynamic category filter chips, and four sort options with direction toggle' },
+      { type: 'New', plan: 'Free', text: 'Gap day logs - log symptoms and notes on days between periods, visible on the period calendar' },
+      { type: 'New', plan: 'Free', text: 'Hub cards show live context - active period day, time until next period, and pantry item count update automatically' },
+    ]
+  },
   {
     version: 'v0.10.0',
     title: 'Pantry Polish + Reverse Proxy',

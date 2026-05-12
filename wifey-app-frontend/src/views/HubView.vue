@@ -114,7 +114,7 @@
               </div>
               <p class="app-name" :style="{ color: app.titleColor }">{{ app.name }}</p>
               <p class="app-sub" :style="{ color: app.subColor }">
-                {{ app.sub ?? (app.active ? 'Tap to open' : 'Coming soon') }}
+                {{ app.sub ?? dynamicSubs[app.name] ?? (app.active ? 'Tap to open' : 'Coming soon') }}
               </p>
             </div>
           </TransitionGroup>
@@ -130,7 +130,7 @@
               </div>
               <p class="app-name" :style="{ color: ghostApp.titleColor }">{{ ghostApp.name }}</p>
               <p class="app-sub" :style="{ color: ghostApp.subColor }">
-                {{ ghostApp.sub ?? (ghostApp.active ? 'Tap to open' : 'Coming soon') }}
+                {{ ghostApp.sub ?? dynamicSubs[ghostApp.name] ?? (ghostApp.active ? 'Tap to open' : 'Coming soon') }}
               </p>
             </div>
           </Teleport>
@@ -144,33 +144,19 @@ import { ref, computed, watch, nextTick, onUnmounted, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import SummaryStrip from '../components/SummaryStrip.vue'
 import MainScreen from '../components/MainScreen.vue'
-import { API, getUser, clearToken, clearUser, setToken, setUser, apiFetch } from '../api'
+import { getUser, clearToken, clearUser, setToken, setUser } from '../api'
 import { usePreferences } from '../composables/usePreferences'
 import { apps } from '../composables/useApps'
+import { useAppStats } from '../composables/useAppStats'
 
 const router = useRouter()
 const { preferences, fetchPreferences, updatePreference, resetCache: resetPreferences } = usePreferences()
+const { dynamicSubs, fetchAppStats } = useAppStats()
 const currentUser = ref(getUser())
 const isDev = import.meta.env.DEV
 const showSwitcher = ref(false)
 
-const pantryStats = ref(null)
-
-onMounted(async () => {
-  try {
-    const res = await apiFetch(`${API}/pantry`)
-    if (res.ok) {
-      const pantryItems = await res.json()
-      const today = new Date().toISOString().split('T')[0]
-      const expiringSoon = pantryItems.filter(i => {
-        if (!i.expiry_date) return false
-        const days = Math.round((new Date(i.expiry_date + 'T00:00:00') - new Date(today + 'T00:00:00')) / 86400000)
-        return days >= 0 && days <= 3
-      }).length
-      pantryStats.value = { count: pantryItems.length, expiringSoon }
-    }
-  } catch {}
-})
+onMounted(() => { fetchAppStats() })
 
 const todayLabel = new Date().toLocaleDateString('en-US', {
   weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
@@ -226,34 +212,18 @@ watch(() => preferences.value.app_grid_order, (val) => {
   if (val) localStorage.setItem('app_grid_order', val)
 })
 
-function injectDynamicSubs(list) {
-  return list.map(app => {
-    if (app.name === 'Pantry' && pantryStats.value) {
-      const { count, expiringSoon } = pantryStats.value
-      const sub = count === 0
-        ? 'Nothing in pantry yet'
-        : expiringSoon > 0
-          ? `${count} item${count !== 1 ? 's' : ''} · ${expiringSoon} expiring soon`
-          : `${count} item${count !== 1 ? 's' : ''} in pantry`
-      return { ...app, sub }
-    }
-    return app
-  })
-}
-
 const displayApps = computed(() => {
-  if (dragState.value) return injectDynamicSubs(localApps.value)
+  if (dragState.value) return localApps.value
   const raw = preferences.value.app_grid_order ?? localStorage.getItem('app_grid_order')
-  if (!raw) return injectDynamicSubs(apps)
+  if (!raw) return apps
   try {
     const order = JSON.parse(raw)
-    const sorted = [...apps].sort((a, b) => {
+    return [...apps].sort((a, b) => {
       const ai = order.indexOf(a.name)
       const bi = order.indexOf(b.name)
       return (ai < 0 ? 999 : ai) - (bi < 0 ? 999 : bi)
     })
-    return injectDynamicSubs(sorted)
-  } catch { return injectDynamicSubs(apps) }
+  } catch { return apps }
 })
 
 const ghostApp = computed(() =>

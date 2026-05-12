@@ -8,6 +8,9 @@ interface Settings {
   notification_signoff: string
   notification_sender_name: string
   reminder_days: string
+  pantry_currency: string
+  pantry_currency_custom_symbol: string
+  pantry_currency_custom_label: string
   [key: string]: string
 }
 
@@ -26,13 +29,26 @@ export function useSettings() {
     } catch {}
   }
 
-  async function updateSetting(key: string, value: string) {
+  async function updateSetting(key: string, value: string): Promise<string | null> {
+    const prev = settings.value[key]
     settings.value = { ...settings.value, [key]: value }
-    await apiFetch(`${API}/settings/${key}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ value })
-    })
+    try {
+      const res = await apiFetch(`${API}/settings/${key}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value })
+      })
+      if (!res.ok) {
+        settings.value = { ...settings.value, [key]: prev }
+        if (res.status === 403) return 'Only the owner can change this setting.'
+        return 'Could not save setting — check your connection.'
+      }
+      window.dispatchEvent(new Event('appstats:invalidate'))
+      return null
+    } catch {
+      settings.value = { ...settings.value, [key]: prev }
+      return 'Could not save setting — check your connection.'
+    }
   }
 
   function resetCache() {

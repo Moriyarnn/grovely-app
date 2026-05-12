@@ -34,17 +34,30 @@ module.exports = (db) => {
       ORDER BY c.start_date ASC
     `).all()
 
+    // Drop explicitly excluded cycles before gap analysis
+    const effective = cycles.filter(c => c.review_state !== 'excluded')
+
     const lengths = []
     const skippedGaps = []
-    for (let i = 1; i < cycles.length; i++) {
+    let anchorIdx = 0
+
+    for (let i = 1; i < effective.length; i++) {
       const diff = Math.round(
-        (new Date(cycles[i].start_date) - new Date(cycles[i - 1].start_date))
+        (new Date(effective[i].start_date) - new Date(effective[anchorIdx].start_date))
         / (1000 * 60 * 60 * 24)
       )
-      if (diff < MIN_CYCLE_GAP) {
-        skippedGaps.push({ from: cycles[i - 1].start_date, to: cycles[i].start_date, gap: diff })
-      } else {
+      if (diff >= MIN_CYCLE_GAP || effective[i].review_state === 'confirmed') {
         lengths.push(diff)
+        anchorIdx = i
+      } else {
+        // Flagged cycle: skip it as an anchor point, bridge over it from the current anchor
+        skippedGaps.push({
+          from: effective[anchorIdx].start_date,
+          to: effective[i].start_date,
+          gap: diff,
+          cycleId: effective[i].id,
+          reviewState: effective[i].review_state
+        })
       }
     }
     return { lengths, skippedGaps }
@@ -55,6 +68,9 @@ module.exports = (db) => {
   router.get('/summary', (req, res) => {
     const today = new Date().toISOString().split('T')[0]
     const dataWarnings = []
+
+    const prefRows = db.prepare('SELECT key, value FROM user_preferences WHERE user_id = ?').all(req.user.id)
+    const prefs = prefRows.reduce((acc, r) => { acc[r.key] = r.value; return acc }, {})
 
     // Detect future cycles (start_date > today), one warning per cycle
     const futureCycles = db.prepare(`
@@ -73,12 +89,14 @@ module.exports = (db) => {
     const { lengths: cycleLengths, skippedGaps } = getCycleLengths()
 
     // Warn about impossibly short gaps
-    skippedGaps.forEach(({ from, to, gap }) => {
+    skippedGaps.forEach(({ from, to, gap, cycleId, reviewState }) => {
       dataWarnings.push({
         code: 'SHORT_CYCLE_GAP',
         message: `Cycles on ${from} and ${to} are only ${gap} day(s) apart (minimum expected is 21). This looks like a data entry mistake, so the gap was excluded from predictions.`,
-        targetDate: from,
-        affectedDates: [from, to]
+        targetDate: to,
+        affectedDates: [from, to],
+        cycleId,
+        reviewState: reviewState ?? null
       })
     })
 
@@ -86,14 +104,18 @@ module.exports = (db) => {
     // Recent cycles get more weight: est = α * latest + (1-α) * past_estimate
     // With 1 cycle it equals that cycle; with more cycles it adapts toward recent data
     const ALPHA = 0.3
-    const avgCycleLength = cycleLengths.length > 0
-      ? Math.round(
-          cycleLengths.slice(1).reduce(
-            (est, len) => ALPHA * len + (1 - ALPHA) * est,
-            cycleLengths[0]
+    const seedValue = prefs.period_cycle_seed ? parseInt(prefs.period_cycle_seed) : null
+    const useSeed = seedValue && seedValue >= 15 && seedValue <= 60 && cycleLengths.length < 3
+    const avgCycleLength = useSeed
+      ? seedValue
+      : cycleLengths.length > 0
+        ? Math.round(
+            cycleLengths.slice(1).reduce(
+              (est, len) => ALPHA * len + (1 - ALPHA) * est,
+              cycleLengths[0]
+            )
           )
-        )
-      : 28 // default assumption
+        : 28 // default assumption
 
     // Cycle variability — standard deviation of cycle lengths
     const cycleStdDev = cycleLengths.length >= 2
@@ -102,29 +124,32 @@ module.exports = (db) => {
         ))
       : null
 
-    // Confidence window: ±stdDev days, minimum ±2 when we have enough data
-    const confidenceWindow = cycleStdDev !== null && cycleLengths.length >= 3
-      ? Math.max(2, cycleStdDev)
-      : null
+    // Irregular cycles: user-flagged setting or std dev > 7 days
+    const irregularSetting = prefs.period_irregular === '1'
+    const isIrregular = irregularSetting || (cycleStdDev !== null && cycleStdDev > 7)
 
-    // Irregular cycles: std dev > 7 days is considered irregular
-    const isIrregular = cycleStdDev !== null && cycleStdDev > 7
+    // Confidence window: ±stdDev days (min ±2); widened to ±7 when user flagged irregular
+    const confidenceWindow = irregularSetting
+      ? 7
+      : (cycleStdDev !== null && cycleLengths.length >= 3 ? Math.max(2, cycleStdDev) : null)
 
     const MAX_PERIOD_LENGTH = 10 // days — longer than this is medically unusual
 
     // Warn about and exclude abnormally long period entries
     const validPeriodCycles = []
     completedCycles.forEach(c => {
-      if (c.period_length > MAX_PERIOD_LENGTH) {
+      if (c.period_length > MAX_PERIOD_LENGTH && c.review_state !== 'confirmed') {
         dataWarnings.push({
           code: 'LONG_PERIOD',
           message: `The entry starting on ${c.start_date} spans ${c.period_length} day(s). A period longer than ${MAX_PERIOD_LENGTH} days looks like a data entry mistake (e.g. the end date was set to the end of the cycle instead of the end of the bleeding). It was excluded from the period length average.`,
           targetDate: c.start_date,
-          affectedDates: [c.start_date, c.end_date].filter(Boolean)
+          affectedDates: [c.start_date, c.end_date].filter(Boolean),
+          cycleId: c.id,
+          reviewState: c.review_state ?? null
         })
-      } else {
-        validPeriodCycles.push(c)
+        return // both null and 'excluded' states are kept out of the avg
       }
+      validPeriodCycles.push(c)
     })
 
     // Average period length (start to end), using only valid entries
@@ -207,11 +232,12 @@ module.exports = (db) => {
     const ovulationDate = lastCycle?.ovulation_date ?? lastCycle?.predicted_ovulation_date ?? null
 
     // Next fertile window and ovulation — always future, always bound to nextPeriodDate.
-    // Gated at 3 cycles (2 start-to-start intervals) so predictions are based on real data.
-    // nextPeriodDate is also nulled below that threshold.
+    // Gated at 3 cycles normally; seed lowers the threshold to 1 logged cycle
+    const minCyclesRequired = useSeed ? 1 : 3
+    const predictionsReady = useSeed ? lastCycle !== null : cycleLengths.length >= 2
     let nextFertileWindow = null
     let nextOvulationDate = null
-    if (cycleLengths.length >= 2 && nextPeriodDate) {
+    if (predictionsReady && nextPeriodDate) {
       // Fertile window belongs to the cycle that STARTS on nextPeriodDate,
       // mirroring how each logged cycle on the calendar has its fertile window after it
       const cycleStart = new Date(nextPeriodDate + 'T00:00:00')
@@ -261,12 +287,14 @@ module.exports = (db) => {
       ovulationDate,
       fertileWindow,
       confidenceWindow,
+      confidence: isIrregular ? 'low' : (confidenceWindow ? 'high' : null),
       isIrregular,
       currentCycle: currentCycle || null,
       totalCyclesTracked: allCycles.length,
       dataWarnings,
-      note: cycleLengths.length < 2
-        ? 'Track 3 cycles to unlock period and fertile window predictions'
+      minCyclesRequired,
+      note: !predictionsReady
+        ? `Track ${minCyclesRequired} cycle${minCyclesRequired === 1 ? '' : 's'} to unlock period and fertile window predictions`
         : null
     })
   })

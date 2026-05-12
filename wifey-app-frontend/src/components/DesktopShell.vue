@@ -73,7 +73,7 @@
           </div>
           <p class="shell-app-name" :style="{ color: app.titleColor }">{{ app.name }}</p>
           <p class="shell-app-sub" :style="{ color: app.subColor }">
-            {{ app.sub ?? (app.active ? 'Tap to open' : 'Coming soon') }}
+            {{ app.sub ?? dynamicSubs[app.name] ?? (app.active ? 'Tap to open' : 'Coming soon') }}
           </p>
         </div>
       </TransitionGroup>
@@ -89,7 +89,7 @@
           </div>
           <p class="shell-app-name" :style="{ color: ghostApp.titleColor }">{{ ghostApp.name }}</p>
           <p class="shell-app-sub" :style="{ color: ghostApp.subColor }">
-            {{ ghostApp.sub ?? (ghostApp.active ? 'Tap to open' : 'Coming soon') }}
+            {{ ghostApp.sub ?? dynamicSubs[ghostApp.name] ?? (ghostApp.active ? 'Tap to open' : 'Coming soon') }}
           </p>
         </div>
       </Teleport>
@@ -116,11 +116,13 @@ import SummaryStrip from './SummaryStrip.vue'
 import { apps } from '../composables/useApps'
 import { API, getToken, getUser, clearToken, clearUser, setToken, setUser } from '../api'
 import { usePreferences } from '../composables/usePreferences'
+import { useAppStats } from '../composables/useAppStats'
 
 const route = useRoute()
 const router = useRouter()
 const { preferences, fetchPreferences, updatePreference, resetCache: resetPreferences } = usePreferences()
-if (getToken()) fetchPreferences()
+const { dynamicSubs, fetchAppStats } = useAppStats()
+if (getToken()) { fetchPreferences(); fetchAppStats() }
 
 const currentUser = ref(getUser())
 

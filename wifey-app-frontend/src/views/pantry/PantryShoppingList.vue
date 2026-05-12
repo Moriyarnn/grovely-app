@@ -35,7 +35,7 @@
               step="0.01"
               min="0"
               class="meta-price-input"
-              placeholder="0.00"
+              :placeholder="pricePlaceholder"
             />
           </div>
         </div>
@@ -54,6 +54,18 @@
             <select v-model="newUnit" class="meta-select meta-select--unit">
               <option v-for="u in PANTRY_UNITS" :key="u" :value="u">{{ u }}</option>
             </select>
+            <div class="meta-pieces-box">
+              <span class="meta-pieces-prefix">×</span>
+              <input
+                v-model="newPieces"
+                type="number"
+                min="1"
+                step="1"
+                class="meta-pieces-input"
+                placeholder="1"
+                autocomplete="off"
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -64,7 +76,7 @@
             <option v-for="cat in CATEGORIES" :key="cat.value" :value="cat.value">{{ cat.label }}</option>
           </select>
         </div>
-        <div class="add-meta-field" style="flex: 1; min-width: 0;">
+        <div class="add-meta-field" style="flex: 1; min-width: 0;" :style="!newUnit ? { opacity: 0.4, pointerEvents: 'none' } : {}">
           <span class="add-meta-label">Density <span class="add-meta-optional">(optional)</span></span>
           <div class="meta-qty-row">
             <input
@@ -84,6 +96,16 @@
       </div>
     </form>
 
+    <ListControls
+      :model-value="{ search: searchQuery, filter: null, sort: null, sortDir: 'asc' }"
+      @update:model-value="searchQuery = $event.search"
+      :filter-options="[]"
+      :sort-options="[]"
+      theme="green"
+      placeholder="Search list…"
+      class="shopping-search"
+    />
+
     <AppScroller theme="green" class="items-area">
 
       <!-- Empty state -->
@@ -91,6 +113,11 @@
         <v-icon size="32" color="#a8c5b0">mdi-cart-outline</v-icon>
         <p class="empty-title">Your list is empty</p>
         <p class="empty-sub">Add the first item above</p>
+      </div>
+      <div v-else-if="showSearchEmpty" class="empty-state">
+        <v-icon size="32" color="#a8c5b0">mdi-magnify</v-icon>
+        <p class="empty-title">No items found</p>
+        <p class="empty-sub">Try a different search</p>
       </div>
 
       <!-- Unchecked items grouped by category -->
@@ -122,10 +149,12 @@
               <button v-else class="check-btn" @click.stop="toggleChecked(item)" :aria-label="'Check ' + item.name">
                 <v-icon size="18" color="#a8c5b0">mdi-checkbox-blank-circle-outline</v-icon>
               </button>
-              <span class="item-name">{{ item.name }}</span>
-              <span v-if="item.amount != null" class="item-qty">{{ clampQty(item.amount, item.unit, 9) }}</span>
-            <span v-else-if="item.quantity" class="item-qty">{{ item.quantity }}</span>
-              <span v-if="item.price != null" class="item-price">{{ pantrySymbol }}&nbsp;{{ clampPrice(item.price, 5) }}</span>
+              <div class="item-name-wrap">
+                <span class="item-name">{{ item.name }}</span>
+                <span v-if="displayPieces(item.pieces)" class="pieces-badge">{{ displayPieces(item.pieces) }}</span>
+              </div>
+              <span v-if="item.quantity && item.amount == null" class="item-qty">{{ item.quantity }}</span>
+              <span v-if="item.price != null" class="item-price">{{ pantrySymbol }}&nbsp;{{ clampPrice(item.price, 5, pantryDecimals) }}{{ (item.pieces ?? 1) >= 2 ? '/pc' : '' }}</span>
               <button v-if="!selectMode" class="delete-btn" @click.stop="deleteItem(item.id)" aria-label="Remove">
                 <v-icon size="15" color="#c4b8bc">mdi-close</v-icon>
               </button>
@@ -151,10 +180,12 @@
             <button class="check-btn" @click="toggleChecked(item)" :aria-label="'Uncheck ' + item.name">
               <v-icon size="18" color="#5a9a72">mdi-checkbox-marked-circle</v-icon>
             </button>
-            <span class="item-name item-name--checked">{{ item.name }}</span>
-            <span v-if="item.amount != null" class="item-qty item-qty--checked">{{ clampQty(item.amount, item.unit, 9) }}</span>
-            <span v-else-if="item.quantity" class="item-qty item-qty--checked">{{ item.quantity }}</span>
-            <span v-if="item.price != null" class="item-price item-price--checked">{{ pantrySymbol }}&nbsp;{{ clampPrice(item.price, 5) }}</span>
+            <div class="item-name-wrap">
+              <span class="item-name item-name--checked">{{ item.name }}</span>
+              <span v-if="displayPieces(item.pieces)" class="pieces-badge pieces-badge--checked">{{ displayPieces(item.pieces) }}</span>
+            </div>
+            <span v-if="item.quantity && item.amount == null" class="item-qty item-qty--checked">{{ item.quantity }}</span>
+            <span v-if="item.price != null" class="item-price item-price--checked">{{ pantrySymbol }}&nbsp;{{ clampPrice(item.price, 5, pantryDecimals) }}{{ (item.pieces ?? 1) >= 2 ? '/pc' : '' }}</span>
             <button class="delete-btn" @click="deleteItem(item.id)" aria-label="Remove">
               <v-icon size="15" color="#c4b8bc">mdi-close</v-icon>
             </button>
@@ -170,7 +201,7 @@
         <button class="bar-btn bar-btn--primary" @click="openMoveSheet(uncheckedItems)">Move all to pantry</button>
         <div v-if="estimatedTotal > 0" class="bar-total-pill">
           <span class="bar-total-label">Cart total</span>
-          <span class="bar-total-value" :title="`${pantrySymbol} ${estimatedTotal.toFixed(2)}`">{{ pantrySymbol }}&nbsp;{{ clampPrice(estimatedTotal, 8) }}</span>
+          <span class="bar-total-value" :title="`${pantrySymbol} ${estimatedTotal.toFixed(pantryDecimals)}`">{{ pantrySymbol }}&nbsp;{{ clampPrice(estimatedTotal, 8, pantryDecimals) }}</span>
         </div>
       </template>
       <template v-else>
@@ -195,7 +226,7 @@
       :open="sheetOpen"
       @update:open="closeItemSheet"
       :title="sheetItem?.name ?? ''"
-      :subtitle="sheetItem ? (catLabel(sheetItem.category) + (sheetItem.amount != null ? ' · ' + clampQty(sheetItem.amount, sheetItem.unit, 9) : (sheetItem.quantity ? ' · ' + sheetItem.quantity : ''))) : ''"
+      :subtitle="sheetItem ? (catLabel(sheetItem.category) + (sheetItem.amount != null ? ' · ' + clampQty(sheetItem.amount * (sheetItem.pieces ?? 1), sheetItem.unit, 10) : (sheetItem.quantity ? ' · ' + sheetItem.quantity : '')) + (sheetItem.pieces >= 2 ? ' · ' + displayPieces(sheetItem.pieces) : '')) : ''"
       theme="green"
     >
       <div v-if="sheetItem" class="item-sheet-body">
@@ -210,12 +241,12 @@
             <div class="view-section view-section--price">
               <span class="view-section-label">Price</span>
               <div class="view-value-box" :class="{ 'view-value-empty': sheetItem.price == null }">
-                {{ sheetItem.price != null ? `${pantrySymbol} ${clampPrice(sheetItem.price, 7)}` : '—' }}
+                {{ sheetItem.price != null ? `${pantrySymbol} ${clampPrice(sheetItem.price, 7, pantryDecimals)}` : '—' }}
               </div>
             </div>
           </div>
-          <div class="view-inline-row">
-            <div class="view-section">
+          <div class="view-inline-row view-inline-row--qty-density">
+            <div class="view-section view-section--qty-wide">
               <span class="view-section-label">Quantity</span>
               <div class="view-value-box" :class="{ 'view-value-empty': sheetItem.amount == null && !sheetItem.quantity }">
                 {{ sheetItem.amount != null ? clampQty(sheetItem.amount, sheetItem.unit, 14) : (sheetItem.quantity || '—') }}
@@ -224,7 +255,7 @@
             <div class="view-section">
               <span class="view-section-label">Density</span>
               <div class="view-value-box" :class="{ 'view-value-empty': sheetItem.density == null }">
-                {{ sheetItem.density != null ? clampQty(sheetItem.density, sheetItem.density_unit, 14) : '—' }}
+                {{ sheetItem.density != null ? clampQty(sheetItem.density, sheetItem.density_unit, 13) : '—' }}
               </div>
             </div>
           </div>
@@ -274,7 +305,7 @@
               </div>
             </div>
           </div>
-          <div class="edit-inline-row">
+          <div class="edit-inline-row edit-row--qty-density">
             <div class="item-edit-field">
               <label class="item-edit-label">Quantity <span class="item-edit-optional">(optional)</span></label>
               <div class="item-qty-row">
@@ -292,21 +323,38 @@
                 </select>
               </div>
             </div>
-            <div class="item-edit-field">
-              <label class="item-edit-label">Density <span class="item-edit-optional">(optional)</span></label>
-              <div class="item-qty-row">
-                <input
-                  v-model="sheetForm.density"
-                  type="number"
-                  min="0"
-                  step="any"
-                  class="item-edit-input"
-                  placeholder="0"
-                  autocomplete="off"
-                />
-                <select v-model="sheetForm.density_unit" class="item-edit-select item-edit-select--unit">
-                  <option v-for="u in DENSITY_UNITS" :key="u" :value="u">{{ u }}</option>
-                </select>
+            <div class="edit-density-group">
+              <div class="item-edit-field item-edit-field--pieces">
+                <label class="item-edit-label">&nbsp;</label>
+                <div class="item-pieces-box">
+                  <span class="item-pieces-prefix">×</span>
+                  <input
+                    v-model="sheetForm.pieces"
+                    type="number"
+                    min="1"
+                    step="1"
+                    class="item-pieces-input"
+                    placeholder="1"
+                    autocomplete="off"
+                  />
+                </div>
+              </div>
+              <div class="item-edit-field" :style="!sheetForm.unit ? { opacity: 0.4, pointerEvents: 'none' } : {}">
+                <label class="item-edit-label">Density <span class="item-edit-optional">(optional)</span></label>
+                <div class="item-qty-row">
+                  <input
+                    v-model="sheetForm.density"
+                    type="number"
+                    min="0"
+                    step="any"
+                    class="item-edit-input"
+                    placeholder="0"
+                    autocomplete="off"
+                  />
+                  <select v-model="sheetForm.density_unit" class="item-edit-select item-edit-select--unit">
+                    <option v-for="u in DENSITY_UNITS" :key="u" :value="u">{{ u }}</option>
+                  </select>
+                </div>
               </div>
             </div>
           </div>
@@ -377,16 +425,19 @@
         <div v-for="item in moveItems" :key="item.id" class="move-list-item">
           <div class="move-item-info">
             <span class="move-item-name">{{ item.name }}</span>
-            <span v-if="item.amount != null" class="move-item-qty">{{ clampQty(item.amount, item.unit, 9) }}</span>
+            <span v-if="item.amount != null" class="move-item-qty">{{ clampQty(item.amount * (item.pieces ?? 1), item.unit, 9) }}</span>
+            <span v-else-if="item.pieces != null" class="move-item-qty">{{ item.pieces }} pcs</span>
             <span v-else-if="item.quantity" class="move-item-qty">{{ item.quantity }}</span>
           </div>
-          <div class="move-item-expiry-field">
-            <label class="move-expiry-label">Expiry <span class="move-expiry-optional">(optional)</span></label>
-            <input
-              v-model="moveExpiries[item.id]"
-              type="date"
-              class="move-expiry-input"
-            />
+          <div class="move-item-fields-row">
+            <div class="move-item-expiry-field">
+              <label class="move-expiry-label">Expiry <span class="move-expiry-optional">(optional)</span></label>
+              <input
+                v-model="moveExpiries[item.id]"
+                type="date"
+                class="move-expiry-input"
+              />
+            </div>
           </div>
         </div>
       </AppScroller>
@@ -411,7 +462,8 @@ import SwipeableListItem from '@/components/ui/SwipeableListItem.vue'
 import DetailSheet from '@/components/ui/DetailSheet.vue'
 import IconAction from '@/components/ui/IconAction.vue'
 import NotesField from '@/components/ui/NotesField.vue'
-import { usePreferences } from '../../composables/usePreferences'
+import ListControls from '@/components/ui/ListControls.vue'
+import { useSettings } from '../../composables/useSettings'
 import { CURRENCIES } from '../../constants/currencies'
 import { PANTRY_UNITS, DENSITY_UNITS } from '../../constants/units'
 import { clampPrice, clampQty } from '../../constants/format'
@@ -423,6 +475,7 @@ const CATEGORIES = [
   { value: 'bakery',    label: 'Bakery' },
   { value: 'frozen',    label: 'Frozen' },
   { value: 'dry_goods', label: 'Dry Goods' },
+  { value: 'beverages', label: 'Beverages' },
   { value: 'other',     label: 'Other' },
 ]
 
@@ -433,6 +486,7 @@ const CAT_COLORS = {
   bakery:    '#d4914a',
   frozen:    '#7e7ecf',
   dry_goods: '#a08060',
+  beverages: '#26b5c8',
   other:     '#9e9e9e',
 }
 
@@ -447,26 +501,53 @@ const adding = ref(false)
 const newName = ref('')
 const newCategory = ref('other')
 const newAmount = ref('')
-const newUnit = ref('pcs')
+const newUnit = ref('g')
 const newPrice = ref('')
+const newPieces = ref('')
 const newDensity = ref('')
 const newDensityUnit = ref('g/ml')
 
-const { preferences, fetchPreferences } = usePreferences()
+function displayPieces(pieces) {
+  if (!pieces || pieces < 2) return null
+  return pieces > 999 ? '×999+' : `×${pieces}`
+}
+
+const { settings, fetchSettings } = useSettings()
 
 const pantrySymbol = computed(() => {
-  const cur = preferences.value.pantry_currency ?? 'USD'
-  if (cur === 'OTHER') return preferences.value.pantry_currency_custom_symbol ?? ''
+  const cur = settings.value.pantry_currency ?? 'USD'
+  if (cur === 'OTHER') return settings.value.pantry_currency_custom_symbol ?? ''
   return CURRENCIES.find(c => c.value === cur)?.symbol ?? '$'
 })
+const pantryDecimals = computed(() => {
+  const cur = settings.value.pantry_currency ?? 'USD'
+  return CURRENCIES.find(c => c.value === cur)?.decimals ?? 2
+})
+const pricePlaceholder = computed(() => pantryDecimals.value === 0 ? '0' : '0.00')
 
-const uncheckedItems = computed(() => items.value.filter(i => !i.checked))
-const checkedItems = computed(() => items.value.filter(i => i.checked))
+const searchQuery = ref('')
+
+const uncheckedItems = computed(() => {
+  const q = searchQuery.value.toLowerCase()
+  return items.value.filter(i => !i.checked && (!q || i.name.toLowerCase().includes(q)))
+})
+const checkedItems = computed(() => {
+  const q = searchQuery.value.toLowerCase()
+  return items.value.filter(i => i.checked && (!q || i.name.toLowerCase().includes(q)))
+})
 
 const estimatedTotal = computed(() =>
   uncheckedItems.value
     .filter(i => i.price != null)
-    .reduce((sum, i) => sum + i.price, 0)
+    .reduce((sum, i) => sum + i.price * (i.pieces ?? 1), 0)
+)
+
+const showSearchEmpty = computed(() =>
+  !loading.value &&
+  items.value.length > 0 &&
+  searchQuery.value.trim() !== '' &&
+  uncheckedItems.value.length === 0 &&
+  checkedItems.value.length === 0
 )
 
 const showEmpty = ref(false)
@@ -521,6 +602,7 @@ async function addItem() {
       amount: newAmount.value !== '' ? parseFloat(newAmount.value) : null,
       unit: newAmount.value !== '' ? newUnit.value : null,
       price: newPrice.value !== '' ? parseFloat(newPrice.value) : null,
+      pieces: newPieces.value !== '' ? parseInt(newPieces.value) : null,
       density: densityProvided ? parseFloat(newDensity.value) : null,
       density_unit: densityProvided ? newDensityUnit.value : null,
     }),
@@ -531,8 +613,9 @@ async function addItem() {
     newName.value = ''
     newCategory.value = 'other'
     newAmount.value = ''
-    newUnit.value = 'pcs'
+    newUnit.value = 'g'
     newPrice.value = ''
+    newPieces.value = ''
     newDensity.value = ''
     newDensityUnit.value = 'g/ml'
   }
@@ -572,7 +655,7 @@ async function clearChecked() {
 const sheetItem = ref(null)
 const sheetOpen = ref(false)
 const sheetMode = ref('view')
-const sheetForm = ref({ name: '', category: 'other', expiry_date: '', price: '', notes: '', amount: '', unit: 'pcs', density: '', density_unit: 'g/ml' })
+const sheetForm = ref({ name: '', category: 'other', expiry_date: '', price: '', notes: '', amount: '', unit: 'g', pieces: '', density: '', density_unit: 'g/ml' })
 const sheetSaving = ref(false)
 const sheetDeleting = ref(false)
 
@@ -585,7 +668,8 @@ function openItemSheet(item) {
     price:        item.price != null ? String(item.price) : '',
     notes:        item.notes ?? '',
     amount:       item.amount != null ? String(item.amount) : '',
-    unit:         item.unit ?? 'pcs',
+    unit:         item.unit ?? 'g',
+    pieces:       item.pieces != null ? String(item.pieces) : '',
     density:      item.density != null ? String(item.density) : '',
     density_unit: item.density_unit ?? 'g/ml',
   }
@@ -613,6 +697,7 @@ function cancelEdit() {
     notes:        sheetItem.value.notes ?? '',
     amount:       sheetItem.value.amount != null ? String(sheetItem.value.amount) : '',
     unit:         sheetItem.value.unit ?? 'pcs',
+    pieces:       sheetItem.value.pieces != null ? String(sheetItem.value.pieces) : '',
     density:      sheetItem.value.density != null ? String(sheetItem.value.density) : '',
     density_unit: sheetItem.value.density_unit ?? 'g/ml',
   }
@@ -633,6 +718,7 @@ async function saveItem() {
       notes:        sheetForm.value.notes.trim() || null,
       amount:       sheetForm.value.amount !== '' ? parseFloat(sheetForm.value.amount) : null,
       unit:         sheetForm.value.amount !== '' ? sheetForm.value.unit : null,
+      pieces:       sheetForm.value.pieces !== '' ? parseInt(sheetForm.value.pieces) : null,
       density:      densityProvided ? parseFloat(sheetForm.value.density) : null,
       density_unit: densityProvided ? sheetForm.value.density_unit : null,
     }),
@@ -756,6 +842,15 @@ function closeMoveSheet() {
 async function confirmMove() {
   moveLoading.value = true
   for (const item of moveItems.value) {
+    let amount = null, unit = null, pieces = null
+    if (item.amount != null && item.unit) {
+      amount = item.amount * (item.pieces ?? 1)
+      unit = item.unit
+    } else if (item.pieces != null) {
+      pieces = item.pieces
+    } else {
+      pieces = 1
+    }
     await apiFetch(`${API}/pantry`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -763,8 +858,10 @@ async function confirmMove() {
         name:         item.name,
         category:     item.category || 'other',
         expiry_date:  moveExpiries.value[item.id] || null,
-        amount:       item.amount ?? null,
-        unit:         item.unit ?? null,
+        amount,
+        unit,
+        price:        item.price ?? null,
+        pieces,
         density:      item.density ?? null,
         density_unit: item.density_unit ?? null,
       }),
@@ -787,7 +884,7 @@ async function deleteSelected() {
   exitSelectMode()
 }
 
-onMounted(() => { load(); fetchPreferences() })
+onMounted(() => { load(); fetchSettings() })
 </script>
 
 <style scoped>
@@ -806,6 +903,8 @@ onMounted(() => { load(); fetchPreferences() })
 @media (max-width: 1279px) {
   .shopping-root { height: 100%; overflow: visible; }
 }
+
+.shopping-search { margin: 0 1rem 0.5rem; }
 
 .items-area {
   flex: 1;
@@ -934,6 +1033,11 @@ onMounted(() => { load(); fetchPreferences() })
   min-width: 0;
 }
 
+.add-meta-field--pieces {
+  flex: 0 0 64px;
+  min-width: 0;
+}
+
 .add-meta-label {
   font-size: 10px;
   font-weight: 700;
@@ -1032,6 +1136,43 @@ onMounted(() => { load(); fetchPreferences() })
 .meta-select--unit {
   flex: 0 0 64px;
 }
+.meta-pieces-box {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border: 1.5px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 7px 8px;
+  background: #fff;
+  flex: 0 0 54px;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+.meta-pieces-box:focus-within { border-color: #2E7D52; }
+
+.meta-pieces-prefix {
+  font-size: 12px;
+  font-weight: 700;
+  color: #2E7D52;
+  flex-shrink: 0;
+}
+
+.meta-pieces-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 12px;
+  color: #1A4D35;
+  padding: 0;
+  width: 28px;
+}
+.meta-pieces-input::placeholder { color: #6BA888; }
+.meta-pieces-input::-webkit-outer-spin-button,
+.meta-pieces-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.meta-pieces-input { -moz-appearance: textfield; }
+
 .meta-select--category {
   width: 100%;
   border: 1.5px solid var(--panel-border);
@@ -1159,8 +1300,15 @@ onMounted(() => { load(); fetchPreferences() })
   flex-shrink: 0;
 }
 
-.item-name {
+.item-name-wrap {
   flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.item-name {
   min-width: 0;
   font-size: 14px;
   color: #1A4D35;
@@ -1178,12 +1326,27 @@ onMounted(() => { load(); fetchPreferences() })
   color: #6BA888;
   white-space: nowrap;
   flex-shrink: 0;
-  max-width: 90px;
+  max-width: 70px;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .item-qty--checked {
   color: #9ECDB6;
+}
+
+.pieces-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: #2E7D52;
+  background: #d4f0e4;
+  border-radius: 99px;
+  padding: 1px 6px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.pieces-badge--checked {
+  color: #9ECDB6;
+  background: #eaf7f0;
 }
 
 .item-price {
@@ -1341,6 +1504,17 @@ onMounted(() => { load(); fetchPreferences() })
   color: #a8c5b0;
 }
 
+.move-item-fields-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.move-item-expiry-field {
+  flex: 1;
+  min-width: 0;
+}
+
 .move-expiry-input {
   width: 100%;
   border: 1.5px solid #B8E6D0;
@@ -1421,6 +1595,9 @@ onMounted(() => { load(); fetchPreferences() })
   min-width: 0;
 }
 
+.view-inline-row--qty-density .view-section           { flex: 1; min-width: 0; }
+.view-inline-row--qty-density .view-section--qty-wide { flex: 0 0 57%; min-width: 0; }
+
 .view-name-row {
   display: flex;
   gap: 8px;
@@ -1489,6 +1666,7 @@ onMounted(() => { load(); fetchPreferences() })
 .edit-inline-row {
   display: flex;
   gap: 8px;
+  align-items: flex-end;
 }
 
 .edit-inline-row .item-edit-field {
@@ -1496,6 +1674,70 @@ onMounted(() => { load(); fetchPreferences() })
   min-width: 0;
 }
 
+.edit-row--qty-density > .item-edit-field {
+  flex: 0 0 calc(50% - 4px);
+  min-width: 0;
+}
+
+.edit-density-group {
+  flex: 0 0 calc(50% - 4px);
+  min-width: 0;
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.edit-density-group .item-edit-field--pieces {
+  flex: 0 0 auto;
+}
+
+.edit-density-group .item-edit-field:not(.item-edit-field--pieces) {
+  flex: 1;
+  min-width: 0;
+}
+
+.item-edit-field--pieces {
+  flex: 0 0 56px !important;
+  min-width: 0;
+}
+
+.item-pieces-box {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border: 1.5px solid #B8E6D0;
+  border-radius: 12px;
+  padding: 10px 8px;
+  background: #EAF7F0;
+  width: 100%;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+.item-pieces-box:focus-within { border-color: #2E7D52; }
+
+.item-pieces-prefix {
+  font-size: 13px;
+  font-weight: 700;
+  color: #2E7D52;
+  flex-shrink: 0;
+}
+
+.item-pieces-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 13px;
+  font-weight: 500;
+  color: #1A4D35;
+  padding: 0;
+  width: 28px;
+}
+.item-pieces-input::placeholder { color: #9ECDB6; }
+.item-pieces-input::-webkit-outer-spin-button,
+.item-pieces-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.item-pieces-input { -moz-appearance: textfield; }
 
 .item-edit-field {
   display: flex;
@@ -1693,5 +1935,6 @@ onMounted(() => { load(); fetchPreferences() })
   display: flex;
   flex-direction: column;
 }
+
 
 </style>

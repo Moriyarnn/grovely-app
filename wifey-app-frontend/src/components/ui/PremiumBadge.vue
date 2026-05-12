@@ -12,7 +12,11 @@ const props = defineProps({
   theme: { type: String, default: 'green' }
 })
 
-const iconColor = computed(() => props.theme === 'pink' ? '#c4a8b8' : '#8fbfa8')
+const iconColor = computed(() => {
+  if (props.theme === 'pink') return '#c4a8b8'
+  if (props.theme === 'neutral') return '#b0b0b0'
+  return '#8fbfa8'
+})
 </script>
 
 <style scoped>
@@ -40,5 +44,11 @@ const iconColor = computed(() => props.theme === 'pink' ? '#c4a8b8' : '#8fbfa8')
   background: #faf4f7;
   border-color: #d4c8d0;
   color: #b0a8b9;
+}
+
+.premium-badge--neutral {
+  background: #f5f5f5;
+  border-color: #e0e0e0;
+  color: #999;
 }
 </style>

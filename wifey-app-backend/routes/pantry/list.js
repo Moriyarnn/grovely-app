@@ -1,7 +1,7 @@
 const express = require('express')
 const router = express.Router()
 
-const VALID_CATEGORIES = ['produce', 'dairy', 'meat', 'bakery', 'frozen', 'dry_goods', 'other']
+const VALID_CATEGORIES = ['produce', 'dairy', 'meat', 'bakery', 'frozen', 'dry_goods', 'beverages', 'other']
 const CATEGORY_ORDER = VALID_CATEGORIES.join("','")
 const VALID_DENSITY_UNITS = ['g/ml', 'g/L', 'kg/L']
 
@@ -55,19 +55,20 @@ module.exports = (db) => {
 
   // POST add item
   router.post('/', (req, res) => {
-    const { name, quantity, category, price, notes, amount, unit } = req.body
+    const { name, quantity, category, price, notes, amount, unit, pieces } = req.body
     if (!name || !name.trim()) return res.status(400).json({ error: 'name is required' })
     const cat = VALID_CATEGORIES.includes(category) ? category : 'other'
     const userId = req.user?.id ?? null
     const priceVal = (price !== undefined && price !== '' && price !== null) ? parseFloat(price) : null
     const amountVal = (amount !== undefined && amount !== null && amount !== '') ? parseFloat(amount) : null
+    const piecesVal = (pieces !== undefined && pieces !== null && pieces !== '') ? parseInt(pieces) : null
     const density = parseDensityFields(req.body)
     if (density.error) return res.status(400).json({ error: density.error })
     const densityVal = density.skip ? null : density.density
     const densityUnitVal = density.skip ? null : density.density_unit
     const result = db.prepare(
-      'INSERT INTO shopping_list (name, quantity, category, added_by, price, notes, amount, unit, density, density_unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-    ).run(name.trim(), quantity?.trim() || null, cat, userId, priceVal, notes?.trim() || null, amountVal, unit || null, densityVal, densityUnitVal)
+      'INSERT INTO shopping_list (name, quantity, category, added_by, price, notes, amount, unit, density, density_unit, pieces) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    ).run(name.trim(), quantity?.trim() || null, cat, userId, priceVal, notes?.trim() || null, amountVal, unit || null, densityVal, densityUnitVal, piecesVal)
     const item = db.prepare('SELECT * FROM shopping_list WHERE id = ?').get(result.lastInsertRowid)
     res.status(201).json(item)
   })
@@ -84,7 +85,7 @@ module.exports = (db) => {
     const item = db.prepare('SELECT * FROM shopping_list WHERE id = ?').get(id)
     if (!item) return res.status(404).json({ error: 'Item not found' })
 
-    const { name, quantity, category, checked, expiry_date, price, notes, amount, unit } = req.body
+    const { name, quantity, category, checked, expiry_date, price, notes, amount, unit, pieces } = req.body
 
     if (checked !== undefined) {
       const nowChecked = checked ? 1 : 0
@@ -127,6 +128,11 @@ module.exports = (db) => {
 
     if (unit !== undefined) {
       db.prepare('UPDATE shopping_list SET unit = ? WHERE id = ?').run(unit || null, id)
+    }
+
+    if (pieces !== undefined) {
+      const piecesVal = (pieces !== null && pieces !== '') ? parseInt(pieces) : null
+      db.prepare('UPDATE shopping_list SET pieces = ? WHERE id = ?').run(piecesVal, id)
     }
 
     const density = parseDensityFields(req.body)
