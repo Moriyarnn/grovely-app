@@ -116,7 +116,7 @@ const props = defineProps({
 
 const router = useRouter()
 
-const APP_VERSION = 'v0.12.0'
+const APP_VERSION = 'v0.12.1'
 const LAST_SEEN_KEY = 'changelog_last_seen_version'
 
 const cycleCount = ref(null)

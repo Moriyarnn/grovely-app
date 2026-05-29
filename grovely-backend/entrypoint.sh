@@ -15,7 +15,10 @@ if ! getent passwd "$PUID" > /dev/null 2>&1; then
   adduser -D -u "$PUID" -G "$(getent group "$PGID" | cut -d: -f1)" appuser
 fi
 
-# Ensure the data directory is owned by the target user
+# Ensure the data directory exists and is owned by the target user.
+# Without this, a `docker run` with no volume mount fails because Node tries
+# to mkdir /app/data as PUID:PGID inside a root-owned /app/.
+mkdir -p /app/data
 chown -R "$PUID:$PGID" /app/data 2>/dev/null || true
 
 # Hand off to Node as the target user
