@@ -1,37 +1,45 @@
-# Wifey App TBD — Caddyfile example
+# Grovely — Caddyfile example
 #
 # Same-origin reverse proxy: SPA at /, backend at /api/* and /health.
 # Caddy handles HTTPS automatically via Let's Encrypt — make sure ports 80
-# and 443 reach this host and that DNS for wifey.example.com points here.
+# and 443 reach this host and that DNS for your hostname points here.
 #
 # Usage:
-#   1. Copy this file to /etc/caddy/Caddyfile (or wherever your Caddy reads from), rename it to Caddyfile
+#   1. Copy this file to your Caddy config location and rename to Caddyfile
+#        Linux:    /etc/caddy/Caddyfile
+#        Windows:  C:\caddy\Caddyfile
 #   2. Replace your.domain.com with your real hostname
 #   3. Replace the (email) text with yours (used for Let's Encrypt notices)
 #   4. Build the frontend with VITE_BACKEND_PORT empty so it routes through
 #      the same origin instead of trying to reach :3000 directly. The override
 #      file docker-compose.proxy.yml does this for you:
 #        docker compose -f docker-compose.yml -f docker-compose.proxy.yml up -d --build
-#   5. Reload Caddy: sudo systemctl reload caddy or caddy start --config C:\caddy\Caddyfile for windows
+#   5. Reload Caddy:
+#        Linux:    sudo systemctl reload caddy
+#        Windows:  Restart-Service caddy   (or)   caddy reload --config C:\caddy\Caddyfile
 
+# Optional: an email lets Let's Encrypt notify you before certs expire.
+# Leave the block out entirely if you'd rather stay anonymous.
 {
-	email (email)
+	email your-email@example.com
 }
 
 your.domain.com {
 	encode zstd gzip
 
-	# Backend API and health check
+	# Backend API and health check.
+	# Use 127.0.0.1 (not localhost) — on some systems localhost resolves to ::1
+	# first, but the backend is bound to IPv4 only via docker-compose.proxy.yml.
 	handle /api/* {
-		reverse_proxy localhost:3000
+		reverse_proxy 127.0.0.1:3000
 	}
 	handle /health {
-		reverse_proxy localhost:3000
+		reverse_proxy 127.0.0.1:3000
 	}
 
 	# SPA — everything else
 	handle {
-		reverse_proxy localhost:5173
+		reverse_proxy 127.0.0.1:5173
 	}
 
 	# Sensible security headers for a household app
@@ -42,15 +50,19 @@ your.domain.com {
 		X-Frame-Options "SAMEORIGIN"
 	}
 
-	log {
-		output file /var/log/caddy/wifey.log
-		format console
-	}
+	# Optional file logging. By default Caddy logs to stdout, which is
+	# usually what you want. Uncomment to log to a file — and make sure the
+	# directory exists and Caddy can write to it.
+	# log {
+	# 	output file /var/log/caddy/grovely.log     # Linux
+	# 	# output file C:\caddy\logs\grovely.log    # Windows
+	# 	format console
+	# }
 }
 
-# If you run Caddy inside the same Docker network as the app, replace
-# localhost:3000 / localhost:5173 with the service names:
-#   reverse_proxy backend:3000
-#   reverse_proxy frontend:5173
-# In that case you can remove the host-published ports from docker-compose.yml
-# so the only public surface is Caddy on 80/443.
+# If you run Caddy inside the same Docker network as the app, use
+# docker-compose.proxy-docker.yml instead and replace the upstreams with
+# the service container names:
+#   reverse_proxy grovely-prod-backend:3000
+#   reverse_proxy grovely-prod-frontend:5173
+# That keeps the only public surface as Caddy on 80/443.

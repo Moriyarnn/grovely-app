@@ -1,10 +1,10 @@
-name: wifey-uat
+name: grovely-uat
 
 services:
   frontend:
-    container_name: wifey-uat-frontend
+    container_name: grovely-uat-frontend
     build:
-      context: ./wifey-app-frontend
+      context: ./grovely-frontend
       target: build
       args:
         BUILD_MODE: uat
@@ -13,20 +13,41 @@ services:
       - "5175:5173"
     depends_on:
       - backend
+    networks:
+      - app_net
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+          cpus: '0.25'
     restart: always
 
   backend:
-    container_name: wifey-uat-backend
-    build: ./wifey-app-backend
+    container_name: grovely-uat-backend
+    build: ./grovely-backend
     ports:
       - "3002:3000"
     volumes:
       - sqlite_data_uat:/app/data
     environment:
-      - NODE_ENV=production
+      - NODE_ENV=staging
+      - TZ=${TZ:-UTC}
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
     env_file:
-      - ./wifey-app-backend/.env.uat
+      - ./grovely-backend/.env.uat
+    networks:
+      - app_net
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: '0.5'
     restart: always
+
+networks:
+  app_net:
+    driver: bridge
 
 volumes:
   sqlite_data_uat:

@@ -7,7 +7,7 @@ yarn-error.log*
 lerna-debug.log*
 
 # Diagnostic reports (https://nodejs.org/api/report.html)
-report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+report.[0-9]*.[0-9]*.[0-9]*.json
 
 # Runtime data
 pids
@@ -69,6 +69,8 @@ web_modules/
 .env
 .env.*
 !.env.example
+!.env.dev.example
+!.env.uat.example
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache
@@ -143,7 +145,4 @@ vite.config.ts.timestamp-*
 
 # Auto-generated JWT secret
 wifey-app-backend/data/secret.key
-
-
-# Environment variables
-.env
+grovely-backend/data/secret.key

@@ -70,7 +70,7 @@ Planned: `008_sleep_logs.sql`
 ## File Locations (planned)
 
 ```
-wifey-app-backend/
+grovely-backend/
 ├── routes/sleep/
 │   ├── logs.js       # CRUD for sleep_logs
 │   └── insights.js   # insight summary + partner overlap

@@ -221,6 +221,15 @@ A reusable bottom sheet (mobile) / centered modal (desktop) for item detail, edi
 | `title` | `String` | `''` | Primary heading — date, item name, etc. |
 | `subtitle` | `String` | `''` | Secondary line below title — shown uppercase, accented |
 | `theme` | `String` | `'pink'` | `'pink'` for period tracker, `'green'` for pantry |
+| `size` | `String` | `'default'` | `'large'` for content-heavy sheets. Opt-in; omitting leaves the original sizing untouched |
+| `scroll` | `String` | `'sheet'` | `'sheet'` = whole sheet scrolls (default, required by sheets with no inner scroller). `'contained'` = sheet doesn't scroll; inner regions own their scroll |
+| `subtitleStyle` | `String` | `'label'` | `'label'` = uppercase metadata; `'plain'` = normal-case sentence |
+| `mobileHeight` | `String` | `''` | Opt-in. Any CSS length (e.g. `'80vh'`) → fixed sheet height on mobile (< 1280px) instead of sizing to content. Sheet-level scroll preserved. Use to make sibling sheets the same size |
+| `hugContent` | `Boolean` | `false` | Opt-in. Desktop modal sizes to content (`height: auto`, capped 88vh, still scrolls past) instead of the fixed `min(640px, 88vh)`. Use for short sheets where the fixed height leaves an awkward empty band |
+
+All sizing props are **strictly opt-in** — defaults reproduce the original behaviour exactly, so adding them never affects existing consumers.
+
+**Stable-height Notes field:** Inside a `DetailSheet` that toggles a view/edit mode, give `NotesField` (`src/components/ui/NotesField.vue`) a `:fixed-height="<px>"`. This makes the field a fixed size (content scrolls inside instead of growing the sheet) and reserves the character-counter's space in **both** modes, so view↔edit never changes height. The counter expands into that reserved space using the same measure-the-target-height transition as the notification message editor — both entering edit and leaving it. For this to animate in *both* directions the `NotesField` instance must persist across the toggle (one instance whose `mode` prop flips), not be re-mounted by a `v-if`-swapped subtree; an ancestor swap suppresses the leave animation. Canonical: `PantryShoppingList.vue` (item sheet), `PeriodCalendar.vue` (day sheet).
 
 **Slots:**
 
@@ -320,6 +329,39 @@ A styled checkbox for multi-select flows. Lives in `src/components/ui/AppCheckbo
 The checkmark icon is always white. The box is 20×20px with a 6px border-radius.
 
 Future features must add their theme variant to `AppCheckbox.vue` when they introduce multi-select UI.
+
+---
+
+## AppFieldToggle
+
+A compact labeled toggle for use in form field label rows (e.g. alongside a field label to switch an input mode). Lives in `src/components/ui/AppFieldToggle.vue`.
+
+```vue
+<AppFieldToggle v-model="isTotal" label="∑ tot." theme="green" />
+```
+
+**Props:**
+
+| Prop | Type | Default | Description |
+|---|---|---|---|
+| `modelValue` | `Boolean` | `false` | Checked state (use with `v-model`) |
+| `label` | `String` | required | Text displayed to the left of the checkbox |
+| `theme` | `String` | `'green'` | `'green'` for pantry, `'pink'` for period tracker |
+
+**Themes:**
+
+| `theme` | Unchecked border | Checked fill | Checked text |
+|---|---|---|---|
+| `green` | `#B8E6D0` | `#2E7D52` | `#2E7D52` |
+| `pink` | `#f0c8d8` | `#993556` | `#993556` |
+
+The unchecked border uses the theme's light tint (matching field borders in the same form). The theme's full accent color fills the box only when checked.
+
+The box is 12×12px. The checkmark icon is always white. The label text matches the `add-meta-label` uppercase style so it integrates naturally alongside field labels.
+
+Future features must add their theme variant to `AppFieldToggle.vue` when they introduce a field toggle.
+
+**Canonical usage:** `PantryShoppingList.vue` — price field "∑ tot." toggle that switches between per-unit and total price input mode.
 
 ---
 
@@ -502,7 +544,7 @@ Used inside a form or settings panel to show a feature that is locked/upcoming. 
 ```
 
 Rules:
-- The `<!-- PREMIUM GATE (frontend) -->` comment is required on the containing element so gates can be found with `grep -r "PREMIUM GATE" wifey-app-frontend/src`.
+- The `<!-- PREMIUM GATE (frontend) -->` comment is required on the containing element so gates can be found with `grep -r "PREMIUM GATE" grovely-frontend/src`.
 - This is UX only. Enforcement is always on the backend (`/api/premium/` routes + `requireLicense` middleware).
 
 ---

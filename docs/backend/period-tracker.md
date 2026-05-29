@@ -34,24 +34,28 @@ Both flows write to the same tables and produce the same shape of data.
 
 ## Calculations (`GET /api/period/calculations/summary`)
 
-Returns the following for the frontend summary strip and notification cron:
+Returns the following for the frontend summary strip. The notification cron has its own `getSummary()` in `notifications/index.js` that *mirrors* this logic as a simpler variant (no stored-prediction reuse, no prediction-error correction) — this endpoint is the authoritative one.
 
 | Field | Description |
 |-------|-------------|
-| `avgCycleLength` | Mean gap between `start_date` values across all cycles |
-| `avgPeriodLength` | Mean count of logged days per cycle |
-| `nextPeriodDate` | Latest `start_date` + `avgCycleLength` |
-| `ovulationDate` | `nextPeriodDate` − 14 days |
-| `fertileWindow` | `ovulationDate` ± 2 days |
-| `currentCycle` | Most recent cycle where `end_date` = today or yesterday, or `null` |
-| `totalCyclesTracked` | Count of all cycles |
+| `avgCycleLength` | Recency-weighted EMA (`ALPHA = 0.3`) over start-to-start cycle gaps. Gaps below `MIN_CYCLE_GAP` (21d) are filtered as data-entry noise. Optional `period_cycle_seed` preference overrides when fewer than 3 gaps exist. Fallback `28` only with no measurable history. |
+| `avgPeriodLength` | Mean start-to-end period length over valid cycles, excluding entries longer than `MAX_PERIOD_LENGTH` (10d). Fallback `5`. |
+| `nextPeriodDate` | Most recent cycle's `start_date` + `avgCycleLength` + `avgPredictionError` (EMA of stored-prediction vs actual error), rolled forward until it is a future date. |
+| `ovulationDate` / `fertileWindow` | Read from the stored predictions on the most recent cycle (`ovulation_date` / `predicted_fertile_start`/`_end`), so the strip and calendar always agree. |
+| `nextOvulationDate` / `nextFertileWindow` | Future window bound to `nextPeriodDate`, derived via `avgLutealPhase` (EMA over recorded ovulation-to-next-period history, fallback `14`). |
+| `cycleStdDev` / `isIrregular` / `confidenceWindow` | Variability of cycle gaps; `isIrregular` when the user flagged it or stddev > 7. Confidence window widens to ±7 when flagged irregular. |
+| `currentCycle` | Most recent cycle where `start_date` ≤ today and `end_date` ≥ yesterday, else `null`. |
+| `totalCyclesTracked` | Count of all past cycles with data. |
+| `dataWarnings` | Future-dated cycles, sub-21-day gaps, and over-10-day period entries are surfaced (and excluded from averages) here. |
 
-Requires a minimum of 2 completed cycles before surfacing predictions. Below that threshold, prediction fields return `null`.
+Predictions unlock once there are ≥2 measurable cycle gaps (or 1 cycle when a `period_cycle_seed` is set, `minCyclesRequired` = 1). Below that, prediction fields return `null` and `note` explains the threshold.
+
+**Lead-up reminder suppression.** The notification cron's "X days before period" reminders are gated on `!currentCycle` *and* an exactly-N-day prediction distance. Logging a period — day-by-day or as a retrospective range — stops them on the next daily run, both because `currentCycle` becomes non-null and because the prediction recalculates forward by ~one cycle. An email already sent earlier the same day is not retracted. Full contract in [notifications.md](notifications.md#days-before-period-reminder-suppression-contract).
 
 ## File Locations
 
 ```
-wifey-app-backend/
+grovely-backend/
 ├── routes/period/
 │   ├── cycles.js        # cycle CRUD + adjust
 │   ├── cycle_days.js    # day CRUD

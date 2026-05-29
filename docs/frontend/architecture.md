@@ -61,7 +61,7 @@ src/
 │   ├── DesktopShell.vue         # Persistent two-pane shell wrapper (≥1280px)
 │   ├── SummaryStrip.vue         # Auto-rotating status carousel; used by shell + HubView
 │   ├── SettingsSheet.vue        # Bottom sheet — settings (wired in v0.7.0)
-│   ├── OnboardingTutorial.vue   # 3-slide animated tutorial modal, shown once on first visit
+│   ├── ui/FeatureTutorial.vue   # Generic themed tutorial shell — normal/premium variants, rose/mint themes
 │   └── LoggingHints.vue         # Compact always-visible hint strip with mini animations
 └── composables/
     ├── useApps.ts               # Shared apps array (used by DesktopShell + HubView)

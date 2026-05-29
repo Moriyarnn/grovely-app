@@ -99,13 +99,75 @@ The response body always indicates warnings even on success:
 
 ---
 
-## Premium extension (not yet built)
+## Scheduled automatic backups (premium)
 
-Scheduled automatic backups are tracked in GitHub issue #125. The free tier ships manual export and restore only. The premium extension adds:
+Scheduled backups extend the manual export with a daily cron, on-disk retention, and optional remote push. The JSON format and versioning rules are identical to the manual flow — a snapshot written by the cron can be downloaded and fed straight into `/api/backup/restore`.
 
-- Cron-based backup on a user-configured interval (daily / weekly / monthly)
-- Configurable target: local path, S3-compatible bucket, or Backblaze B2
-- Retention policy: keep last N backups, auto-prune older ones
-- Backup history UI in Settings
+### How it runs
 
-When implemented, automatic backups use the same JSON format and versioning rules as manual backups.
+- A single cron job is registered at startup (`grovely-backend/backups/index.js → startBackups`). The expression is derived from `backup_schedule_time` (HH:MM in server-local time) and only registered if `backup_schedule_enabled = '1'` and a license is loaded.
+- On startup, if no successful backup is logged for today the run is fired immediately (catch-up — covers the "computer was off at 03:00" case).
+- Changing `backup_schedule_time` or `backup_schedule_enabled` via `PATCH /api/settings/:key` calls `rescheduleBackups(db)` automatically. No restart required.
+- Each run writes a snapshot to `<BACKUP_DIR>/grovely-backup-<ISO>.json`, prunes the directory to the latest `backup_retention_count` files, then attempts to push to every configured remote. Local success is independent of remote success.
+
+### Settings keys
+
+| Key | Default | Description |
+|---|---|---|
+| `backup_schedule_enabled` | `'0'` | `'1'` activates the cron and catch-up |
+| `backup_schedule_time` | `'03:00'` | HH:MM, server-local time |
+| `backup_retention_count` | `'7'` | Local snapshots kept; older ones pruned |
+
+All three are seeded by migration `028_scheduled_backups.sql` and editable from the in-app Backups sheet under Settings → Data & Backups → Automatic.
+
+### Environment variables (optional)
+
+All optional. With none set, scheduled backups stay local-only.
+
+| Variable | Effect |
+|---|---|
+| `BACKUP_DIR` | Override the local snapshot directory (default: `data/backups` inside the data volume) |
+| `BACKUP_S3_ENDPOINT` / `BACKUP_S3_BUCKET` / `BACKUP_S3_KEY` / `BACKUP_S3_SECRET` | Activate S3-compatible push (AWS S3, Backblaze B2, Cloudflare R2, Wasabi, MinIO, Hetzner, etc.). All four required together. |
+| `BACKUP_S3_REGION` | S3 region (default `us-east-1`) |
+| `BACKUP_S3_PREFIX` | Key prefix inside the bucket (optional) |
+| `BACKUP_WEBDAV_URL` / `BACKUP_WEBDAV_USER` / `BACKUP_WEBDAV_PASS` | Activate WebDAV push (Nextcloud, ownCloud, Synology, QNAP, TrueNAS, Apache mod_dav). All three required together. |
+
+Credentials live in environment variables only — never in the database, never in the UI, never in the backup file itself.
+
+### Remote push semantics
+
+- Best-effort. The local snapshot is the source of truth; remote failure is logged but does not mark the run as failed.
+- Both S3 and WebDAV SDKs are lazily required — installs that don't use a given target never pay the require cost.
+- When multiple remotes are configured, the per-run log row carries a comma-joined `remote_target` (e.g. `s3,webdav`) and an aggregate `remote_status`:
+  - `ok` — every configured target succeeded
+  - `partial` — at least one succeeded and at least one failed
+  - `error` — every configured target failed
+  - `skipped` — nothing configured
+
+### Log table — `log_system_backups`
+
+| Column | Description |
+|---|---|
+| `id`, `logged_at` | Standard log identifiers |
+| `trigger` | `scheduled`, `startup_catchup`, or `manual` |
+| `status` | `ok` or `error` (local snapshot outcome) |
+| `file_path` | Full path to the snapshot on disk |
+| `size_bytes`, `duration_ms`, `table_count`, `row_count` | Run stats |
+| `remote_target` | Comma-joined list of attempted remotes (null if none configured) |
+| `remote_status` | `ok` / `partial` / `error` / `skipped` |
+| `error_message` | Per-target failures (format: `s3: ...; webdav: ...`) or local error |
+
+The table is excluded from backups (see `EXCLUDED_TABLES` in `backups/index.js`).
+
+### Premium endpoints
+
+All mounted under `/api/premium/backups`. License + auth applied at the prefix.
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/premium/backups/status` | Current schedule, last run row, computed next-run timestamp, configured target descriptions |
+| `GET` | `/api/premium/backups/history?offset=&limit=` | Paginated `log_system_backups` rows, newest first |
+| `POST` | `/api/premium/backups/run-now` | Fire a one-off run (`trigger='manual'`), return the inserted row |
+| `POST` | `/api/premium/backups/verify/:id` | Re-read the snapshot referenced by a log row, parse it, count tables and rows |
+
+The `verify` endpoint never touches the database — it's a read-only "can I trust this file?" check the UI exposes as a one-click button.

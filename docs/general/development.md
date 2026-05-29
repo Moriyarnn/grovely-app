@@ -24,9 +24,9 @@ export PATH="$PATH:/c/Program Files/GitHub CLI"
 ```
 Installed at `C:\Program Files\GitHub CLI\gh.exe` — PATH must be set manually in bash.
 
-Bug tracking: GitHub Issues on `Moriyarnn/wifey-app`
+Bug tracking: GitHub Issues on `Moriyarnn/grovely-app`
 
 ## Docker Notes
-- `.dockerignore` in `wifey-app-backend/` excludes `node_modules`, `.env`, and `data` from the build context — critical for native modules (`better-sqlite3`) so Windows-compiled binaries don't overwrite Linux ones in the image.
+- `.dockerignore` in `grovely-backend/` excludes `node_modules`, `.env`, and `data` from the build context — critical for native modules (`better-sqlite3`) so Windows-compiled binaries don't overwrite Linux ones in the image.
 - Anonymous volumes (`- /app/node_modules`) mask host bind-mount. If a native module breaks after a rebuild, remove the stale volume: `docker volume rm <id>`.
-- Env vars are loaded via `env_file: ./wifey-app-backend/.env` in `docker-compose.yml`.
+- Env vars are loaded via `env_file: ./grovely-backend/.env` in `docker-compose.yml`.

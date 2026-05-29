@@ -139,7 +139,7 @@ The distinction between "no cycle_days record" (drag) and "null cycle_days recor
 ## Files Affected
 
 ### Frontend
-- `wifey-app-frontend/src/views/period/PeriodHome.vue`
+- `grovely-frontend/src/views/period/PeriodHome.vue`
   - Remove `startLegacyPeriod()` (the "Start period from this day" button and logic)
   - Remove `autoLogConsecutiveDay()` (silent logging — replaced by panel open)
   - Rewrite `onDayClick()` to route all period-relevant taps to the log panel
@@ -149,13 +149,13 @@ The distinction between "no cycle_days record" (drag) and "null cycle_days recor
   - Add "End period on this day" button to the log form panel (for open cycles)
   - Remove or repurpose the gap dialog template
 
-- `wifey-app-frontend/src/components/OnboardingTutorial.vue`
+- `grovely-frontend/src/components/OnboardingTutorial.vue`
   - Slide 2 currently shows the silent ✓ animation for tap-to-extend
   - Must be updated to reflect the new tap → panel → save flow
   - Update after the main PeriodHome.vue changes are validated in UAT
 
 ### Backend
-- `wifey-app-backend/routes/period/cycles.js`
+- `grovely-backend/routes/period/cycles.js`
   - `PATCH /:id/end` — add cascade delete of cycle_days after end_date (issue #35, should be done before or alongside this)
 
 ---
