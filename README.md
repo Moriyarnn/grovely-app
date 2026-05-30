@@ -18,25 +18,16 @@ email notifications, and a shared grocery list — runs on your own hardware.
 ## Quick Start
 
 ```bash
-cp .env.example .env   # fill in SMTP settings
+mkdir grovely && cd grovely
+curl -O https://raw.githubusercontent.com/Moriyarnn/grovely-app/main/docker-compose.yml
+curl -o .env https://raw.githubusercontent.com/Moriyarnn/grovely-app/main/grovely-backend/.env.example
+# edit .env: set OWNER1_* and OWNER2_*
 docker compose up -d
 ```
 
-## Reverse Proxy
+Then open `http://your-server:5173`.
 
-The base compose file publishes the frontend on `5173` and the backend on `3000`. Two opt-in overrides take those ports off public interfaces when a reverse proxy fronts the app:
-
-```bash
-# Reverse proxy on the host (Caddy, Nginx, etc.) — binds both services to 127.0.0.1
-docker compose -f docker-compose.yml -f docker-compose.proxy.yml up -d --build
-
-# Reverse proxy in another container (Traefik, NPM, dockerized Caddy) — no host ports,
-# both services attach to an external Docker network named "proxy"
-docker network create proxy
-docker compose -f docker-compose.yml -f docker-compose.proxy-docker.yml up -d --build
-```
-
-`Caddyfile.example` at the repo root is a working same-origin Caddy config (SPA at `/`, API at `/api/*` and `/health`, automatic HTTPS via Let's Encrypt). Replace the hostname and email and copy it into place.
+See [INSTALL.md](./INSTALL.md) for full instructions, including reverse proxy setups (Caddy, Nginx, Traefik, Nginx Proxy Manager), backups, license keys, and troubleshooting.
 
 ## Tech Stack
 
