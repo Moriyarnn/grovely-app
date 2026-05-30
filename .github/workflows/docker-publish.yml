@@ -24,6 +24,7 @@ jobs:
             image: ghcr.io/${{ github.repository_owner }}/grovely-backend
             target: ''
             build_args: ''
+            tag_suffix: ''
           - name: frontend
             context: ./grovely-frontend
             image: ghcr.io/${{ github.repository_owner }}/grovely-frontend
@@ -31,6 +32,15 @@ jobs:
             build_args: |
               BUILD_MODE=prod
               VITE_BACKEND_PORT=3000
+            tag_suffix: ''
+          - name: frontend-proxy
+            context: ./grovely-frontend
+            image: ghcr.io/${{ github.repository_owner }}/grovely-frontend
+            target: build
+            build_args: |
+              BUILD_MODE=prod
+              VITE_BACKEND_PORT=
+            tag_suffix: '-proxy'
 
     steps:
       - name: Checkout
@@ -58,6 +68,8 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ steps.img.outputs.name }}
+          flavor: |
+            suffix=${{ matrix.tag_suffix }},onlatest=true
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}
