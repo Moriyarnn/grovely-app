@@ -35,7 +35,7 @@ services:
       - PUID=${PUID:-1000}
       - PGID=${PGID:-1000}
     env_file:
-      - ./grovely-backend/.env.uat
+      - .env.uat
     networks:
       - app_net
     deploy:

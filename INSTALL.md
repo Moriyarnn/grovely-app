@@ -33,7 +33,7 @@ mkdir grovely && cd grovely
 
 ```bash
 curl -O https://raw.githubusercontent.com/Moriyarnn/grovely-app/main/docker-compose.yml
-curl -o .env https://raw.githubusercontent.com/Moriyarnn/grovely-app/main/grovely-backend/.env.example
+curl -o .env https://raw.githubusercontent.com/Moriyarnn/grovely-app/main/.env.example
 ```
 
 The `.env.example` file is the canonical reference for every supported variable, with inline notes explaining what each one does (accounts, license, SMTP, backups, timezone, etc.). Open it, fill in `OWNER1_*` and `OWNER2_*`, leave the rest commented until you need it.
@@ -50,7 +50,19 @@ DISABLE_EMAIL=true
 
 Drop that into a file called `.env` next to `docker-compose.yml` and you're ready. Pull `.env.example` later when you want to enable notifications, backups, or a license.
 
-### Step 3: pull and start
+### Step 3 (optional): validate your `.env`
+
+Catches typos, leftover placeholders, missing required values, and common gotchas before you start the stack:
+
+```bash
+curl -O https://raw.githubusercontent.com/Moriyarnn/grovely-app/main/validate-env.sh
+chmod +x validate-env.sh
+./validate-env.sh
+```
+
+It exits non-zero on any error so you can chain it: `./validate-env.sh && docker compose up -d`.
+
+### Step 4: pull and start
 
 ```bash
 docker compose pull
@@ -70,12 +82,14 @@ Use this when your reverse proxy runs directly on the host OS, not in Docker. Gr
 mkdir grovely && cd grovely
 curl -O https://raw.githubusercontent.com/Moriyarnn/grovely-app/main/docker-compose.yml
 curl -O https://raw.githubusercontent.com/Moriyarnn/grovely-app/main/docker-compose.proxy-host.yml
-curl -o .env https://raw.githubusercontent.com/Moriyarnn/grovely-app/main/grovely-backend/.env.example
+curl -o .env https://raw.githubusercontent.com/Moriyarnn/grovely-app/main/.env.example
 ```
 
 Fill in your `.env` (see Step 2 of section 1).
 
 ### Step 2: start
+
+Optional: validate your `.env` before starting (catches placeholders, missing required values, and common mistakes). See [Step 3 of section 1](#step-3-optional-validate-your-env) for the validator script — it works the same for any install method.
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.proxy-host.yml pull
@@ -137,12 +151,14 @@ If you already have a shared network with a different name (e.g. `web`, `traefik
 mkdir grovely && cd grovely
 curl -O https://raw.githubusercontent.com/Moriyarnn/grovely-app/main/docker-compose.yml
 curl -O https://raw.githubusercontent.com/Moriyarnn/grovely-app/main/docker-compose.proxy-docker.yml
-curl -o .env https://raw.githubusercontent.com/Moriyarnn/grovely-app/main/grovely-backend/.env.example
+curl -o .env https://raw.githubusercontent.com/Moriyarnn/grovely-app/main/.env.example
 ```
 
 Fill in your `.env` (see Step 2 of section 1).
 
 ### Step 3: start
+
+Optional: validate your `.env` before starting (catches placeholders, missing required values, and common mistakes). See [Step 3 of section 1](#step-3-optional-validate-your-env) for the validator script — it works the same for any install method.
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.proxy-docker.yml pull
@@ -160,7 +176,7 @@ For Traefik, you'd typically use container labels. For Nginx Proxy Manager, add 
 
 ## Configuration
 
-Everything Grovely accepts is documented inline in [`.env.example`](https://github.com/Moriyarnn/grovely-app/blob/main/grovely-backend/.env.example), with comments explaining each variable. The quick summary:
+Everything Grovely accepts is documented inline in [`.env.example`](https://github.com/Moriyarnn/grovely-app/blob/main/.env.example), with comments explaining each variable. The quick summary:
 
 **Required**
 
@@ -169,7 +185,7 @@ Everything Grovely accepts is documented inline in [`.env.example`](https://gith
 
 **Common optional**
 
-- `LICENSE_KEY`: premium license, unlocks notifications, backups, advanced analytics. Get one at [grovely.org](https://grovely.org).
+- `LICENSE_KEY`: premium license, unlocks notifications, backups, advanced analytics. Get one at [grovely.lemonsqueezy.com](https://grovely.lemonsqueezy.com/).
 - `DISABLE_EMAIL=true`: disable email entirely (useful during setup).
 - `TZ`: container timezone, e.g. `Europe/Madrid`. Defaults to UTC.
 - `PUID` / `PGID`: user/group IDs for files in the data volume. Defaults to `1000:1000`.
@@ -204,7 +220,7 @@ A free, manual backup is always available: Settings → Download backup.
 
 ## Adding a license key
 
-Premium features (notifications, backups, advanced cycle analytics, partner features) require a license. Purchase at [grovely.org](https://grovely.org); you'll receive a signed key by email.
+Premium features (notifications, backups, advanced cycle analytics, partner features) require a license. Purchase at [grovely.lemonsqueezy.com](https://grovely.lemonsqueezy.com/); you'll receive a signed key by email.
 
 Add it to your `.env`:
 

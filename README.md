@@ -20,7 +20,7 @@ email notifications, and a shared grocery list — runs on your own hardware.
 ```bash
 mkdir grovely && cd grovely
 curl -O https://raw.githubusercontent.com/Moriyarnn/grovely-app/main/docker-compose.yml
-curl -o .env https://raw.githubusercontent.com/Moriyarnn/grovely-app/main/grovely-backend/.env.example
+curl -o .env https://raw.githubusercontent.com/Moriyarnn/grovely-app/main/.env.example
 # edit .env: set OWNER1_* and OWNER2_*
 docker compose up -d
 ```

@@ -84,7 +84,7 @@ const props = defineProps({
 
 defineEmits(['update:open'])
 
-const pricingUrl = 'https://grovely.app/pricing'
+const pricingUrl = 'https://grovely.lemonsqueezy.com/'
 
 const iconColor = computed(() => ({
   pink:    '#993556',
