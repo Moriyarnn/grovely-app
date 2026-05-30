@@ -1,5 +1,7 @@
 # Override for use with a reverse proxy running in Docker (Traefik, Nginx
-# Proxy Manager, dockerized Caddy, etc.).
+# Proxy Manager, dockerized Caddy, etc.). For a reverse proxy installed
+# directly on the host OS (Caddy, Nginx, Apache, HAProxy), use
+# docker-compose.proxy-host.yml instead.
 #
 # What this does:
 #  - Builds the frontend without a hardcoded backend port so API calls go to

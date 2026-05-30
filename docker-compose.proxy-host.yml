@@ -1,0 +1,58 @@
+# Override for use with a reverse proxy installed on the host
+# (Caddy, Nginx, Apache, HAProxy — anything running directly on the host OS,
+# NOT in Docker). For a reverse proxy running in Docker (Traefik, Nginx Proxy
+# Manager, dockerized Caddy), use docker-compose.proxy-docker.yml instead.
+#
+# What this does:
+#  - Pulls the `:latest-proxy` frontend image, built with VITE_BACKEND_PORT=""
+#    so API calls go to the same origin (e.g. https://grovely.example.com/api)
+#    instead of port 3000.
+#  - Binds the frontend and backend to 127.0.0.1 only. Your host-installed
+#    reverse proxy can reach them on the loopback interface, but they are
+#    never exposed on a public network interface.
+#
+# Apply alongside the main compose file:
+#   docker compose -f docker-compose.yml -f docker-compose.proxy-host.yml up -d
+#
+# Example Caddyfile snippet (replace grovely.example.com with your domain):
+#
+#   grovely.example.com {
+#     handle_path /api/* {
+#       reverse_proxy 127.0.0.1:3000 {
+#         rewrite /api{uri}
+#       }
+#     }
+#     reverse_proxy 127.0.0.1:5173
+#   }
+#
+# Example Nginx server block:
+#
+#   server {
+#     server_name grovely.example.com;
+#     location /api/ {
+#       proxy_pass http://127.0.0.1:3000/;
+#       proxy_set_header Host $host;
+#       proxy_set_header X-Forwarded-For $remote_addr;
+#       proxy_set_header X-Forwarded-Proto $scheme;
+#     }
+#     location / {
+#       proxy_pass http://127.0.0.1:5173/;
+#       proxy_set_header Host $host;
+#     }
+#   }
+
+services:
+  frontend:
+    image: ghcr.io/moriyarnn/grovely-frontend:latest-proxy
+    # If you'd rather build locally, comment the `image:` line above and use
+    # `docker compose ... up -d --build` — the main compose file provides the
+    # build context; this overlay overrides the build arg below.
+    build:
+      args:
+        VITE_BACKEND_PORT: ""
+    ports: !override
+      - "127.0.0.1:5173:5173"
+
+  backend:
+    ports: !override
+      - "127.0.0.1:3000:3000"
