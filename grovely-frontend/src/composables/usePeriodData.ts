@@ -97,10 +97,13 @@ async function loadData() {
     apiFetch(`${API}/period/cycles`),
     apiFetch(`${API}/period/gap-days`)
   ])
-  allCycleDays.value = await daysRes.json()
-  summary.value = await summaryRes.json()
-  allCycles.value = await cyclesRes.json()
-  gapDayLogs.value = await gapRes.json()
+  const [days, sum, cycles, gaps] = await Promise.all([
+    daysRes.json(), summaryRes.json(), cyclesRes.json(), gapRes.json()
+  ])
+  allCycleDays.value = days
+  summary.value = sum
+  allCycles.value = cycles
+  gapDayLogs.value = gaps
 }
 
 export function usePeriodData() {

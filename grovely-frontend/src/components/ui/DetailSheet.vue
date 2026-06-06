@@ -3,7 +3,7 @@
     <div
       class="ds-backdrop"
       :class="[`ds-backdrop--${theme}`, { 'ds-backdrop--visible': open }]"
-      @pointerdown="$emit('update:open', false)"
+      @pointerdown.prevent="$emit('update:open', false)"
     />
     <div
       class="ds-sheet"

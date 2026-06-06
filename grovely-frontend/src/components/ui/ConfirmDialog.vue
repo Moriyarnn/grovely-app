@@ -20,7 +20,7 @@
           <slot v-else />
         </p>
         <slot name="content" />
-        <div class="cd-actions">
+        <div v-if="!hideActions" class="cd-actions">
           <button class="cd-cancel" :class="`cd-cancel--${theme}`" @click="$emit('update:open', false)">Cancel</button>
           <slot name="extra-action" />
           <button
@@ -47,6 +47,7 @@ defineProps({
   loading:      { type: Boolean, default: false },
   theme:        { type: String,  default: 'pink' },  // 'pink' | 'green' | 'amber'
   descMaxLines: { type: Number,  default: 0 },       // 0 = unlimited; >0 reserves N lines, ellipsis after
+  hideActions:  { type: Boolean, default: false },   // hide default cancel/confirm row; use #content for custom actions
 })
 defineEmits(['update:open', 'confirm'])
 </script>

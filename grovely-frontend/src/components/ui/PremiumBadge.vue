@@ -1,7 +1,7 @@
 <template>
   <span class="premium-badge" :class="[`premium-badge--${theme}`, { 'premium-badge--unlocked': unlocked }]">
     <v-icon size="11" :color="iconColor">{{ unlocked ? 'mdi-lock-open-outline' : 'mdi-lock' }}</v-icon>
-    Premium
+    <span class="premium-badge-text">Premium</span>
   </span>
 </template>
 
@@ -51,6 +51,10 @@ const iconColor = computed(() => {
   background: #f5f5f5;
   border-color: #e0e0e0;
   color: #999;
+}
+
+.premium-badge-text {
+  transform: translateY(0px);
 }
 
 </style>

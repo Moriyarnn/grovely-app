@@ -146,3 +146,6 @@ vite.config.ts.timestamp-*
 # Auto-generated JWT secret
 wifey-app-backend/data/secret.key
 grovely-backend/data/secret.key
+
+# Auto-generated data encryption key (private field encryption at rest)
+grovely-backend/data/encryption.key

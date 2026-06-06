@@ -29,6 +29,7 @@ services:
   backend:
     container_name: grovely-dev-backend
     build: ./grovely-backend
+    entrypoint: ["sh", "/app/entrypoint.sh"]
     ports:
       - "3001:3000"
     volumes:
@@ -51,9 +52,53 @@ services:
           cpus: '0.5'
     restart: always
 
+  minio:
+    container_name: grovely-dev-minio
+    image: minio/minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data_dev:/data
+    networks:
+      - app_net
+
+  minio-init:
+    container_name: grovely-dev-minio-init
+    image: minio/mc
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+        sleep 3;
+        mc alias set local http://minio:9000 minioadmin minioadmin;
+        mc mb --ignore-existing local/grovely-backups;
+        exit 0;
+      "
+    networks:
+      - app_net
+    restart: "no"
+
+  webdav:
+    container_name: grovely-dev-webdav
+    image: bytemark/webdav
+    ports:
+      - "8081:80"
+    environment:
+      AUTH_TYPE: Basic
+      USERNAME: admin
+      PASSWORD: admin
+    networks:
+      - app_net
+
 networks:
   app_net:
     driver: bridge
 
 volumes:
   sqlite_data_dev:
+  minio_data_dev:

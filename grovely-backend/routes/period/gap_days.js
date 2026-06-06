@@ -1,19 +1,21 @@
 const express = require('express')
 const router = express.Router()
 const { requireOwner } = require('../../middleware/auth')
+const { encrypt, revealPrivateFields } = require('../../utils/encryption')
 
 module.exports = (db) => {
-  // Get all gap day logs for the authenticated user
+  // Get all gap day logs. Gap logs belong to the period owner (owner1 is the
+  // only role that can create them); the partner gets the same read-only view
+  // as the rest of the period calendar, with notes gated by revealPrivateFields.
   router.get('/', (req, res) => {
     const rows = db.prepare(`
       SELECT g.*, GROUP_CONCAT(s.symptom) as symptoms
       FROM gap_day_logs g
       LEFT JOIN gap_day_symptoms s ON s.gap_day_id = g.id
-      WHERE g.user_id = ?
       GROUP BY g.id
       ORDER BY g.date ASC
-    `).all(req.user.id)
-    res.json(rows)
+    `).all()
+    res.json(revealPrivateFields(db, req, 'gap_day_logs', rows))
   })
 
   // Create a gap day log
@@ -24,7 +26,7 @@ module.exports = (db) => {
     const result = db.prepare(`
       INSERT INTO gap_day_logs (user_id, date, notes) VALUES (?, ?, ?)
       ON CONFLICT(user_id, date) DO UPDATE SET notes = excluded.notes, updated_at = CURRENT_TIMESTAMP
-    `).run(req.user.id, date, notes || null)
+    `).run(req.user.id, date, encrypt(notes || null))
 
     const id = result.lastInsertRowid || db.prepare(
       'SELECT id FROM gap_day_logs WHERE user_id = ? AND date = ?'
@@ -47,7 +49,7 @@ module.exports = (db) => {
 
     const { notes, symptoms } = req.body
     db.prepare('UPDATE gap_day_logs SET notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
-      .run(notes || null, id)
+      .run(encrypt(notes || null), id)
 
     if (symptoms !== undefined) {
       db.prepare('DELETE FROM gap_day_symptoms WHERE gap_day_id = ?').run(id)

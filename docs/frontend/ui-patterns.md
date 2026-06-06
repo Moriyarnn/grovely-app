@@ -633,3 +633,212 @@ Rules:
 - Add one `premium-card` per locked feature — cards share space equally via `flex: 1`.
 - Title clears both badges with `padding-right: 150px`.
 - The panel itself follows the same root structure as other column components (see Column Panel Root above).
+
+---
+
+## Expand Transition (slide-down)
+
+Animates a single `v-if` element sliding down from zero height when it appears, and collapsing back up when it disappears. Used for conditional rows that belong to a parent setting — e.g. custom currency fields appearing when "Other" is selected, or a custom days input appearing when "Custom" is chosen in a segmented control.
+
+**This is a pattern, not a component.** Parameters (duration, easing) are intentionally left to the caller so they can match the surrounding context.
+
+### HTML
+
+Wrap the `v-if` element in a `<Transition>` with JavaScript hooks. The child element must own the `overflow: hidden` and `transition: height` CSS — not the parent.
+
+```html
+<Transition
+  @before-enter="onExpandBeforeEnter"
+  @enter="onExpandEnter"
+  @leave="onExpandLeave"
+>
+  <div v-if="condition" class="my-expand">
+    <!-- rows or content that slide in -->
+  </div>
+</Transition>
+```
+
+### CSS (on the child element)
+
+```css
+.my-expand {
+  overflow: hidden;
+  transition: height 0.25s ease; /* adjust duration/easing to taste */
+}
+```
+
+### JS hooks
+
+Copy these three functions into the component's `<script setup>`. The names are local — rename them to avoid conflicts if the same component has multiple expand sections.
+
+```ts
+function onExpandBeforeEnter(el: Element) {
+  (el as HTMLElement).style.height = '0'
+}
+
+function onExpandEnter(el: Element, done: () => void) {
+  const h = el as HTMLElement
+  h.style.height = 'auto'
+  const target = h.scrollHeight
+  h.style.height = '0'
+  void h.offsetHeight
+  h.style.height = target + 'px'
+  h.addEventListener('transitionend', function onEnd(e) {
+    if ((e as TransitionEvent).propertyName !== 'height') return
+    h.removeEventListener('transitionend', onEnd)
+    h.style.height = ''
+    done()
+  })
+}
+
+function onExpandLeave(el: Element, done: () => void) {
+  const h = el as HTMLElement
+  h.style.height = h.scrollHeight + 'px'
+  void h.offsetHeight
+  h.style.height = '0'
+  h.addEventListener('transitionend', function onEnd(e) {
+    if ((e as TransitionEvent).propertyName !== 'height') return
+    h.removeEventListener('transitionend', onEnd)
+    done()
+  })
+}
+```
+
+**Why measure-then-animate instead of a CSS `max-height` trick:** `max-height` requires a hardcoded cap value which causes the animation to feel slow or jerky when the real height is much smaller than the cap. `scrollHeight` measures the exact target so the animation duration maps 1:1 to the actual distance, feeling natural at any content height.
+
+**Canonical uses:** `SettingsView.vue` (custom currency fields), `PantrySettingsSheet.vue` (custom expiry days). The same underlying approach is also used in `NotesField.vue` (character counter panel) and `NotificationMessagesView.vue` (edit panel per notification type).
+
+---
+
+## Inline Fade-Slide (appear/disappear in a flex row)
+
+Animates a small inline element fading in from slightly above when it appears, and fading out downward when it disappears. Used for optional controls that sit inside a label row alongside other text — e.g. the `∑ tot.` toggle that appears in the Price label row when piece count exceeds 1.
+
+**This is a pattern, not a component.** Adjust duration and offset to taste.
+
+### When to use vs. Expand Transition
+
+Use **Inline Fade-Slide** when the element lives *inside* a horizontal flex row alongside other content and its presence doesn't change the row's height — you want it to appear softly without pushing anything around. Use **Expand Transition** when the element is a full block row (or group of rows) that should visibly push content down as it opens.
+
+### HTML
+
+```html
+<Transition name="inline-fade-slide">
+  <SomeComponent v-if="condition" />
+</Transition>
+```
+
+Add `appear` if the element should also animate on initial mount:
+
+```html
+<Transition appear name="inline-fade-slide">
+```
+
+### CSS
+
+```css
+.inline-fade-slide-enter-active,
+.inline-fade-slide-leave-active { transition: opacity 0.15s ease, transform 0.15s ease; }
+.inline-fade-slide-enter-from   { opacity: 0; transform: translateY(-4px); }
+.inline-fade-slide-leave-to     { opacity: 0; transform: translateY(4px); }
+
+/* Absolute on leave so the row doesn't reflow while the element fades out */
+.inline-fade-slide-leave-active { position: absolute; }
+```
+
+The `position: absolute` on leave is important — without it, the disappearing element holds its space in the flex row until the transition finishes, causing a visible layout jump. With it, the element is pulled out of flow immediately and fades in place.
+
+**Canonical uses:** `PantryShoppingList.vue` — `∑ tot.` toggle in the Price label row (both add form and edit sheet, named `tot-toggle` and `edit-toggle` respectively). Also the `pcs` toggle in the edit sheet label row (`edit-toggle`).
+
+---
+
+## Directional Slide Swap
+
+Swaps two mutually exclusive elements by sliding the outgoing one out and the incoming one in from the opposite side. Direction is determined at runtime — left when moving "forward", right when moving "back" (or whatever the feature's directional logic is). Always use `mode="out-in"` so the incoming element waits for the outgoing one to fully exit before entering.
+
+Used when the user explicitly chooses a direction — e.g. toggling between an amount+unit input and a pieces input in the quantity field.
+
+### HTML
+
+```html
+<Transition :name="`directional-swap-${slideDir}`" mode="out-in">
+  <div v-if="conditionA" key="a"> ... </div>
+  <div v-else key="b"> ... </div>
+</Transition>
+```
+
+`slideDir` is a `ref<'left' | 'right'>` updated before the condition changes.
+
+### CSS
+
+```css
+.directional-swap-right-enter-active,
+.directional-swap-right-leave-active,
+.directional-swap-left-enter-active,
+.directional-swap-left-leave-active {
+  transition: transform 0.18s ease, opacity 0.15s ease;
+}
+.directional-swap-right-enter-from { transform: translateX(16px);  opacity: 0; }
+.directional-swap-right-leave-to   { transform: translateX(-16px); opacity: 0; }
+.directional-swap-left-enter-from  { transform: translateX(-16px); opacity: 0; }
+.directional-swap-left-leave-to    { transform: translateX(16px);  opacity: 0; }
+```
+
+The offset (`16px`) can be tuned — smaller values feel subtler, larger values feel more decisive.
+
+**Canonical use:** `PantryShoppingList.vue` — quantity field toggling between amount+unit and pieces input (`qty-swap-left` / `qty-swap-right`).
+
+---
+
+## Edge Slide-in
+
+An element slides in from one edge (typically the right) when it appears or mounts, and slides back out to the same edge when it leaves. Use `appear` to also animate on initial mount. Used for controls that reveal themselves alongside an input when a related mode activates — e.g. a unit selector appearing next to a number input.
+
+### HTML
+
+```html
+<Transition appear name="edge-slide-in">
+  <select v-model="unit" class="unit-select" />
+</Transition>
+```
+
+### CSS
+
+```css
+.edge-slide-in-enter-active,
+.edge-slide-in-leave-active { transition: transform 0.18s ease, opacity 0.15s ease; }
+.edge-slide-in-enter-from,
+.edge-slide-in-leave-to     { transform: translateX(16px); opacity: 0; }
+```
+
+**Canonical use:** `PantryShoppingList.vue` — qty unit select and density unit select sliding in when edit mode opens (`edit-ctrl`).
+
+---
+
+## Vertical Content Swap
+
+Swaps inline text or a small element in place — the outgoing content fades out downward while the incoming content fades in from slightly above. Always use `mode="out-in"`. Use `key` on each child to force Vue to treat them as distinct elements.
+
+Used when a short piece of text changes meaning based on a toggle — e.g. `/pc` becoming `= $1.20/pc` when a total-price toggle is switched on.
+
+### HTML
+
+```html
+<Transition name="vertical-swap" mode="out-in">
+  <span v-if="condition" key="a">New text</span>
+  <span v-else key="b">Other text</span>
+</Transition>
+```
+
+### CSS
+
+```css
+.vertical-swap-enter-active,
+.vertical-swap-leave-active { transition: opacity 0.15s ease, transform 0.15s ease; }
+.vertical-swap-enter-from   { opacity: 0; transform: translateY(-4px); }
+.vertical-swap-leave-to     { opacity: 0; transform: translateY(4px); }
+```
+
+The container must have `overflow: hidden` if the outgoing and incoming elements have different widths, to avoid layout shifts during the crossfade gap.
+
+**Canonical use:** `PantryShoppingList.vue` — price suffix swapping between `/pc` and `= $X.XX/pc` when the ∑ tot. toggle is flipped (`price-suffix`).

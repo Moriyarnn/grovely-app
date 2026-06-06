@@ -31,67 +31,30 @@
         </div>
       </div>
 
-      <div v-if="isCustomExpiry" class="aps-row">
-        <span class="aps-label">Custom days</span>
-        <div style="display:flex;align-items:center;gap:6px;">
-          <input
-            type="number"
-            min="1"
-            max="60"
-            class="aps-number-input"
-            :value="settings.pantry_expiry_warning_days"
-            @change="e => saveSetting('pantry_expiry_warning_days', String(Math.max(1, parseInt((e.target as HTMLInputElement).value) || 1)))"
-          />
-          <span style="font-size:12px;color:#aaa;">days</span>
-        </div>
-      </div>
-
-      <div class="aps-row" @click="toggleHideEmptyCategories" style="cursor:pointer">
-        <span class="aps-label">Hide empty categories</span>
-        <div class="aps-toggle" :class="{ on: preferences.pantry_hide_empty_categories === '1' }">
-          <div class="aps-knob" />
-        </div>
-      </div>
-
-      <div class="aps-row">
-        <span class="aps-label">Currency</span>
-        <select
-          class="aps-select"
-          :value="settings.pantry_currency ?? 'USD'"
-          @change="e => saveSetting('pantry_currency', (e.target as HTMLInputElement).value)"
-        >
-          <option v-for="c in CURRENCIES" :key="c.value" :value="c.value">{{ c.label }}</option>
-        </select>
-      </div>
-
-      <template v-if="(settings.pantry_currency ?? 'USD') === 'OTHER'">
-        <div class="aps-row">
-          <div class="aps-label-group">
-            <span class="aps-label">Custom currency symbol</span>
-            <span class="aps-sublabel">e.g. Kč, zł, kr</span>
+      <Transition
+        @before-enter="onExpandBeforeEnter"
+        @enter="onExpandEnter"
+        @leave="onExpandLeave"
+      >
+        <div v-if="isCustomExpiry" class="aps-expand">
+          <div class="aps-row">
+            <span class="aps-label">Expiry warning custom days</span>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <input
+                type="number"
+                min="1"
+                max="60"
+                class="aps-number-input"
+                :value="settings.pantry_expiry_warning_days"
+                @change="e => saveSetting('pantry_expiry_warning_days', String(Math.max(1, parseInt((e.target as HTMLInputElement).value) || 1)))"
+              />
+              <span style="font-size:12px;color:#aaa;">days</span>
+            </div>
           </div>
-          <input
-            class="aps-symbol-input"
-            maxlength="4"
-            placeholder="$"
-            :value="settings.pantry_currency_custom_symbol ?? ''"
-            @change="e => saveSetting('pantry_currency_custom_symbol', (e.target as HTMLInputElement).value)"
-          />
         </div>
-        <div class="aps-row">
-          <div class="aps-label-group">
-            <span class="aps-label">Custom currency name</span>
-            <span class="aps-sublabel">e.g. Czech Koruna, Polish Złoty</span>
-          </div>
-          <input
-            class="aps-symbol-input aps-symbol-input--wide"
-            maxlength="32"
-            placeholder="Currency"
-            :value="settings.pantry_currency_custom_label ?? ''"
-            @change="e => saveSetting('pantry_currency_custom_label', (e.target as HTMLInputElement).value)"
-          />
-        </div>
-      </template>
+      </Transition>
+
+
 
     </div>
 
@@ -103,14 +66,11 @@
 import { ref, computed } from 'vue'
 import DetailSheet from '../components/ui/DetailSheet.vue'
 import { useSettings } from '../composables/useSettings'
-import { usePreferences } from '../composables/usePreferences'
-import { CURRENCIES } from '../constants/currencies'
 
 defineProps<{ open: boolean }>()
 defineEmits<{ (e: 'update:open', v: boolean): void }>()
 
 const { settings, updateSetting } = useSettings()
-const { preferences, updatePreference } = usePreferences()
 
 const errMsg = ref('')
 function showErr(msg: string) {
@@ -130,8 +90,34 @@ function selectCustomExpiry() {
   if (isCustomExpiry.value) return
   saveSetting('pantry_expiry_warning_days', '14')
 }
-function toggleHideEmptyCategories() {
-  updatePreference('pantry_hide_empty_categories', preferences.value.pantry_hide_empty_categories === '1' ? '0' : '1')
+
+function onExpandBeforeEnter(el: Element) {
+  (el as HTMLElement).style.height = '0'
+}
+function onExpandEnter(el: Element, done: () => void) {
+  const h = el as HTMLElement
+  h.style.height = 'auto'
+  const target = h.scrollHeight
+  h.style.height = '0'
+  void h.offsetHeight
+  h.style.height = target + 'px'
+  h.addEventListener('transitionend', function onEnd(e) {
+    if ((e as TransitionEvent).propertyName !== 'height') return
+    h.removeEventListener('transitionend', onEnd)
+    h.style.height = ''
+    done()
+  })
+}
+function onExpandLeave(el: Element, done: () => void) {
+  const h = el as HTMLElement
+  h.style.height = h.scrollHeight + 'px'
+  void h.offsetHeight
+  h.style.height = '0'
+  h.addEventListener('transitionend', function onEnd(e) {
+    if ((e as TransitionEvent).propertyName !== 'height') return
+    h.removeEventListener('transitionend', onEnd)
+    done()
+  })
 }
 </script>
 
@@ -155,17 +141,6 @@ function toggleHideEmptyCategories() {
 .aps-label-group { display: flex; flex-direction: column; gap: 2px; }
 .aps-sublabel { font-size: 12px; color: #8e8e93; }
 
-.aps-toggle {
-  width: 36px; height: 20px; background: #ddd;
-  border-radius: 10px; position: relative; cursor: pointer;
-  transition: background 0.2s; flex-shrink: 0;
-}
-.aps-toggle.on { background: #D4537E; }
-.aps-knob {
-  width: 16px; height: 16px; background: white; border-radius: 50%;
-  position: absolute; top: 2px; left: 2px; transition: left 0.2s;
-}
-.aps-toggle.on .aps-knob { left: 18px; }
 
 .aps-segmented { display: flex; gap: 4px; flex-shrink: 0; }
 .aps-seg-btn {
@@ -176,26 +151,17 @@ function toggleHideEmptyCategories() {
 }
 .aps-seg-btn.active { background: #D4537E; border-color: #D4537E; color: #fff; }
 
+.aps-expand {
+  overflow: hidden;
+  transition: height 0.25s ease;
+}
+
 .aps-number-input {
   border: none; border-bottom: 1px solid #e0e0e0;
   background: transparent; font-size: 13px; color: #333;
   text-align: right; padding: 2px 0; outline: none; width: 48px;
 }
 .aps-number-input::placeholder { color: #ccc; }
-.aps-select {
-  border: none; border-bottom: 1px solid #e0e0e0;
-  background: transparent; font-size: 13px; color: #333;
-  padding: 2px 0; outline: none; max-width: 180px;
-  appearance: none; -webkit-appearance: none;
-  cursor: pointer;
-}
-.aps-symbol-input {
-  border: none; border-bottom: 1px solid #e0e0e0;
-  background: transparent; font-size: 13px; color: #333;
-  text-align: right; padding: 2px 0; outline: none; width: 60px;
-}
-.aps-symbol-input::placeholder { color: #ccc; }
-.aps-symbol-input--wide { width: 120px; }
 
 .aps-snackbar {
   position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);

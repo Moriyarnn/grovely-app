@@ -29,7 +29,8 @@ function s3Config () {
   // All four are required. Endpoint is optional for real AWS but required for everything
   // else, so we always demand it — keeps the config surface obvious.
   if (!endpoint || !bucket || !key || !secret) return null
-  return { endpoint, bucket, key, secret, region, prefix }
+  const name = (process.env.BACKUP_S3_NAME || '').trim()
+  return { endpoint, bucket, key, secret, region, prefix, name }
 }
 
 // Reports which required S3 fields are missing. Used by the Phase C destinations
@@ -54,7 +55,8 @@ function webdavConfig () {
   const user = (process.env.BACKUP_WEBDAV_USER || '').trim()
   const pass = (process.env.BACKUP_WEBDAV_PASS || '').trim()
   if (!url || !user || !pass) return null
-  return { url, user, pass }
+  const name = (process.env.BACKUP_WEBDAV_NAME || '').trim()
+  return { url, user, pass, name }
 }
 
 function webdavConfigDiagnose () {
@@ -159,6 +161,175 @@ async function pushWebDAV (filePath) {
 }
 
 // ---------------------------------------------------------------------------
+// Target resolution helpers
+// ---------------------------------------------------------------------------
+
+// Derives the protocol type from a target name.
+// Convention: 's3' and 's3:*' are S3-compatible; 'webdav' and 'webdav:*' are WebDAV.
+// Future named targets ('s3:archive', 'webdav:nextcloud') follow the same convention
+// — add config resolution for them in s3Config(name) / webdavConfig(name) without
+// touching this function or the routes.
+function targetProtocol (name) {
+  if (name === 's3'     || name.startsWith('s3:'))     return 's3'
+  if (name === 'webdav' || name.startsWith('webdav:')) return 'webdav'
+  return null
+}
+
+// Resolve S3 config for a named target.
+// When multi-target support is added, extend this to read per-name env vars
+// (e.g. BACKUP_S3_ARCHIVE_ENDPOINT for 's3:archive') before falling back to the
+// default set — callers don't change.
+function s3ConfigForTarget (name) {
+  return s3Config()  // currently one S3 target; extend here for named variants
+}
+
+// Same pattern for WebDAV.
+function webdavConfigForTarget (name) {
+  return webdavConfig()
+}
+
+// ---------------------------------------------------------------------------
+// Live listing — returns what is actually in the destination right now
+// ---------------------------------------------------------------------------
+
+const LIST_TIMEOUT_MS     = 10000
+const DOWNLOAD_TIMEOUT_MS = 30000
+
+async function _listS3 (cfg) {
+  const { S3Client, ListObjectsV2Command } = require('@aws-sdk/client-s3')
+  const client = new S3Client({
+    endpoint: cfg.endpoint, region: cfg.region,
+    credentials: { accessKeyId: cfg.key, secretAccessKey: cfg.secret },
+    forcePathStyle: true, maxAttempts: 1,
+  })
+  const ac    = new AbortController()
+  const timer = setTimeout(() => ac.abort(), LIST_TIMEOUT_MS)
+  let result
+  try {
+    result = await client.send(
+      new ListObjectsV2Command({ Bucket: cfg.bucket, Prefix: cfg.prefix || '' }),
+      { abortSignal: ac.signal }
+    )
+  } finally {
+    clearTimeout(timer)
+  }
+  return (result.Contents || [])
+    .filter(obj => obj.Key.endsWith('.json'))
+    .map(obj => ({
+      remote_key:    obj.Key,
+      filename:      path.basename(obj.Key),
+      size_bytes:    obj.Size ?? null,
+      last_modified: obj.LastModified ? obj.LastModified.toISOString() : null,
+    }))
+    .sort((a, b) => (b.last_modified || '').localeCompare(a.last_modified || ''))
+}
+
+async function _listWebDAV (cfg) {
+  const { createClient } = require('webdav')
+  const client  = createClient(cfg.url, { username: cfg.user, password: cfg.pass })
+  const ac      = new AbortController()
+  const timer   = setTimeout(() => ac.abort(), LIST_TIMEOUT_MS)
+  let contents
+  try {
+    contents = await client.getDirectoryContents('/', { signal: ac.signal })
+  } finally {
+    clearTimeout(timer)
+  }
+  return contents
+    .filter(item => item.type === 'file' && item.basename.endsWith('.json'))
+    .map(item => ({
+      remote_key:    item.filename,
+      filename:      item.basename,
+      size_bytes:    item.size ?? null,
+      last_modified: item.lastmod ?? null,
+    }))
+    .sort((a, b) => (b.last_modified || '').localeCompare(a.last_modified || ''))
+}
+
+/**
+ * List all backup files currently present in a named remote target.
+ * Returns null when the target is not configured, an array otherwise.
+ * targetName matches the strings returned by getConfiguredTargets() —
+ * currently 's3' or 'webdav', extensible to 's3:archive', 'webdav:nextcloud', etc.
+ */
+async function listTarget (targetName) {
+  const protocol = targetProtocol(targetName)
+  if (protocol === 's3') {
+    const cfg = s3ConfigForTarget(targetName)
+    if (!cfg) return null
+    return _listS3(cfg)
+  }
+  if (protocol === 'webdav') {
+    const cfg = webdavConfigForTarget(targetName)
+    if (!cfg) return null
+    return _listWebDAV(cfg)
+  }
+  return null
+}
+
+// ---------------------------------------------------------------------------
+// Download — fetch the raw bytes of a single backup from a named target
+// ---------------------------------------------------------------------------
+
+async function _downloadS3 (cfg, remoteKey) {
+  const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3')
+  const client = new S3Client({
+    endpoint: cfg.endpoint, region: cfg.region,
+    credentials: { accessKeyId: cfg.key, secretAccessKey: cfg.secret },
+    forcePathStyle: true, maxAttempts: 1,
+  })
+  const ac    = new AbortController()
+  const timer = setTimeout(() => ac.abort(), DOWNLOAD_TIMEOUT_MS)
+  let response
+  try {
+    response = await client.send(
+      new GetObjectCommand({ Bucket: cfg.bucket, Key: remoteKey }),
+      { abortSignal: ac.signal }
+    )
+  } finally {
+    clearTimeout(timer)
+  }
+  const chunks = []
+  for await (const chunk of response.Body) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
+  }
+  return Buffer.concat(chunks)
+}
+
+async function _downloadWebDAV (cfg, remoteKey) {
+  const { createClient } = require('webdav')
+  const client  = createClient(cfg.url, { username: cfg.user, password: cfg.pass })
+  const ac      = new AbortController()
+  const timer   = setTimeout(() => ac.abort(), DOWNLOAD_TIMEOUT_MS)
+  let content
+  try {
+    content = await client.getFileContents(remoteKey, { format: 'text', signal: ac.signal })
+  } finally {
+    clearTimeout(timer)
+  }
+  return Buffer.from(typeof content === 'string' ? content : JSON.stringify(content))
+}
+
+/**
+ * Download a single backup file from a named remote target.
+ * targetName and remoteKey come from the items returned by listTarget().
+ */
+async function downloadFromTarget (targetName, remoteKey) {
+  const protocol = targetProtocol(targetName)
+  if (protocol === 's3') {
+    const cfg = s3ConfigForTarget(targetName)
+    if (!cfg) throw new Error(`Target '${targetName}' is not configured`)
+    return _downloadS3(cfg, remoteKey)
+  }
+  if (protocol === 'webdav') {
+    const cfg = webdavConfigForTarget(targetName)
+    if (!cfg) throw new Error(`Target '${targetName}' is not configured`)
+    return _downloadWebDAV(cfg, remoteKey)
+  }
+  throw new Error(`Unknown target '${targetName}'`)
+}
+
+// ---------------------------------------------------------------------------
 // Orchestration
 // ---------------------------------------------------------------------------
 
@@ -196,13 +367,15 @@ async function pushToRemotes (filePath, { enabledTargets } = {}) {
 module.exports = {
   getConfiguredTargets,
   pushToRemotes,
+  listTarget,
+  downloadFromTarget,
   // Exposed for Phase C status panel (without leaking credentials)
   describeTargets () {
     const out = []
     const s3 = s3Config()
-    if (s3) out.push({ name: 's3', endpoint: s3.endpoint, bucket: s3.bucket, prefix: s3.prefix || null })
+    if (s3) out.push({ name: 's3', display_name: s3.name || null, endpoint: s3.endpoint, bucket: s3.bucket, prefix: s3.prefix || null })
     const wd = webdavConfig()
-    if (wd) out.push({ name: 'webdav', url: wd.url })
+    if (wd) out.push({ name: 'webdav', display_name: wd.name || null, url: wd.url })
     return out
   },
   // Per-destination config diagnosis — surfaces partial configs (some env vars

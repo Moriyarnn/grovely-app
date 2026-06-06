@@ -70,19 +70,6 @@
             </div>
           </div>
 
-          <p class="sheet-section-label">App Grid</p>
-          <div class="prefs-list">
-            <div class="pref-row" @click="toggleReorder" style="cursor:pointer">
-              <div class="pref-label-group">
-                <span class="pref-label">App reordering</span>
-                <span class="pref-sublabel">Hold any card to drag and rearrange</span>
-              </div>
-              <div class="toggle" :class="{ on: preferences.app_reorder_enabled === '1' }">
-                <div class="toggle-knob" />
-              </div>
-            </div>
-          </div>
-
           <button class="close-btn" @click="$emit('update:modelValue', false)">Close</button>
         </div>
       </div>
@@ -117,11 +104,6 @@ onMounted(async () => {
 function togglePartnerNotes() {
   const next = settings.value.partner_can_read_notes === '1' ? '0' : '1'
   updateSetting('partner_can_read_notes', next)
-}
-
-function toggleReorder() {
-  const next = preferences.value.app_reorder_enabled === '1' ? '0' : '1'
-  updatePreference('app_reorder_enabled', next)
 }
 
 function toggleNotifications() {

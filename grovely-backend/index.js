@@ -90,6 +90,12 @@ const seedUsers = () => {
 
 seedUsers()
 
+// Encrypt any pre-existing plaintext private notes at rest (idempotent —
+// already-encrypted rows are skipped). See utils/encryption.js.
+const { encryptExistingRows } = require('./utils/encryption')
+const encryptedCount = encryptExistingRows(db)
+if (encryptedCount > 0) console.log(`🔒 Encrypted ${encryptedCount} existing private note(s) at rest`)
+
 // Auth
 const { requireAuth } = require('./middleware/auth')
 const authRouter = require('./routes/auth')(db)
@@ -131,6 +137,10 @@ const premiumRouter = require('./routes/premium/index')
 app.use('/api/premium', requireAuth, requireLicense, premiumRouter)
 
 app.get('/api/license/status', requireAuth, (_req, res) => {
+  res.json({ active: !!licensePayload })
+})
+
+app.get('/api/license/active', (_req, res) => {
   res.json({ active: !!licensePayload })
 })
 

@@ -5,11 +5,9 @@
     <div class="shell-nav">
 
       <div class="shell-header">
-        <div class="shell-header-left">
-          <span class="shell-header-title">Grovely</span>
-          <span class="shell-header-greeting">{{ greeting }}</span>
-        </div>
-        <div class="shell-header-right">
+        <div class="shell-header-top">
+          <img :src="logoSide" alt="Grovely" class="shell-header-logo" />
+          <div class="shell-header-right">
           <div class="user-avatar-wrap">
             <div
               class="user-avatar"
@@ -41,7 +39,9 @@
           <button class="shell-icon-btn" title="Settings" @click="router.push('/settings')">
             <v-icon size="18" color="grey-darken-1">mdi-cog-outline</v-icon>
           </button>
+          </div>
         </div>
+        <span class="shell-header-greeting">{{ greeting }}</span>
       </div>
 
       <div class="shell-header-divider" />
@@ -78,6 +78,13 @@
         </div>
       </TransitionGroup>
 
+      <Transition name="shell-hint">
+        <button v-if="reorderHintVisible" class="shell-reorder-hint" @click="dismissReorderHint" title="Dismiss">
+          <v-icon size="11" color="#999">mdi-gesture-tap-hold</v-icon>
+          <span>Hold to reorder</span>
+        </button>
+      </Transition>
+
       <!-- Drag ghost: follows cursor while dragging -->
       <Teleport to="body">
         <div v-if="ghostApp && dragState" class="drag-ghost" :style="ghostStyle">
@@ -112,6 +119,7 @@
 <script setup>
 import { ref, computed, watch, nextTick, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import logoSide from '../assets/Logo Side Desktop.png'
 import SummaryStrip from './SummaryStrip.vue'
 import { apps } from '../composables/useApps'
 import { API, getToken, getUser, clearToken, clearUser, setToken, setUser } from '../api'
@@ -129,9 +137,10 @@ const currentUser = ref(getUser())
 
 const greeting = computed(() => {
   const h = new Date().getHours()
-  if (h < 12) return 'Good morning, my love'
-  if (h < 18) return 'Good afternoon, my love'
-  return 'Good evening, my love'
+  const name = currentUser.value?.username ? ', ' + currentUser.value.username : ''
+  if (h < 12) return 'Good morning' + name
+  if (h < 18) return 'Good afternoon' + name
+  return 'Good evening' + name
 })
 const isDev = import.meta.env.DEV
 const showSwitcher = ref(false)
@@ -159,7 +168,15 @@ let insertDebounceTimer = null
 const dragState = ref(null)
 const localApps = ref([...apps])
 
-const reorderEnabled = computed(() => preferences.value.app_reorder_enabled === '1')
+const reorderEnabled = computed(() => true)
+
+// Inline reorder hint — shared localStorage flag with the mobile pill so
+// dismissing in one place silences both. Lives under the "Your apps" label.
+const reorderHintVisible = ref(!localStorage.getItem('grovely_reorder_hint_dismissed'))
+function dismissReorderHint() {
+  reorderHintVisible.value = false
+  localStorage.setItem('grovely_reorder_hint_dismissed', '1')
+}
 
 const transitionReady = ref(Object.keys(preferences.value).length > 0)
 if (!transitionReady.value) {
@@ -284,6 +301,7 @@ function onWindowPointerUp() {
     localStorage.setItem('app_grid_order', orderJson)
     updatePreference('app_grid_order', orderJson)
     dragState.value = null
+    if (reorderHintVisible.value) dismissReorderHint()
   }
   clearHold()
   removeWindowListeners()
@@ -386,28 +404,21 @@ async function switchUser(role) {
 
 /* ── Header ───────────────────────────────────────────────────── */
 .shell-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
   padding: 0.25rem 0 1.1rem;
+}
+
+.shell-header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 8px;
 }
 
-.shell-header-left {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 0;
-}
-
-.shell-header-title {
-  font-size: 22px;
-  font-weight: 700;
-  font-style: italic;
-  color: #52B788;
-  letter-spacing: -0.02em;
-  margin: 0 0 2px;
-  line-height: 1;
+.shell-header-logo {
+  height: 55px;
+  width: auto;
+  object-fit: contain;
+  margin: -6px 0 -6px -5px;
 }
 
 .shell-header-greeting {
@@ -415,6 +426,7 @@ async function switchUser(role) {
   color: #aaa;
   margin: 0;
   line-height: 1;
+  font-style: italic;
 }
 
 .shell-header-right {
@@ -439,6 +451,26 @@ async function switchUser(role) {
   text-transform: uppercase;
   margin: 0 0 10px;
 }
+.shell-reorder-hint {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  padding: 0;
+  font-size: 10px;
+  color: #999;
+  background: none;
+  border: none;
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.12s;
+}
+.shell-reorder-hint:hover { color: #666; }
+.shell-hint-enter-active,
+.shell-hint-leave-active { transition: opacity 0.2s ease; }
+.shell-hint-enter-from,
+.shell-hint-leave-to     { opacity: 0; }
 
 /* ── App grid ─────────────────────────────────────────────────── */
 .shell-app-grid {

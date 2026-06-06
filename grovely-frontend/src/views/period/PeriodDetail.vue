@@ -186,7 +186,7 @@
             :key="i"
             class="warning-item"
             :class="{ 'warning-item-orphan': w.isOrphaned }"
-            @click="goToWarning(w)"
+            @click="onWarningClick(w)"
           >
             <v-icon v-if="w.isOrphaned" size="11" color="#f97316" style="margin-right:4px;vertical-align:middle">mdi-link-off</v-icon>
             {{ w.message }}
@@ -216,7 +216,7 @@
             v-for="(w, i) in acknowledgedWarnings"
             :key="i"
             class="warning-item warning-item--ack"
-            @click="goToWarning(w)"
+            @click="onWarningClick(w)"
           >
             <span class="warning-ack-badge">{{ w.reviewState === 'confirmed' ? 'Confirmed' : 'Excluded' }}</span>
             {{ w.message }}
@@ -229,7 +229,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, inject } from 'vue'
 import AppScroller from '@/components/ui/AppScroller.vue'
 import PremiumGate from '@/components/PremiumGate.vue'
 import { getUser } from '../../api'
@@ -237,6 +237,12 @@ import { usePeriodData } from '../../composables/usePeriodData'
 import { useLicense } from '../../composables/useLicense'
 
 const { summary, allCycles, allWarnings, goToWarning } = usePeriodData()
+const layoutGoTo = inject('appLayoutGoTo', null)
+
+function onWarningClick(w) {
+  goToWarning(w)
+  if (layoutGoTo) layoutGoTo(0)
+}
 const { licenseActive, fetchLicenseStatus } = useLicense()
 const isPremium = computed(() => licenseActive.value === true)
 
@@ -288,7 +294,7 @@ const recentCycle = computed(() => {
 
 // Day 1 of the cycle today belongs to.
 // Three cases, in priority order:
-//   1. Today has passed the predicted next-period start → we've rolled into the next (predicted) cycle.
+//   1. A missed prediction exists (predicted period passed without being logged) → anchor to the most recent one.
 //   2. There's an actively logged cycle → its raw start_date.
 //   3. Otherwise → the most recent logged cycle's raw start_date (Luteal tail of the previous one).
 // Reads raw cycles rows directly — this is a discrete classifier (phase buckets), it cannot lean
@@ -296,8 +302,8 @@ const recentCycle = computed(() => {
 const phaseAnchorDate = computed(() => {
   const s = summary.value
   if (!s) return null
-  const todayStr = new Date().toISOString().split('T')[0]
-  if (s.nextPeriodDate && s.nextPeriodDate <= todayStr) return s.nextPeriodDate
+  const missed = s.missedPredictions ?? []
+  if (missed.length) return missed[missed.length - 1].startDate
   if (s.currentCycle) return s.currentCycle.start_date
   const latest = allCycles.value.length
     ? allCycles.value.reduce((a, b) => (a.start_date > b.start_date ? a : b))
@@ -312,8 +318,7 @@ const phaseAnchorDate = computed(() => {
 const phaseConfidence = computed(() => {
   const s = summary.value
   if (!s || cycleDayNum.value === null) return null
-  const todayStr = new Date().toISOString().split('T')[0]
-  if (s.nextPeriodDate && s.nextPeriodDate <= todayStr) return 'predicted'
+  if (s.missedPredictions?.length) return 'predicted'
   // Active cycle whose logged range covers today → Menstrual is directly observed
   const cc = s.currentCycle
   if (cc && cc.start_date <= todayStr && (cc.end_date ?? cc.start_date) >= todayStr && currentPhase.value?.name === 'Menstrual') {
@@ -350,23 +355,29 @@ const currentPhase = computed(() => {
 
 
 const displayFertileWindow = computed(() => {
+  const s = summary.value
+  const todayStr = new Date().toISOString().split('T')[0]
   const rc = recentCycle.value
   if (rc?.predicted_fertile_start && rc?.predicted_fertile_end) {
-    const todayStr = new Date().toISOString().split('T')[0]
     if (rc.predicted_fertile_end >= todayStr) {
       return { start: rc.predicted_fertile_start, end: rc.predicted_fertile_end }
     }
   }
-  return summary.value?.nextFertileWindow ?? null
+  const upcoming = (s?.missedPredictions ?? []).find(m => m.fertileWindow.end >= todayStr)
+  if (upcoming) return upcoming.fertileWindow
+  return s?.nextFertileWindow ?? null
 })
 
 const displayOvulationDate = computed(() => {
+  const s = summary.value
+  const todayStr = new Date().toISOString().split('T')[0]
   const rc = recentCycle.value
   if (rc?.predicted_ovulation_date) {
-    const todayStr = new Date().toISOString().split('T')[0]
     if (rc.predicted_ovulation_date >= todayStr) return rc.predicted_ovulation_date
   }
-  return summary.value?.nextOvulationDate ?? null
+  const upcoming = (s?.missedPredictions ?? []).find(m => m.ovulationDate >= todayStr)
+  if (upcoming) return upcoming.ovulationDate
+  return s?.nextOvulationDate ?? null
 })
 
 const predictedCurrentPeriodEnd = computed(() => {
@@ -420,7 +431,23 @@ const phaseSegments = computed(() => {
   const menstrualEnd  = Math.max(1, s?.avgPeriodLength  ?? 5)
   const avgCycle      = Math.max(20, s?.avgCycleLength  ?? 28)
   const avgLuteal     = Math.max(7,  s?.avgLutealPhase  ?? 14)
-  const ovulatoryDay  = Math.max(menstrualEnd + 2, avgCycle - avgLuteal)
+  // Derive ovulatory day from the same source the calendar uses:
+  // the cycle's stored predicted_ovulation_date, or summary.nextOvulationDate
+  // for predicted cycles with no DB row yet.
+  let ovulatoryDay = Math.max(menstrualEnd + 2, avgCycle - avgLuteal)
+  const anchor = phaseAnchorDate.value
+  if (anchor) {
+    const missed = s?.missedPredictions ?? []
+    const ovDate = missed.length
+      ? missed[missed.length - 1].ovulationDate
+      : (recentCycle.value?.ovulation_date ?? recentCycle.value?.predicted_ovulation_date)
+    if (ovDate) {
+      const anchorMs = new Date(anchor + 'T00:00:00').getTime()
+      const ovMs = new Date(ovDate + 'T00:00:00').getTime()
+      const derived = Math.round((ovMs - anchorMs) / 86400000) + 1
+      if (derived > menstrualEnd + 1) ovulatoryDay = derived
+    }
+  }
   return [
     { name: 'Menstrual',  startPct: 0,          endPct: 5/28*100,   startDay: 1,                endDay: menstrualEnd      },
     { name: 'Follicular', startPct: 5/28*100,   endPct: 13/28*100,  startDay: menstrualEnd + 1, endDay: ovulatoryDay - 1  },

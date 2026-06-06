@@ -11,9 +11,11 @@ User preferences are per-user visual and behavioural settings stored in the data
 
 **Rule:** No new preference may use `localStorage`. All user preferences go to `user_preferences` via `GET /api/preferences` and `PATCH /api/preferences/:key`.
 
+> `partner_can_read_notes` (in `settings`) is owner-managed and enforced on the backend: it controls whether the partner may read the owner's private period notes, which are encrypted at rest. See [Authentication](authentication.md#private-notes-partner-visibility).
+
 ---
 
-## Database — Migration 011
+## Database - Migration 011
 
 ```sql
 CREATE TABLE IF NOT EXISTS user_preferences (
@@ -25,7 +27,7 @@ CREATE TABLE IF NOT EXISTS user_preferences (
 );
 ```
 
-Seed defaults on first write (upsert), not at migration time — each user gets defaults on their first preference change.
+Seed defaults on first write (upsert), not at migration time - each user gets defaults on their first preference change.
 
 ---
 
@@ -41,7 +43,7 @@ Returns all preferences for the authenticated user as a flat object.
 { "flow_hue": "340", "theme": "Rose" }
 ```
 
-Missing keys are omitted — the frontend applies its own defaults.
+Missing keys are omitted - the frontend applies its own defaults.
 
 ### `PATCH /api/preferences/:key`
 
@@ -62,9 +64,9 @@ Response: `{ "success": true }`
 
 A new `src/composables/usePreferences.ts` owns all user preferences (separate from `useSettings`, which handles app-level settings).
 
-- `preferences` — reactive ref, flat `Record<string, string>`
-- `fetchPreferences()` — called once after login, populates the store
-- `updatePreference(key, value)` — optimistic update + PATCH to API
+- `preferences` - reactive ref, flat `Record<string, string>`
+- `fetchPreferences()` - called once after login, populates the store
+- `updatePreference(key, value)` - optimistic update + PATCH to API
 - On fetch: applies all preferences to the DOM (e.g. sets `--flow-hue` CSS var)
 
 ### Loading order
@@ -78,7 +80,7 @@ A new `src/composables/usePreferences.ts` owns all user preferences (separate fr
 
 `SettingsSheet.vue` currently reads and writes `flow-hue` via `localStorage` (lines 99 and 111). Migration steps:
 
-1. On `fetchPreferences()`, check if `flow_hue` is absent in the API response **and** present in `localStorage` — if so, write it to the API and clear `localStorage`
+1. On `fetchPreferences()`, check if `flow_hue` is absent in the API response **and** present in `localStorage` - if so, write it to the API and clear `localStorage`
 2. Remove the `localStorage.getItem` / `localStorage.setItem` calls from `SettingsSheet.vue`
 3. Bind the slider to `preferences.value.flow_hue` instead
 
@@ -109,6 +111,6 @@ _Add new preferences to this table when implementing them._
 
 ## Related
 
-- [Authentication](authentication.md) — JWT, roles, middleware
-- [API Endpoints](api.md) — full endpoint list
-- [Database Schema](schema.md) — full schema
+- [Authentication](authentication.md) - JWT, roles, middleware
+- [API Endpoints](api.md) - full endpoint list
+- [Database Schema](schema.md) - full schema

@@ -63,130 +63,182 @@
             <!-- APP NOTIFICATIONS -->
             <div class="nm-section">
               <div class="nm-section-head">
-                <p class="nm-section-label">App Notifications</p>
-                <button class="nm-all-on-btn" :class="{ 'nm-all-on-btn--done': allOnFlash }" @click="enableAll">
-                  <span v-if="!allOnFlash" class="nm-status-dot" />{{ allOnFlash ? 'All on' : 'Enable all' }}
-                </button>
+                <div class="nm-section-head-left">
+                  <p class="nm-section-label">App Notifications</p>
+                  <button class="nm-all-on-btn" :class="{ 'nm-all-on-btn--done': allOnFlash, 'nm-all-on-btn--hidden': !!drilledApp }" @click="enableAll">
+                    <span v-if="!allOnFlash" class="nm-status-dot" />{{ allOnFlash ? 'All on' : 'Enable all' }}
+                  </button>
+                </div>
               </div>
               <div class="nm-app-card">
 
-                <!-- Dropdown header -->
                 <div class="nm-app-header">
-                  <div class="nm-dropdown-wrap" ref="dropdownRef">
-                    <button class="nm-dropdown-btn" @click="dropdownOpen = !dropdownOpen">
-                      <span>{{ selectedApp.label }}</span>
-                      <v-icon size="16" color="#888" class="nm-chevron" :class="{ 'nm-chevron--open': dropdownOpen }">mdi-chevron-down</v-icon>
-                    </button>
-                    <div v-if="dropdownOpen" class="nm-dropdown-list">
-                      <button
-                        v-for="app in APPS"
-                        :key="app.id"
-                        class="nm-dropdown-item"
-                        :class="{ 'nm-dropdown-item--active': selectedAppId === app.id }"
-                        @click="selectApp(app.id)"
-                      >{{ app.label }}</button>
-                    </div>
-                  </div>
-                  <div v-if="selectedAppId !== 'general'" class="nm-app-header-right">
-                    <span class="nm-status-pill" :class="selectedAppLive ? 'nm-status-pill--live' : 'nm-status-pill--paused'">
-                      <span class="nm-status-dot" />{{ selectedAppLive ? 'Active' : 'Paused' }}
+                  <span class="nm-app-header-title">Notifications</span>
+                  <div class="nm-app-header-right">
+                    <span class="nm-status-pill" :class="headerCount === 'All paused' ? 'nm-status-pill--paused' : 'nm-status-pill--live'">
+                      <span class="nm-status-dot" />{{ headerCount }}
                     </span>
-                    <div class="nm-toggle" :class="{ on: selectedAppEnabled }" @click="toggleSelectedApp"><div class="nm-knob" /></div>
                   </div>
                 </div>
 
                 <div class="nm-app-content">
                 <Transition :name="`nm-slide-${slideDirection}`" mode="out-in">
 
-                <!-- Type list — notification types -->
-                <div v-if="selectedAppId !== 'general'" :key="selectedAppId" class="nm-type-scroll">
-                  <div v-for="t in selectedApp.types" :key="t.id" class="nm-type-item">
-                    <div class="nm-type-row">
+                <!-- APP LIST -->
+                <div v-if="!drilledApp" key="app-list" class="nm-type-scroll nm-type-scroll--list">
+                  <div
+                    v-for="app in APP_LIST"
+                    :key="app.id"
+                    class="nm-type-item"
+                  >
+                    <div class="nm-dest-row">
                       <v-icon
+                        v-if="app.id === 'general'"
+                        size="15"
+                        class="nm-type-icon nm-type-icon--locked"
+                        color="#888"
+                      >mdi-cog-outline</v-icon>
+                      <v-icon
+                        v-else
                         size="15"
                         class="nm-type-icon"
-                        :color="selectedAppLive && isTypeEnabled(t.id) ? '#4ade80' : '#d4d4d4'"
-                        @click="toggleType(t.id)"
-                      >{{ selectedAppLive && isTypeEnabled(t.id) ? 'mdi-check-circle' : 'mdi-close-circle' }}</v-icon>
-                      <div class="nm-type-body">
-                        <span class="nm-type-name">{{ t.label }}</span>
-                        <span class="nm-type-when">{{ t.when }}</span>
-                      </div>
-                      <button
-                        v-if="editingTypeId !== t.id"
-                        class="nm-type-edit-btn"
-                        @click="startEditType(t)"
-                      >Edit</button>
-                    </div>
-                    <Transition
-                      @before-enter="onPanelBeforeEnter"
-                      @enter="onPanelEnter"
-                      @leave="onPanelLeave"
-                    >
-                      <div v-if="editingTypeId === t.id" class="nm-type-edit-panel">
-                        <textarea
-                          class="nm-type-textarea"
-                          v-model="editingTypeValue"
-                          :placeholder="t.message"
-                          autofocus
-                        />
-                        <div class="nm-type-edit-footer">
-                          <button class="nm-type-cancel-btn" @click="cancelEditType">Cancel</button>
-                          <button class="nm-type-save-btn" @click="saveEditType">Save</button>
+                        :color="appLiveState(app.id) ? '#4ade80' : '#d4d4d4'"
+                        @click.stop="toggleAppFromList(app.id)"
+                      >{{ appLiveState(app.id) ? 'mdi-check-circle' : 'mdi-close-circle' }}</v-icon>
+
+                      <div
+                        class="nm-dest-row-body nm-dest-row-body--clickable"
+                        @click="drillInto(app.id)"
+                      >
+                        <div class="nm-dest-row-line">
+                          <v-icon size="8" color="#ccc">mdi-circle</v-icon>
+                          <span class="nm-dest-name">{{ app.label }}</span>
                         </div>
+                        <span class="nm-dest-detail">{{ app.detail }}</span>
                       </div>
-                    </Transition>
+
+                      <span
+                        v-if="app.id !== 'general'"
+                        class="nm-status-pill"
+                        :class="appLiveState(app.id) ? 'nm-status-pill--live' : 'nm-status-pill--paused'"
+                      >
+                        <span class="nm-status-dot" />{{ appLiveState(app.id) ? 'On' : 'Paused' }}
+                      </span>
+                      <span v-else class="nm-status-pill nm-status-pill--spacer" />
+                      <v-icon
+                        size="14"
+                        color="#bbb"
+                        class="nm-dest-chev"
+                        @click.stop="drillInto(app.id)"
+                      >mdi-chevron-right</v-icon>
+                    </div>
                   </div>
                 </div>
 
-                <!-- General — email fields -->
-                <div v-else key="general" class="nm-general-wrap">
-                  <div class="nm-fields-scroll">
-                  <div v-for="field in EMAIL_FIELDS" :key="field.key" class="nm-type-item">
-                    <div class="nm-type-row">
-                      <v-icon size="15" color="#e0e0e0">mdi-circle-outline</v-icon>
-                      <div class="nm-type-body">
-                        <span class="nm-type-name">{{ field.label }}</span>
-                        <span class="nm-type-when">{{ field.description }}</span>
+                <!-- DRILL-IN -->
+                <div v-else :key="`drill-${drilledApp}`" class="nm-type-scroll nm-type-scroll--drill">
+                  <div class="nm-drill-head">
+                    <button class="nm-back-chip" @click="drillBack()">
+                      <v-icon size="16">mdi-chevron-left</v-icon>
+                    </button>
+                    <span class="nm-drill-title">{{ drilledAppLabel }}</span>
+                  </div>
+
+                  <div class="nm-drill-body">
+
+                  <!-- Period / Pantry types -->
+                  <template v-if="drilledApp !== 'general'">
+                    <div v-for="t in drilledTypes" :key="t.id" class="nm-type-item">
+                      <div class="nm-type-row">
+                        <v-icon
+                          size="15"
+                          class="nm-type-icon"
+                          :color="drilledAppLive && isTypeEnabled(t.id) ? '#4ade80' : '#d4d4d4'"
+                          @click="toggleType(t.id)"
+                        >{{ drilledAppLive && isTypeEnabled(t.id) ? 'mdi-check-circle' : 'mdi-close-circle' }}</v-icon>
+                        <div class="nm-type-body">
+                          <span class="nm-type-name">{{ t.label }}</span>
+                          <span class="nm-type-when">{{ t.when }}</span>
+                        </div>
+                        <button
+                          v-if="editingTypeId !== t.id"
+                          class="nm-type-edit-btn"
+                          @click="startEditType(t)"
+                        >Edit</button>
                       </div>
-                      <button
-                        v-if="editingKey !== field.key"
-                        class="nm-type-edit-btn"
-                        @click="startEdit(field.key)"
-                      >Edit</button>
+                      <Transition
+                        @before-enter="onPanelBeforeEnter"
+                        @enter="onPanelEnter"
+                        @leave="onPanelLeave"
+                      >
+                        <div v-if="editingTypeId === t.id" class="nm-type-edit-panel">
+                          <textarea
+                            class="nm-type-textarea"
+                            v-model="editingTypeValue"
+                            :placeholder="t.message"
+                            autofocus
+                          />
+                          <div class="nm-type-edit-footer">
+                            <button class="nm-type-cancel-btn" @click="cancelEditType">Cancel</button>
+                            <button class="nm-type-save-btn" @click="saveEditType">Save</button>
+                          </div>
+                        </div>
+                      </Transition>
                     </div>
-                    <Transition
-                      @before-enter="onPanelBeforeEnter"
-                      @enter="onPanelEnter"
-                      @leave="onPanelLeave"
-                    >
-                      <div v-if="editingKey === field.key" class="nm-type-edit-panel nm-type-edit-panel--field">
-                        <textarea
-                          class="nm-type-textarea"
-                          v-model="editingValue"
-                          :placeholder="field.placeholder"
-                          autofocus
-                        />
-                        <div class="nm-type-edit-footer">
-                          <button class="nm-type-cancel-btn" @click="cancelEdit">Cancel</button>
-                          <button class="nm-type-save-btn" @click="saveEdit(field.key)">Save</button>
+                  </template>
+
+                  <!-- General — email fields + preview -->
+                  <template v-else>
+                    <div class="nm-general-inner">
+                      <div class="nm-fields-scroll">
+                      <div v-for="field in EMAIL_FIELDS" :key="field.key" class="nm-type-item">
+                        <div class="nm-type-row">
+                          <v-icon size="15" color="#e0e0e0">mdi-circle-outline</v-icon>
+                          <div class="nm-type-body">
+                            <span class="nm-type-name">{{ field.label }}</span>
+                            <span class="nm-type-when">{{ field.description }}</span>
+                          </div>
+                          <button
+                            v-if="editingKey !== field.key"
+                            class="nm-type-edit-btn"
+                            @click="startEdit(field.key)"
+                          >Edit</button>
+                        </div>
+                        <Transition
+                          @before-enter="onPanelBeforeEnter"
+                          @enter="onPanelEnter"
+                          @leave="onPanelLeave"
+                        >
+                          <div v-if="editingKey === field.key" class="nm-type-edit-panel nm-type-edit-panel--field">
+                            <textarea
+                              class="nm-type-textarea"
+                              v-model="editingValue"
+                              :placeholder="field.placeholder"
+                              autofocus
+                            />
+                            <div class="nm-type-edit-footer">
+                              <button class="nm-type-cancel-btn" @click="cancelEdit">Cancel</button>
+                              <button class="nm-type-save-btn" @click="saveEdit(field.key)">Save</button>
+                            </div>
+                          </div>
+                        </Transition>
+                      </div>
+                      </div>
+
+                      <div class="nm-email-preview">
+                        <p class="nm-preview-label">Preview</p>
+                        <div class="nm-preview-card">
+                          <p class="nm-preview-from">From: <span>{{ previewSenderName }}</span></p>
+                          <p class="nm-preview-line">Hi {{ previewGreeting }},</p>
+                          <p class="nm-preview-body">Your period is predicted to start in 3 days. Take care of yourself.</p>
+                          <p class="nm-preview-signoff">{{ previewSignoff }}</p>
                         </div>
                       </div>
-                    </Transition>
-                  </div>
-                  </div><!-- /nm-fields-scroll -->
-
-                  <!-- Email preview -->
-                  <div class="nm-email-preview">
-                    <p class="nm-preview-label">Preview</p>
-                    <div class="nm-preview-card">
-                      <p class="nm-preview-from">From: <span>{{ previewSenderName }}</span></p>
-                      <p class="nm-preview-line">Hi {{ previewGreeting }},</p>
-                      <p class="nm-preview-body">Your period is predicted to start in 3 days. Take care of yourself.</p>
-                      <p class="nm-preview-signoff">{{ previewSignoff }}</p>
                     </div>
-                  </div>
-                </div><!-- /nm-general-wrap -->
+                  </template>
+
+                  </div><!-- /nm-drill-body -->
+                </div>
 
                 </Transition>
                 </div><!-- /nm-app-content -->
@@ -201,7 +253,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch } from 'vue'
 import DetailSheet from '../components/ui/DetailSheet.vue'
 import { useSettings } from '../composables/useSettings'
 import { API, apiFetch } from '../api'
@@ -215,6 +267,7 @@ function close() {
   editingKey.value       = null
   editingValue.value     = ''
   emailStatus.value      = null
+  drilledApp.value       = null
   emit('update:modelValue', false)
 }
 
@@ -318,76 +371,97 @@ function togglePantry() {
 // ── Notification type lists ──────────────────────────────────────────────────
 
 const PERIOD_TYPES = [
-  { id: 'period_due_3d',           label: 'Period due in 3 days',       when: '3 days before predicted start',       message: "Just a heads up — your period is predicted to start in 3 days. Take care of yourself." },
+  { id: 'period_due_3d',           label: 'Period due in 3 days',       when: '3 days before predicted start',       message: "Just a heads up, your period is predicted to start in 3 days. Take care of yourself." },
   { id: 'period_due_2d',           label: 'Period due in 2 days',       when: '2 days before predicted start',       message: "Your period is predicted to start in 2 days. Make sure you're stocked up." },
   { id: 'period_due_1d',           label: 'Period due tomorrow',        when: '1 day before predicted start',        message: "Your period is predicted to start tomorrow. You've got this." },
   { id: 'pms_window',              label: 'PMS window starting',        when: '5 days before predicted start',       message: "Your PMS window is starting. Be gentle with yourself this week." },
   { id: 'period_overdue_3d',       label: 'Period 3 days late',         when: 'When period is 3 days overdue',       message: "Your period is now 3 days late. If you haven't already, it may be worth noting." },
-  { id: 'irregular_cycle',         label: 'Irregular cycles',           when: 'Weekly while cycles are irregular',   message: "Your recent cycles have been irregular. No action needed — just keeping you in the loop." },
+  { id: 'irregular_cycle',         label: 'Irregular cycles',           when: 'Weekly while cycles are irregular',   message: "Your recent cycles have been irregular. No action needed, just keeping you in the loop." },
   { id: 'fertile_window_tomorrow', label: 'Fertile window tomorrow',    when: 'Day before fertile window opens',     message: "Your fertile window opens tomorrow." },
   { id: 'fertile_window_start',    label: 'Fertile window starts',      when: 'When fertile window opens',           message: "Your fertile window has started today." },
   { id: 'ovulation_today',         label: 'Ovulation day',              when: 'On predicted ovulation date',         message: "Today is your predicted ovulation day." },
   { id: 'fertile_window_ending',   label: 'Last day of fertile window', when: 'On the last day of fertile window',   message: "Today is the last day of your fertile window." },
   { id: 'period_ended',            label: 'Period ended',               when: 'Within 3 days after period ends',     message: "Your period has ended. Hope you're feeling better." },
   { id: 'cycle_summary',           label: 'Cycle summary',              when: 'When a new period is logged',         message: "Your cycle summary is ready. Your last cycle was {duration} days." },
-  { id: 'partner_period_starting', label: 'Partner: period starting',   when: '3 days before — sent to partner',    message: "Just a heads up — her period is expected to start in 3 days." },
-  { id: 'partner_fertile_window',  label: 'Partner: fertile window',    when: 'When window opens — sent to partner', message: "Her fertile window has started today." },
+  { id: 'partner_period_starting', label: 'Partner: period starting',   when: '3 days before (sent to partner)',    message: "Just a heads up, her period is expected to start in 3 days." },
+  { id: 'partner_fertile_window',  label: 'Partner: fertile window',    when: 'When window opens (sent to partner)', message: "Her fertile window has started today." },
   { id: 'partner_period_ended',    label: 'Partner: period ended',      when: 'After period ends — sent to partner', message: "Her period has ended." },
 ]
 
 const PANTRY_TYPES = [
-  { id: 'pantry_expiry_today', label: 'Expiring today', when: 'Items with today\'s expiry date', message: "Some items in your pantry are expiring today: {items}." },
-  { id: 'pantry_expiry_soon',  label: 'Expiring soon',  when: 'Items within your warning window', message: "Some items in your pantry are expiring soon: {items}." },
+  { id: 'pantry_expiry_today', label: 'Expiring today', when: 'Items with today\'s expiry date',      message: "Some items in your pantry are expiring today: {items}." },
+  { id: 'pantry_expiry_soon',  label: 'Expiring soon',  when: 'Items within your warning window',     message: "Some items in your pantry are expiring soon: {items}." },
+  { id: 'pantry_expired',      label: 'Already expired', when: 'When a new item passes its expiry date', message: "Some items in your pantry have already expired: {items}." },
 ]
 
-// ── App dropdown ─────────────────────────────────────────────────────────────
+// ── App list + drill-in ─────────────────────────────────────────────────────
 
-const APPS = [
-  { id: 'general',  label: 'General',        types: [] },
-  { id: 'period',   label: 'Period Tracker', types: PERIOD_TYPES },
-  { id: 'pantry',   label: 'Pantry',         types: PANTRY_TYPES },
+const APP_LIST = [
+  { id: 'general', label: 'General',        color: '#888', detail: 'Greeting, sign-off, sender name' },
+  { id: 'period',  label: 'Period Tracker',  color: '#D4537E', detail: '15 notification types' },
+  { id: 'pantry',  label: 'Pantry',          color: '#f59e0b', detail: '3 notification types' },
 ]
 
-const selectedAppId    = ref('general')
-const dropdownOpen     = ref(false)
-const dropdownRef      = ref<HTMLElement | null>(null)
-const slideDirection   = ref<'left' | 'right'>('left')
+const slideDirection = ref<'left' | 'right'>('left')
+const drilledApp     = ref<string | null>(null)
 
-function selectApp(id: string) {
-  const oldIdx = APPS.findIndex(a => a.id === selectedAppId.value)
-  const newIdx = APPS.findIndex(a => a.id === id)
-  slideDirection.value   = newIdx >= oldIdx ? 'left' : 'right'
-  selectedAppId.value    = id
-  dropdownOpen.value     = false
-  editingTypeId.value    = null
-  editingKey.value       = null
+function appLiveState(id: string): boolean {
+  if (id === 'period') return periodLive.value
+  if (id === 'pantry') return pantryLive.value
+  return false
 }
 
-const selectedApp     = computed(() => APPS.find(a => a.id === selectedAppId.value)!)
-const selectedAppEnabled = computed(() =>
-  selectedAppId.value === 'period' ? periodEnabled.value : pantryEnabled.value
-)
-const selectedAppLive = computed(() =>
-  selectedAppId.value === 'period' ? periodLive.value : pantryLive.value
-)
-
-function toggleSelectedApp() {
-  if (selectedAppId.value === 'period') togglePeriod()
-  else togglePantry()
+function toggleAppFromList(id: string) {
+  if (id === 'period') togglePeriod()
+  else if (id === 'pantry') togglePantry()
 }
 
-function onOutsideClick(e: MouseEvent) {
-  if (dropdownRef.value && !dropdownRef.value.contains(e.target as Node)) {
-    dropdownOpen.value = false
-  }
+function drillInto(id: string) {
+  slideDirection.value = 'left'
+  drilledApp.value     = id
+  editingTypeId.value  = null
+  editingKey.value     = null
 }
 
-// Body scroll-lock + touchmove guard now live in DetailSheet.
-onMounted(() => {
-  document.addEventListener('mousedown', onOutsideClick)
+function drillBack() {
+  slideDirection.value = 'right'
+  drilledApp.value     = null
+}
+
+const drilledAppLabel = computed(() => {
+  const a = APP_LIST.find(x => x.id === drilledApp.value)
+  return a?.label ?? ''
 })
-onBeforeUnmount(() => {
-  document.removeEventListener('mousedown', onOutsideClick)
+
+const drilledAppLive = computed(() => {
+  if (drilledApp.value === 'period') return periodLive.value
+  if (drilledApp.value === 'pantry') return pantryLive.value
+  return false
+})
+
+const drilledAppEnabled = computed(() => {
+  if (drilledApp.value === 'period') return periodEnabled.value
+  if (drilledApp.value === 'pantry') return pantryEnabled.value
+  return false
+})
+
+function toggleDrilledApp() {
+  if (drilledApp.value === 'period') togglePeriod()
+  else if (drilledApp.value === 'pantry') togglePantry()
+}
+
+const drilledTypes = computed(() => {
+  if (drilledApp.value === 'period') return PERIOD_TYPES
+  if (drilledApp.value === 'pantry') return PANTRY_TYPES
+  return []
+})
+
+const headerCount = computed(() => {
+  if (drilledApp.value === 'period') return `${PERIOD_TYPES.length} types`
+  if (drilledApp.value === 'pantry') return `${PANTRY_TYPES.length} types`
+  if (drilledApp.value === 'general') return `${EMAIL_FIELDS.length} fields`
+  const active = [periodLive, pantryLive].filter(v => v.value).length
+  return active === 0 ? 'All paused' : `${active} of 2 active`
 })
 
 // ── Type edit panel animation ────────────────────────────────────────────────
@@ -412,7 +486,7 @@ function onPanelEnter(el: Element, done: () => void) {
   h.style.paddingBottom = targetPb
   void h.offsetHeight // commit layout
 
-  const scroll = (el.closest('.nm-type-scroll') ?? el.closest('.nm-fields-scroll')) as HTMLElement | null
+  const scroll = (el.closest('.nm-fields-scroll') ?? el.closest('.nm-drill-body') ?? el.closest('.nm-type-scroll--list')) as HTMLElement | null
   const item   = el.parentElement as HTMLElement | null
 
   // Reset and animate — all synchronous so the browser paints once at the end
@@ -600,6 +674,7 @@ function cancelEdit() {
 .nm-all-on-btn:hover { background: #f7dae6; }
 .nm-all-on-btn--done { background: #DCFCE7; color: #15803D; }
 .nm-all-on-btn--done:hover { background: #DCFCE7; color: #15803D; }
+.nm-all-on-btn--hidden { visibility: hidden; pointer-events: none; }
 
 /* ── Toggle ──────────────────────────────────────────────────────────────── */
 .nm-toggle {
@@ -634,35 +709,58 @@ function cancelEdit() {
 }
 .nm-app-header-right { display: flex; align-items: center; gap: 10px; }
 
-/* ── Dropdown ────────────────────────────────────────────────────────────── */
-.nm-dropdown-wrap { position: relative; }
-
-.nm-dropdown-btn {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 6px 10px; border-radius: 8px; font-size: 13px; font-weight: 600;
-  color: #333; background: #f5f5f5; border: 1px solid #e8e8e8;
-  cursor: pointer; transition: background 0.15s;
+/* ── App header title ───────────────────────────────────────────────────── */
+.nm-app-header-title {
+  font-size: 13px; font-weight: 600; color: #333; padding: 6px 0;
 }
-.nm-dropdown-btn:hover { background: #ececec; }
 
-.nm-dropdown-list {
-  position: absolute; top: calc(100% + 6px); left: 0; z-index: 10;
-  background: #fff; border: 1px solid #e8e8e8; border-radius: 10px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.1);
-  min-width: 160px; overflow: hidden;
+/* ── Dest row (app list entries) ────────────────────────────────────────── */
+.nm-dest-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 14px;
 }
-.nm-dropdown-item {
-  display: block; width: 100%; text-align: left;
-  padding: 10px 14px; font-size: 13px; color: #333;
-  background: none; border: none; cursor: pointer;
-  border-bottom: 1px solid #f5f5f5; transition: background 0.12s;
-}
-.nm-dropdown-item:last-child { border-bottom: none; }
-.nm-dropdown-item:hover { background: #f8f8f8; }
-.nm-dropdown-item--active { font-weight: 600; color: #993556; background: #fdf5f8; }
+.nm-dest-row-body { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+.nm-dest-row-body--clickable { cursor: pointer; }
+.nm-dest-row-line { display: flex; align-items: center; gap: 6px; }
+.nm-dest-name { font-size: 12px; color: #444; font-weight: 500; }
+.nm-dest-detail { font-size: 11px; color: #bbb; }
+.nm-dest-chev { cursor: pointer; flex-shrink: 0; }
 
-.nm-chevron { transition: transform 0.2s ease; }
-.nm-chevron--open { transform: rotate(180deg); }
+/* ── Section head left ──────────────────────────────────────────────────── */
+.nm-section-head-left { display: flex; align-items: center; gap: 8px; flex: 1; }
+
+/* ── Status pill spacer ─────────────────────────────────────────────────── */
+.nm-status-pill--spacer { visibility: hidden; }
+
+/* ── Locked icon ────────────────────────────────────────────────────────── */
+.nm-type-icon--locked { cursor: default !important; }
+.nm-type-icon--locked:hover { opacity: 1 !important; }
+
+/* ── Type scroll modes ──────────────────────────────────────────────────── */
+.nm-type-scroll--list { overflow-y: auto; }
+.nm-type-scroll--drill { overflow-y: hidden; display: flex; flex-direction: column; }
+
+/* ── Drill-in header ────────────────────────────────────────────────────── */
+.nm-drill-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 14px; flex-shrink: 0;
+  border-bottom: 1px solid #f0f0f0; background: #fafafa;
+}
+.nm-back-chip {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: 99px;
+  background: #fff; border: 1px solid #e0e0e0;
+  cursor: pointer; flex-shrink: 0; transition: background 0.15s;
+}
+.nm-back-chip:hover { background: #FBEAF0; }
+.nm-drill-title { font-size: 13px; font-weight: 600; color: #333; flex: 1; min-width: 0; }
+.nm-drill-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+
+/* ── Drill body ─────────────────────────────────────────────────────────── */
+.nm-drill-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
+
+/* ── General inner ──────────────────────────────────────────────────────── */
+.nm-general-inner { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 
 /* ── Type list ───────────────────────────────────────────────────────────── */
 .nm-type-scroll {
@@ -764,16 +862,6 @@ function cancelEdit() {
   cursor: pointer; flex-shrink: 0; transition: background 0.15s, color 0.15s;
 }
 .nm-type-edit-btn:hover { background: #f5f5f5; color: #555; }
-/* ── General wrap ────────────────────────────────────────────────────────── */
-.nm-general-wrap {
-  border-top: 1px solid #f0f0f0;
-  background: #fafafa;
-  border-radius: 0 0 12px 12px;
-  height: 380px;
-  display: flex; flex-direction: column;
-  overflow: hidden;
-  overscroll-behavior: none;
-}
 
 .nm-fields-scroll {
   flex: 1; min-height: 0;

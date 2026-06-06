@@ -20,7 +20,8 @@ const path = require('path')
 const cron = require('node-cron')
 const { logSystemError } = require('../logger')
 const { licensePayload } = require('../middleware/license')
-const { pushToRemotes, getConfiguredTargets, describeTargets, diagnoseTargets } = require('./remote')
+const { encryptExistingRows } = require('../utils/encryption')
+const { pushToRemotes, getConfiguredTargets, describeTargets, diagnoseTargets, listTarget, downloadFromTarget } = require('./remote')
 
 // ---------------------------------------------------------------------------
 // Snapshot building (shared with routes/backup.js)
@@ -409,6 +410,10 @@ function restoreFromSnapshot (db, backup, { recompute } = {}) {
   }
   db.pragma('foreign_keys = ON')
 
+  // An older backup may hold plaintext private fields — encrypt them at rest now
+  // so the partner can't read them from a freshly re-exported backup.
+  try { encryptExistingRows(db) } catch {}
+
   if (recompute) {
     try { recompute(db) } catch {}
   }
@@ -436,4 +441,7 @@ module.exports = {
   getConfiguredTargets,
   describeTargets,
   diagnoseTargets,
+  // Live listing and download — protocol-agnostic, target-name-driven
+  listTarget,
+  downloadFromTarget,
 }

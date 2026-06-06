@@ -61,10 +61,17 @@ const stripCards = computed(() => {
       const days = Math.round((new Date(s.nextPeriodDate + 'T00:00:00') - today) / 86400000)
       const w = s.confidenceWindow ? ` ±${s.confidenceWindow}d` : ''
       let periodMsg = null
-      if (days < 0)        periodMsg = `Period is ${Math.abs(days)} day${Math.abs(days) !== 1 ? 's' : ''} late${w}`
-      else if (days === 0) periodMsg = `Period is due today${w}`
-      else if (days === 1) periodMsg = `Period due tomorrow${w}`
-      else if (days <= 3)  periodMsg = `Period in ${days} days${w}`
+      if (isOwner) {
+        if (days < 0)        periodMsg = `Period is ${Math.abs(days)} day${Math.abs(days) !== 1 ? 's' : ''} late${w}`
+        else if (days === 0) periodMsg = `Period is due today${w}`
+        else if (days === 1) periodMsg = `Period due tomorrow${w}`
+        else if (days <= 3)  periodMsg = `Period in ${days} days${w}`
+      } else {
+        if (days < 0)        periodMsg = `Her period is ${Math.abs(days)} day${Math.abs(days) !== 1 ? 's' : ''} late${w}`
+        else if (days === 0) periodMsg = `Her period is due today${w}`
+        else if (days === 1) periodMsg = `Her period is due tomorrow${w}`
+        else if (days <= 3)  periodMsg = `Her period is in ${days} days${w}`
+      }
       if (periodMsg) {
         cards.push({ label: 'Period tracker', message: periodMsg, bg: '#FBEAF0', border: '#F4C0D1', labelColor: '#993556', messageColor: '#72243E' })
       }
@@ -75,7 +82,7 @@ const stripCards = computed(() => {
       const fEnd   = new Date(s.fertileWindow.end   + 'T00:00:00')
       let fertileMsg = null
       if (s.ovulationDate === todayStr) {
-        fertileMsg = 'Today is your predicted ovulation day'
+        fertileMsg = isOwner ? 'Today is your predicted ovulation day' : 'Today is her predicted ovulation day'
       } else if (today >= fStart && today <= fEnd) {
         fertileMsg = `Fertile window active — ends ${fEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
       } else if (today < fStart) {
@@ -88,7 +95,7 @@ const stripCards = computed(() => {
     }
 
     if (s.isIrregular) {
-      cards.push({ label: 'Cycle alert', message: 'Your recent cycles have been irregular', bg: '#FFFBEB', border: '#FAC775', labelColor: '#854F0B', messageColor: '#633806' })
+      cards.push({ label: 'Cycle alert', message: isOwner ? 'Your recent cycles have been irregular' : 'Her recent cycles have been irregular', bg: '#FFFBEB', border: '#FAC775', labelColor: '#854F0B', messageColor: '#633806' })
     }
 
     if (!s.currentCycle && s.ovulationDate && s.ovulationDate < todayStr) {

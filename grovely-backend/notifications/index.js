@@ -65,15 +65,6 @@ function addDays (dateStr, n) {
   return d.toISOString().split('T')[0]
 }
 
-// Monday of the current ISO week — used as date_key for weekly notifications
-// Uses UTC methods to avoid timezone issues (date strings are always UTC midnight)
-function mondayOfWeek (today) {
-  const d = new Date(today + 'T00:00:00Z')
-  const day = d.getUTCDay() || 7 // Sunday = 7
-  d.setUTCDate(d.getUTCDate() - (day - 1))
-  return d.toISOString().split('T')[0]
-}
-
 // ---------------------------------------------------------------------------
 // Cron scheduling helpers
 // ---------------------------------------------------------------------------
@@ -154,6 +145,17 @@ function getSummary (db) {
 
   const isIrregular = cycleStdDev !== null && cycleStdDev > 7
 
+  // Was it already irregular before the latest cycle was added?
+  const prevLengths = cycleLengths.slice(0, -1)
+  const prevAvg = prevLengths.length > 0
+    ? Math.round(prevLengths.slice(1).reduce((est, l) => ALPHA * l + (1 - ALPHA) * est, prevLengths[0]))
+    : 28
+  const prevStdDev = prevLengths.length >= 2
+    ? Math.round(Math.sqrt(prevLengths.reduce((s, l) => s + Math.pow(l - prevAvg, 2), 0) / prevLengths.length))
+    : null
+  const wasIrregularBefore = prevStdDev !== null && prevStdDev > 7
+  const becameIrregular = isIrregular && !wasIrregularBefore
+
   const prefRow = db.prepare("SELECT value FROM settings WHERE key = 'period_irregular'").get()
   const irregularSetting = prefRow?.value === '1'
 
@@ -165,11 +167,33 @@ function getSummary (db) {
     ORDER BY c.start_date DESC LIMIT 1
   `).get() || null
 
-  // Next period prediction
+  // Prediction accuracy correction
+  const predictionErrors = db.prepare(`
+    SELECT CAST(julianday(start_date) - julianday(predicted_start_date) AS INTEGER) AS error_days
+    FROM cycles
+    WHERE predicted_start_date IS NOT NULL
+      AND start_date IS NOT NULL
+      AND start_date <= date('now')
+      AND ABS(julianday(start_date) - julianday(predicted_start_date)) <= 14
+      AND review_state IS NOT 'excluded'
+    ORDER BY start_date ASC
+  `).all().map(r => r.error_days)
+
+  const avgPredictionError = predictionErrors.length >= 2
+    ? predictionErrors.slice(1).reduce((est, e) => ALPHA * e + (1 - ALPHA) * est, predictionErrors[0])
+    : 0
+  const errorAdj = Math.round(avgPredictionError)
+
+  // Next period prediction — always a future date
   let nextPeriodDate = null
   if (lastCycle) {
-    const predicted = new Date(lastCycle.start_date)
-    predicted.setDate(predicted.getDate() + avgCycleLength)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const predicted = new Date(lastCycle.start_date + 'T00:00:00')
+    predicted.setDate(predicted.getDate() + avgCycleLength + errorAdj)
+    while (predicted < today) {
+      predicted.setDate(predicted.getDate() + avgCycleLength + errorAdj)
+    }
     nextPeriodDate = predicted.toISOString().split('T')[0]
   }
 
@@ -206,7 +230,7 @@ function getSummary (db) {
     ORDER BY c.start_date DESC LIMIT 1
   `).get(today, today) || null
 
-  return { today, avgCycleLength, cycleStdDev, isIrregular, irregularSetting, lastCycle, nextPeriodDate, fertileWindow, ovulationDate, currentCycle }
+  return { today, avgCycleLength, cycleStdDev, isIrregular, becameIrregular, irregularSetting, lastCycle, nextPeriodDate, fertileWindow, ovulationDate, currentCycle }
 }
 
 // ---------------------------------------------------------------------------
@@ -233,7 +257,7 @@ const wrap = (body) => `
  * Each entry:
  *   id        — unique string identifier
  *   category  — 'period' | 'pantry' — used to gate per-category toggles
- *   dateKey   — fn(today, db?) => string used as the unique date_key in notification_log
+ *   dateKey   — fn(today, db?, summary?) => string used as the unique date_key in notification_log
  *               Default is today's date. Weekly types return monday of the week.
  *   onSent    — optional fn(today, db). Called after a successful send. Use for post-send state writes
  *               (e.g. setting a flag on the data row). The notification_log entry is written before this fires.
@@ -298,9 +322,9 @@ const NOTIFICATION_TYPES = [
   {
     id: 'irregular_cycle',
     category: 'period',
-    // Weekly — sends once per week while cycles remain irregular
-    dateKey: (today) => mondayOfWeek(today),
-    check: ({ isIrregular }) => isIrregular === true,
+    // Fires once when a new cycle tips stddev > 7, keyed to the cycle that caused it
+    dateKey: (_today, _db, summary) => summary.lastCycle?.start_date || _today,
+    check: ({ becameIrregular, irregularSetting }) => becameIrregular && !irregularSetting,
     subject: () => '📊 Your periods have been a little unpredictable lately',
     html: () => wrap(`
       <h2 style="color:#c06;">Hey ${_runContext.greeting} 💗</h2>
@@ -429,14 +453,14 @@ const NOTIFICATION_TYPES = [
     dateKey: (today) => today,
     check: (_summary, db) => {
       const items = db.prepare(
-        "SELECT id FROM pantry WHERE status = 'active' AND expiry_date = date('now')"
+        "SELECT id FROM pantry WHERE status = 'active' AND deleted_at IS NULL AND expiry_date = date('now')"
       ).all()
       return items.length > 0
     },
     subject: () => '🧊 Items expiring today',
     html: (_summary, db) => {
       const items = db.prepare(
-        "SELECT name, quantity FROM pantry WHERE status = 'active' AND expiry_date = date('now') ORDER BY name ASC"
+        "SELECT name, quantity FROM pantry WHERE status = 'active' AND deleted_at IS NULL AND expiry_date = date('now') ORDER BY name ASC"
       ).all()
       const list = items.map(i => `<li>${i.name}${i.quantity ? ` (${i.quantity})` : ''}</li>`).join('')
       return wrap(`
@@ -454,7 +478,7 @@ const NOTIFICATION_TYPES = [
       const row = db.prepare("SELECT value FROM settings WHERE key = 'pantry_expiry_warning_days'").get()
       const warningDays = Math.max(1, parseInt(row?.value ?? '3', 10))
       const items = db.prepare(
-        "SELECT id FROM pantry WHERE status = 'active' AND expiry_date > date('now') AND expiry_date <= date('now', '+' || ? || ' days')"
+        "SELECT id FROM pantry WHERE status = 'active' AND deleted_at IS NULL AND expiry_date > date('now') AND expiry_date <= date('now', '+' || ? || ' days')"
       ).all(String(warningDays))
       return items.length > 0
     },
@@ -463,7 +487,7 @@ const NOTIFICATION_TYPES = [
       const row = db.prepare("SELECT value FROM settings WHERE key = 'pantry_expiry_warning_days'").get()
       const warningDays = Math.max(1, parseInt(row?.value ?? '3', 10))
       const items = db.prepare(
-        "SELECT name, quantity, expiry_date FROM pantry WHERE status = 'active' AND expiry_date > date('now') AND expiry_date <= date('now', '+' || ? || ' days') ORDER BY expiry_date ASC, name ASC"
+        "SELECT name, quantity, expiry_date FROM pantry WHERE status = 'active' AND deleted_at IS NULL AND expiry_date > date('now') AND expiry_date <= date('now', '+' || ? || ' days') ORDER BY expiry_date ASC, name ASC"
       ).all(String(warningDays))
       const list = items.map(i => {
         const days = Math.round((new Date(i.expiry_date) - new Date()) / 86400000)
@@ -473,6 +497,41 @@ const NOTIFICATION_TYPES = [
       return wrap(`
         <h2 style="color:#c45309;">Items expiring soon 🧊</h2>
         <p>These pantry items will expire within the next ${warningDays} day${warningDays !== 1 ? 's' : ''}:</p>
+        <ul style="padding-left:1.5em;line-height:1.8;">${list}</ul>`)
+    }
+  },
+
+  {
+    id: 'pantry_expired',
+    category: 'pantry',
+    // Dedup is handled by pantry.expiry_notified (set in onSent), not by notification_log date_key.
+    // Fires once per newly-expired item: check triggers when any active item has expiry_notified = 0,
+    // but the email always lists all currently-expired active items so the recipient sees the full picture.
+    dateKey: (today) => today,
+    check: (_summary, db) => {
+      const row = db.prepare(
+        "SELECT id FROM pantry WHERE status = 'active' AND deleted_at IS NULL AND expiry_date < date('now') AND expiry_notified = 0 LIMIT 1"
+      ).get()
+      return !!row
+    },
+    onSent: (_today, db) => {
+      db.prepare(
+        "UPDATE pantry SET expiry_notified = 1 WHERE status = 'active' AND deleted_at IS NULL AND expiry_date < date('now')"
+      ).run()
+    },
+    subject: () => '🧊 Items past their expiry date',
+    html: (_summary, db) => {
+      const items = db.prepare(
+        "SELECT name, quantity, expiry_date FROM pantry WHERE status = 'active' AND deleted_at IS NULL AND expiry_date < date('now') ORDER BY expiry_date ASC, name ASC"
+      ).all()
+      const list = items.map(i => {
+        const daysAgo = Math.round((new Date() - new Date(i.expiry_date)) / 86400000)
+        const when = daysAgo === 1 ? 'yesterday' : `${daysAgo} days ago`
+        return `<li>${i.name}${i.quantity ? ` (${i.quantity})` : ''} — expired <strong>${when}</strong></li>`
+      }).join('')
+      return wrap(`
+        <h2 style="color:#c45309;">Items past their expiry date 🧊</h2>
+        <p>These pantry items have already expired — you may want to check them:</p>
         <ul style="padding-left:1.5em;line-height:1.8;">${list}</ul>`)
     }
   },
@@ -674,7 +733,7 @@ async function runNotifications (db, trigger = 'scheduled') {
       total_skipped++
       continue
     }
-    const dateKey = type.dateKey(today, db)
+    const dateKey = type.dateKey(today, db, summary)
     total_checked++
 
     // Already sent for this date_key?

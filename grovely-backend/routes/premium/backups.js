@@ -5,10 +5,14 @@
  * applied at the /api/premium prefix in grovely-backend/index.js. Nothing here
  * needs to re-check the license.
  *
- *   GET  /status         — schedule + last/next + configured remote targets
- *   GET  /history        — paginated rows from log_system_backups (newest first)
- *   POST /run-now        — fire a one-off backup synchronously, return the result row
- *   POST /verify/:id     — re-read the snapshot at row.file_path, parse JSON, count tables/rows
+ *   GET  /status                   — schedule + last/next + configured remote targets
+ *   GET  /history                  — paginated rows from log_system_backups (newest first)
+ *   POST /run-now                  — fire a one-off backup synchronously, return the result row
+ *   POST /verify/:id               — re-read the snapshot at row.file_path, parse JSON, count tables/rows
+ *   GET  /available/:target        — live list of files actually present in a destination
+ *                                    target: 'local' | 's3' | 'webdav' (extensible to 's3:archive' etc.)
+ *   POST /restore-remote           — download from a remote target and restore; body: { target, remote_key }
+ *   GET  /download-remote          — stream a remote file as an attachment; query: target, key
  */
 
 const fs   = require('fs')
@@ -16,7 +20,7 @@ const path = require('path')
 const express = require('express')
 const router  = express.Router()
 
-const { runBackup, getConfiguredTargets, describeTargets, diagnoseTargets, restoreFromSnapshot, MIN_COMPATIBLE_SCHEMA } = require('../../backups')
+const { runBackup, getConfiguredTargets, describeTargets, diagnoseTargets, restoreFromSnapshot, MIN_COMPATIBLE_SCHEMA, getBackupDir, listTarget, downloadFromTarget } = require('../../backups')
 const { recomputeAllPredictions } = require('../period/_calcHelpers')
 
 // ---------------------------------------------------------------------------
@@ -246,6 +250,149 @@ router.post('/:id/restore', (req, res) => {
   const result = restoreFromSnapshot(db, snapshot, { recompute: recomputeAllPredictions })
   if (!result.success) return res.status(result.status).json({ error: result.error })
   res.json({ success: true, warnings: result.warnings, restored_from: row.id })
+})
+
+// ---------------------------------------------------------------------------
+// GET /api/premium/backups/available/:target
+//
+// Returns what is actually present in the destination right now — not history.
+// For 'local': scans the backup directory and checks each file exists.
+// For remote targets: calls listTarget() which hits the live S3/WebDAV API.
+// History rows are joined by filename to attach metadata (row_count, trigger, etc.)
+// where available, but a file is only included if it physically exists.
+// ---------------------------------------------------------------------------
+
+router.get('/available/:target', async (req, res) => {
+  const db     = req.db
+  const target = req.params.target
+
+  if (!['local', 's3', 'webdav'].includes(target) && !target.startsWith('s3:') && !target.startsWith('webdav:')) {
+    return res.status(400).json({ error: `Unknown target '${target}'` })
+  }
+
+  // History rows keyed by filename for fast metadata join.
+  const historyRows = db.prepare(
+    `SELECT ${RUN_COLUMNS} FROM log_system_backups WHERE status = 'ok' ORDER BY id DESC`
+  ).all()
+  const byFilename = {}
+  for (const row of historyRows) {
+    if (row.file_path) {
+      const fname = path.basename(row.file_path)
+      if (!byFilename[fname]) byFilename[fname] = row
+    }
+  }
+
+  try {
+    if (target === 'local') {
+      const dir = getBackupDir()
+      if (!fs.existsSync(dir)) return res.json([])
+      const files = fs.readdirSync(dir)
+        .filter(f => f.startsWith('grovely-backup-') && f.endsWith('.json'))
+        .sort().reverse()
+      const result = files.map(filename => {
+        const file_path = path.join(dir, filename)
+        const stat      = fs.statSync(file_path)
+        const hist      = byFilename[filename] ?? null
+        return {
+          source:      'local',
+          history_id:  hist?.id        ?? null,
+          file_path,
+          remote_key:  null,
+          filename,
+          size_bytes:  stat.size,
+          logged_at:   hist?.logged_at ?? stat.mtime.toISOString(),
+          row_count:   hist?.row_count  ?? null,
+          table_count: hist?.table_count ?? null,
+          trigger:     hist?.trigger    ?? null,
+        }
+      })
+      return res.json(result)
+    }
+
+    // Remote target - call the live listing API.
+    const items = await listTarget(target)
+    if (items === null) return res.status(400).json({ error: `Target '${target}' is not configured` })
+
+    const result = items.map(item => {
+      const hist = byFilename[item.filename] ?? null
+      return {
+        source:      target,
+        history_id:  hist?.id         ?? null,
+        file_path:   null,
+        remote_key:  item.remote_key,
+        filename:    item.filename,
+        size_bytes:  item.size_bytes  ?? hist?.size_bytes  ?? null,
+        logged_at:   item.last_modified ?? hist?.logged_at ?? null,
+        row_count:   hist?.row_count  ?? null,
+        table_count: hist?.table_count ?? null,
+        trigger:     hist?.trigger    ?? null,
+      }
+    })
+    return res.json(result)
+
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// ---------------------------------------------------------------------------
+// POST /api/premium/backups/restore-remote
+//
+// Downloads a backup file from a named remote target and restores from it.
+// Body: { target, remote_key }
+// ---------------------------------------------------------------------------
+
+router.post('/restore-remote', async (req, res) => {
+  const db         = req.db
+  const { target, remote_key } = req.body ?? {}
+
+  if (!target || !remote_key) {
+    return res.status(400).json({ error: 'target and remote_key are required' })
+  }
+
+  let content
+  try {
+    content = await downloadFromTarget(target, remote_key)
+  } catch (err) {
+    return res.status(502).json({ error: `Failed to download from ${target}: ${err.message}` })
+  }
+
+  let snapshot
+  try {
+    snapshot = JSON.parse(content.toString('utf8'))
+  } catch (err) {
+    return res.status(422).json({ error: `Downloaded file is not valid JSON: ${err.message}` })
+  }
+
+  const result = restoreFromSnapshot(db, snapshot, { recompute: recomputeAllPredictions })
+  if (!result.success) return res.status(result.status).json({ error: result.error })
+  res.json({ success: true, warnings: result.warnings })
+})
+
+// ---------------------------------------------------------------------------
+// GET /api/premium/backups/download-remote?target=s3&key=backups%2Ffile.json
+//
+// Streams a backup file from a named remote target as a downloadable attachment.
+// ---------------------------------------------------------------------------
+
+router.get('/download-remote', async (req, res) => {
+  const { target, key } = req.query
+
+  if (!target || !key) {
+    return res.status(400).json({ error: 'target and key query params are required' })
+  }
+
+  let content
+  try {
+    content = await downloadFromTarget(target, key)
+  } catch (err) {
+    return res.status(502).json({ error: `Failed to download from ${target}: ${err.message}` })
+  }
+
+  const filename = path.basename(key) || 'grovely-backup.json'
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+  res.setHeader('Content-Type', 'application/json')
+  res.send(content)
 })
 
 module.exports = router

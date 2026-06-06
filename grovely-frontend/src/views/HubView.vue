@@ -11,44 +11,44 @@
 
           <!-- Mobile-only header -->
           <div class="hub-header mobile-only">
-            <div>
-              <p class="hub-date">{{ todayLabel }}</p>
-              <h1 class="hub-title">Grovely</h1>
-              <p class="hub-subtitle">Good morning, my love</p>
-            </div>
-            <div class="header-actions">
-              <div v-if="currentUser" class="user-avatar-wrap">
-                <div
-                  class="user-avatar"
-                  :class="{ 'user-avatar--dev': isDev }"
-                  :title="currentUser.username"
-                  @click="isDev && (showSwitcher = !showSwitcher)"
-                >
-                  {{ currentUser.username[0].toUpperCase() }}
-                </div>
-                <div v-if="isDev && showSwitcher" class="dev-switcher">
-                  <p class="dev-switcher-label">Switch user</p>
-                  <div class="dev-switcher-btns">
-                    <button
-                      class="dev-switch-btn"
-                      :class="{ 'dev-switch-btn--pressed': currentUser.role === 'owner1' }"
-                      @click="switchUser('owner1')"
-                    >owner1</button>
-                    <button
-                      class="dev-switch-btn"
-                      :class="{ 'dev-switch-btn--pressed': currentUser.role === 'owner2' }"
-                      @click="switchUser('owner2')"
-                    >owner2</button>
+            <div class="hub-header-top">
+              <img :src="logoSide" alt="Grovely" class="hub-logo" />
+              <div class="header-actions">
+                <div v-if="currentUser" class="user-avatar-wrap">
+                  <div
+                    class="user-avatar"
+                    :class="{ 'user-avatar--dev': isDev }"
+                    :title="currentUser.username"
+                    @click="isDev && (showSwitcher = !showSwitcher)"
+                  >
+                    {{ currentUser.username[0].toUpperCase() }}
+                  </div>
+                  <div v-if="isDev && showSwitcher" class="dev-switcher">
+                    <p class="dev-switcher-label">Switch user</p>
+                    <div class="dev-switcher-btns">
+                      <button
+                        class="dev-switch-btn"
+                        :class="{ 'dev-switch-btn--pressed': currentUser.role === 'owner1' }"
+                        @click="switchUser('owner1')"
+                      >owner1</button>
+                      <button
+                        class="dev-switch-btn"
+                        :class="{ 'dev-switch-btn--pressed': currentUser.role === 'owner2' }"
+                        @click="switchUser('owner2')"
+                      >owner2</button>
+                    </div>
                   </div>
                 </div>
+                <button class="settings-icon-btn" @click="router.push('/info')">
+                  <v-icon size="18" color="grey-darken-1">mdi-home-outline</v-icon>
+                </button>
+                <button class="settings-icon-btn" @click="router.push('/settings')">
+                  <v-icon size="18" color="grey-darken-1">mdi-cog-outline</v-icon>
+                </button>
               </div>
-              <button class="settings-icon-btn" @click="router.push('/info')">
-                <v-icon size="18" color="grey-darken-1">mdi-home-outline</v-icon>
-              </button>
-              <button class="settings-icon-btn" @click="router.push('/settings')">
-                <v-icon size="18" color="grey-darken-1">mdi-cog-outline</v-icon>
-              </button>
             </div>
+            <p class="hub-date">{{ todayLabel }}</p>
+            <p class="hub-subtitle">{{ greeting }}{{ currentUser ? ', ' + currentUser.username : '' }}</p>
           </div>
 
           <!-- Mobile-only status strip — wrapper reserves fixed height so the
@@ -143,16 +143,29 @@
             <button class="hub-logout-btn" @click="logout">Sign out</button>
           </div>
 
+          <!-- Floating reorder hint (mobile only, first visit) -->
+          <AppToast
+            :model-value="reorderHintVisible ? 'Hold a tile to reorder' : null"
+            tone="info"
+            icon="mdi-gesture-tap-hold"
+            icon-color="rgba(255,255,255,0.9)"
+            :closeable="true"
+            :duration="9000"
+            @update:model-value="dismissReorderHint"
+          />
+
         </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, watch, nextTick, onUnmounted, onMounted } from 'vue'
+import AppToast from '../components/ui/AppToast.vue'
+import logoSide from '../assets/Logo Side Hub.png'
 import { useRouter } from 'vue-router'
 import SummaryStrip from '../components/SummaryStrip.vue'
 import MainScreen from '../components/MainScreen.vue'
-import { getUser, clearToken, clearUser, setToken, setUser } from '../api'
+import { API, apiFetch, getUser, clearToken, clearUser, setToken, setUser } from '../api'
 import { usePreferences } from '../composables/usePreferences'
 import { apps } from '../composables/useApps'
 import { useAppStats } from '../composables/useAppStats'
@@ -167,9 +180,23 @@ const showSwitcher = ref(false)
 
 onMounted(() => { fetchAppStats() })
 
-const todayLabel = new Date().toLocaleDateString('en-US', {
-  weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+// Refresh on tab focus so a hub left open across midnight still shows
+// today's date and the right greeting on the next look.
+const now = ref(new Date())
+const todayLabel = computed(() =>
+  now.value.toLocaleDateString('en-US', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+  })
+)
+const greeting = computed(() => {
+  const h = now.value.getHours()
+  if (h < 12) return 'Good morning'
+  if (h < 18) return 'Good afternoon'
+  return 'Good evening'
 })
+function onVisibility() { if (!document.hidden) now.value = new Date() }
+onMounted(() => document.addEventListener('visibilitychange', onVisibility))
+onUnmounted(() => document.removeEventListener('visibilitychange', onVisibility))
 
 function logout() {
   clearToken()
@@ -181,7 +208,7 @@ function logout() {
 
 async function switchUser(role) {
   try {
-    const res = await fetch(`${API}/auth/dev-switch`, {
+    const res = await apiFetch(`${API}/auth/dev-switch`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ role })
@@ -205,7 +232,20 @@ let insertDebounceTimer = null
 const dragState = ref(null)
 const localApps = ref([...apps])
 
-const reorderEnabled = computed(() => preferences.value.app_reorder_enabled === '1')
+// Reorder is always on — the 500ms hold is enough accident protection,
+// and gating it behind a preference made it undiscoverable. A floating
+// hint surfaces the feature once per user (localStorage flag).
+const reorderEnabled = computed(() => true)
+const reorderHintVisible = ref(false)
+onMounted(() => {
+  if (!localStorage.getItem('grovely_reorder_hint_dismissed') && window.innerWidth < 768) {
+    setTimeout(() => { reorderHintVisible.value = true }, 1200)
+  }
+})
+function dismissReorderHint() {
+  reorderHintVisible.value = false
+  localStorage.setItem('grovely_reorder_hint_dismissed', '1')
+}
 
 // Disable tile transitions until:
 // (a) preferences have landed (prevents "slide into place" on cold load), AND
@@ -335,6 +375,7 @@ function onWindowPointerUp() {
     localStorage.setItem('app_grid_order', orderJson)
     updatePreference('app_grid_order', orderJson)
     dragState.value = null
+    if (reorderHintVisible.value) dismissReorderHint()
   }
   clearHold()
   removeWindowListeners()
@@ -412,15 +453,17 @@ onUnmounted(removeWindowListeners)
 
 /* ── Mobile header ────────────────────────────────────────────── */
 .hub-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
   margin-bottom: 1rem;
 }
+.hub-header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
 
-.hub-date { font-size: 12px; color: #888; margin: 0 0 2px; }
-.hub-title { font-size: 22px; font-weight: 700; font-style: italic; color: #52B788; letter-spacing: -0.02em; margin: 0 0 2px; }
-.hub-subtitle { font-size: 13px; color: #aaa; margin: 0; }
+.hub-date { font-size: 12px; color: #888; margin: 4px 0 2px; }
+.hub-logo { height: 70px; width: auto; object-fit: contain; margin: -7px 0 -5px -7px; }
+.hub-subtitle { font-size: 13px; color: #aaa; margin: 0; font-style: italic; }
 .settings-icon-btn { width: 34px; height: 34px; border-radius: 50%; border: 1px solid #e0e0e0; background: #f5f5f5; display: flex; align-items: center; justify-content: center; cursor: pointer; }
 .header-actions { display: flex; gap: 8px; align-items: center; }
 .user-avatar-wrap { position: relative; flex-shrink: 0; }
@@ -482,18 +525,9 @@ onUnmounted(removeWindowListeners)
 }
 .hub-logout-btn:hover { color: #D4537E; }
 
-/* ── Privacy note (desktop) ───────────────────────────────────── */
-.hub-privacy-note {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 11px;
-  color: #ccc;
-  margin: 1rem 0 0;
-}
 
 /* ── Drag to reorder ──────────────────────────────────────────── */
-.app-card--reorderable { cursor: grab; user-select: none; touch-action: none; }
+.app-card--reorderable { cursor: grab; user-select: none; touch-action: pan-y; }
 .app-card--placeholder { opacity: 0 !important; pointer-events: none; }
 
 .tile-move { transition: transform 180ms ease-out; }

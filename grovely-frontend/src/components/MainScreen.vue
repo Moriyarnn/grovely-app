@@ -5,7 +5,6 @@
     <div class="ms-brand">
       <div class="ms-brand-body">
         <h1 class="ms-brand-title">Grovely</h1>
-        <p class="ms-brand-greeting">{{ greeting }}</p>
         <p class="ms-brand-date">{{ todayLabel }}</p>
       </div>
       <button v-if="showBack" class="ms-back-chip" @click="router.back()">
@@ -116,7 +115,7 @@ const props = defineProps({
 
 const router = useRouter()
 
-const APP_VERSION = 'v0.12.4'
+const APP_VERSION = 'v' + __APP_VERSION__
 const LAST_SEEN_KEY = 'changelog_last_seen_version'
 
 const cycleCount = ref(null)
@@ -215,6 +214,14 @@ const stats = computed(() => [
     bg: '#FEF0E6', iconColor: '#C45B1A',
     value: '—',
     label: 'workouts',
+    stub: true,
+  },
+  {
+    key: 'events',
+    icon: 'mdi-star-four-points',
+    bg: '#FAEEDA', iconColor: '#854F0B',
+    value: '—',
+    label: 'events',
     stub: true,
   },
 ])
@@ -528,17 +535,13 @@ const CHANGELOG = [
   gap: 8px;
 }
 
-/* Below desktop: each card spans 2 of 6 cols → 3 per row.
-   Last 2 cards are pinned to cols 2–4 and 4–6 to center them. */
 @media (max-width: 1279px) {
   .ms-stat { grid-column: span 2; }
-  .ms-stat:nth-child(4) { grid-column: 2 / 4; }
-  .ms-stat:nth-child(5) { grid-column: 4 / 6; }
 }
 
 @media (min-width: 1280px) {
   .ms-stats {
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(6, 1fr);
   }
 }
 
@@ -689,7 +692,9 @@ const CHANGELOG = [
 
 /* ── Plan tags ────────────────────────────────────────────────── */
 .ms-tag {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 4px;
   padding: 2px 6px;
   font-size: 9px;
@@ -698,6 +703,8 @@ const CHANGELOG = [
   text-transform: uppercase;
   flex-shrink: 0;
   line-height: 1.5;
+  min-width: 58px;
+  box-sizing: border-box;
 }
 
 .ms-tag--free    { background: #F3F4F6; color: #6B7280; }

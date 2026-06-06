@@ -21,17 +21,12 @@
     <div class="sv-section">
       <p class="sv-section-label">General</p>
 
-      <div class="sv-subgroup">
-        <p class="sv-sub-label">App Grid</p>
+      <div v-if="isDev" class="sv-subgroup">
+        <p class="sv-sub-label">Dev</p>
         <div class="sv-list">
-          <div class="sv-row" @click="toggleReorder" style="cursor:pointer">
-            <div class="sv-label-group">
-              <span class="sv-label">App reordering</span>
-              <span class="sv-sublabel">Hold any card to drag and rearrange</span>
-            </div>
-            <div class="sv-toggle" :class="{ on: preferences.app_reorder_enabled === '1' }">
-              <div class="sv-knob" />
-            </div>
+          <div class="sv-row" @click="resetHints" style="cursor:pointer">
+            <span class="sv-label">Reset onboarding hints</span>
+            <span class="sv-soon">Dev only</span>
           </div>
         </div>
       </div>
@@ -43,6 +38,62 @@
             <span class="sv-label">Language / locale</span>
             <span class="sv-soon">Coming soon</span>
           </div>
+          <div class="sv-row">
+            <span class="sv-label">Currency</span>
+            <select
+              class="sv-select"
+              :value="settings.pantry_currency ?? 'USD'"
+              @change="e => updateSetting('pantry_currency', (e.target as HTMLInputElement).value)"
+            >
+              <option v-for="c in CURRENCIES" :key="c.value" :value="c.value">{{ c.label }}</option>
+            </select>
+          </div>
+          <Transition
+            @before-enter="onCurrencyBeforeEnter"
+            @enter="onCurrencyEnter"
+            @leave="onCurrencyLeave"
+          >
+            <div v-if="(settings.pantry_currency ?? 'USD') === 'OTHER'" class="sv-currency-expand">
+              <div class="sv-row">
+                <div class="sv-label-group">
+                  <span class="sv-label">Custom currency symbol</span>
+                  <span class="sv-sublabel">e.g. Kč, zł, kr</span>
+                </div>
+                <input
+                  class="sv-symbol-input"
+                  maxlength="4"
+                  placeholder="$"
+                  :value="settings.pantry_currency_custom_symbol ?? ''"
+                  @change="e => updateSetting('pantry_currency_custom_symbol', (e.target as HTMLInputElement).value)"
+                />
+              </div>
+              <div class="sv-row">
+                <div class="sv-label-group">
+                  <span class="sv-label">Custom currency name</span>
+                  <span class="sv-sublabel">e.g. Czech Koruna, Polish Złoty</span>
+                </div>
+                <input
+                  class="sv-symbol-input sv-symbol-input--wide"
+                  maxlength="32"
+                  placeholder="Currency"
+                  :value="settings.pantry_currency_custom_label ?? ''"
+                  @change="e => updateSetting('pantry_currency_custom_label', (e.target as HTMLInputElement).value)"
+                />
+              </div>
+              <div class="sv-row">
+                <span class="sv-label">Custom currency decimals</span>
+                <div class="sv-segmented">
+                  <button
+                    v-for="d in ['0', '2']"
+                    :key="d"
+                    class="sv-seg-btn"
+                    :class="{ active: (settings.pantry_currency_custom_decimals ?? '2') === d }"
+                    @click="updateSetting('pantry_currency_custom_decimals', d)"
+                  >{{ d }}</button>
+                </div>
+              </div>
+            </div>
+          </Transition>
           <div class="sv-row sv-row--stub">
             <span class="sv-label">Dark mode</span>
             <span class="sv-soon">Coming soon</span>
@@ -89,18 +140,15 @@
               <span class="sv-sublabel">Flow color, fertile window, cycle settings</span>
             </div>
             <div class="sv-row-end">
-              <span class="sv-preview-dot" :style="{ background: periodPreviewColor }" />
-              <span class="sv-preview-text">{{ fertileOn ? 'Fertile on' : 'Fertile off' }}</span>
               <v-icon size="16" color="#bbb">mdi-chevron-right</v-icon>
             </div>
           </div>
           <div class="sv-row sv-row--link" @click="pantrySettingsOpen = true" style="cursor:pointer">
             <div class="sv-label-group">
               <span class="sv-label">Pantry</span>
-              <span class="sv-sublabel">Expiry warnings, currency, categories</span>
+              <span class="sv-sublabel">Expiry warnings</span>
             </div>
             <div class="sv-row-end">
-              <span class="sv-preview-text">{{ pantryExpiryDays }}d · {{ pantryCurrency }}</span>
               <v-icon size="16" color="#bbb">mdi-chevron-right</v-icon>
             </div>
           </div>
@@ -198,6 +246,7 @@ import { exportBackup, restoreBackup } from '../api'
 import { useSettings } from '../composables/useSettings'
 import { usePreferences } from '../composables/usePreferences'
 import { useLicense } from '../composables/useLicense'
+import { CURRENCIES } from '../constants/currencies'
 import NotificationMessagesModal from './NotificationMessagesView.vue'
 import BackupsDetailSheet from './BackupsDetailSheet.vue'
 import PeriodSettingsSheet from './PeriodSettingsSheet.vue'
@@ -206,20 +255,9 @@ import PremiumGate from '../components/PremiumGate.vue'
 import PremiumBadge from '../components/ui/PremiumBadge.vue'
 
 const router = useRouter()
-const { settings, fetchSettings } = useSettings()
+const { settings, fetchSettings, updateSetting } = useSettings()
 const { preferences, fetchPreferences, updatePreference } = usePreferences()
 
-// ── Per-app row previews (use already-loaded composable state) ──────────────
-const periodPreviewColor = computed(() => {
-  const hue = parseInt(preferences.value.flow_hue ?? '335', 10)
-  return `hsl(${hue}, 65%, 58%)`
-})
-const fertileOn = computed(() => preferences.value.period_show_fertile_window !== '0')
-const pantryExpiryDays = computed(() => settings.value.pantry_expiry_warning_days ?? '3')
-const pantryCurrency = computed(() => {
-  const c = settings.value.pantry_currency ?? 'USD'
-  return c === 'OTHER' ? (settings.value.pantry_currency_custom_symbol || '¤') : c
-})
 const { licenseActive, fetchLicenseStatus } = useLicense()
 const notifMessagesOpen = ref(false)
 const backupsSheetOpen = ref(false)
@@ -290,11 +328,43 @@ onMounted(async () => {
   fetchLicenseStatus()
 })
 
-
-
-function toggleReorder() {
-  updatePreference('app_reorder_enabled', preferences.value.app_reorder_enabled === '1' ? '0' : '1')
+function onCurrencyBeforeEnter(el: Element) {
+  (el as HTMLElement).style.height = '0'
 }
+function onCurrencyEnter(el: Element, done: () => void) {
+  const h = el as HTMLElement
+  h.style.height = 'auto'
+  const target = h.scrollHeight
+  h.style.height = '0'
+  void h.offsetHeight
+  h.style.height = target + 'px'
+  h.addEventListener('transitionend', function onEnd(e) {
+    if ((e as TransitionEvent).propertyName !== 'height') return
+    h.removeEventListener('transitionend', onEnd)
+    h.style.height = ''
+    done()
+  })
+}
+function onCurrencyLeave(el: Element, done: () => void) {
+  const h = el as HTMLElement
+  h.style.height = h.scrollHeight + 'px'
+  void h.offsetHeight
+  h.style.height = '0'
+  h.addEventListener('transitionend', function onEnd(e) {
+    if ((e as TransitionEvent).propertyName !== 'height') return
+    h.removeEventListener('transitionend', onEnd)
+    done()
+  })
+}
+
+const isDev = import.meta.env.DEV
+function resetHints() {
+  localStorage.removeItem('grovely_reorder_hint_dismissed')
+  showMsg('Hints reset — refresh to see them again.')
+}
+
+
+
 </script>
 
 <style scoped>
@@ -387,17 +457,7 @@ function toggleReorder() {
 .sv-label-group { display: flex; flex-direction: column; gap: 2px; }
 .sv-sublabel { font-size: 12px; color: #8e8e93; }
 
-/* Per-app row preview (right side, before chevron) */
 .sv-row-end { display: flex; align-items: center; gap: 7px; flex-shrink: 0; }
-.sv-preview-dot {
-  width: 11px; height: 11px; border-radius: 50%;
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
-}
-.sv-preview-text {
-  font-size: 12px; color: #8e8e93;
-  white-space: nowrap; letter-spacing: 0.01em;
-}
-
 .sv-soon {
   background: #f5f5f5; color: #bbb; border: 1px solid #ececec;
   border-radius: 5px; padding: 2px 8px; font-size: 10px;
@@ -448,6 +508,11 @@ function toggleReorder() {
 }
 .sv-symbol-input::placeholder { color: #ccc; }
 .sv-symbol-input--wide { width: 120px; }
+
+.sv-currency-expand {
+  overflow: hidden;
+  transition: height 0.25s ease;
+}
 
 /* Snackbar */
 .sv-snackbar {

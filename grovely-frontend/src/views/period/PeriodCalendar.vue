@@ -69,14 +69,14 @@
             >
               <span v-if="cell.day" class="cal-day-num">{{ cell.day }}</span>
               <span v-if="cell.dateStr && justSaved.has(cell.dateStr)" class="cal-saved-check">✓</span>
-              <span v-if="cell.day && (hasDataWarning(cell) || hasOrphanedData(cell) || (hasInfo(cell) && (!isPartner || partnerCanReadNotes)))" class="cal-cell-badges">
-                <span v-if="hasDataWarning(cell)" class="cal-cell-badge cal-cell-badge-warn">
+              <span v-if="cell.day && topBadge(cell)" class="cal-cell-badges">
+                <span v-if="topBadge(cell) === 'warn'" class="cal-cell-badge cal-cell-badge-warn">
                   <v-icon size="18" color="#f59e0b">mdi-alert</v-icon>
                 </span>
-                <span v-if="hasOrphanedData(cell)" class="cal-cell-badge cal-cell-badge-orphan">
+                <span v-else-if="topBadge(cell) === 'orphan'" class="cal-cell-badge cal-cell-badge-orphan">
                   <v-icon size="18" color="#f97316">mdi-link-off</v-icon>
                 </span>
-                <span v-if="hasInfo(cell) && (!isPartner || partnerCanReadNotes)" class="cal-cell-badge cal-cell-badge-note">
+                <span v-else-if="topBadge(cell) === 'note'" class="cal-cell-badge cal-cell-badge-note">
                   <v-icon size="18" color="#94a3b8">mdi-note-text</v-icon>
                 </span>
               </span>
@@ -170,27 +170,32 @@
       @confirm="confirmLongCycleAdjust"
     >This would make the period <strong>{{ longCycleDays }} days</strong> long — most periods last 3–7 days.<br><span style="font-size:11px;color:#b45309;">Are you sure you want to apply this change?</span></ConfirmDialog>
 
-    <!-- Short gap warning dialog -->
+    <!-- Short cycle warning dialog. Fires when the new cycle would be < 21 days long
+         (start to start), matching the prediction-health threshold so the proactive
+         warning agrees with the retroactive data flag. -->
     <ConfirmDialog
-      :open="showShortGapDialog"
-      @update:open="val => { if (!val) cancelShortGap() }"
+      :open="showShortCycleDialog"
+      @update:open="val => { if (!val) cancelShortCycle() }"
       icon="mdi-calendar-clock-outline"
       icon-color="#b45309"
-      title="Short gap since last period"
+      title="Unusually short cycle"
       confirm-label="Continue anyway"
       confirm-color="#b45309"
-      @confirm="confirmShortGap"
-    >This new cycle is only <strong>{{ shortGapDays }} day{{ shortGapDays === 1 ? '' : 's' }}</strong> away from an existing one. Starting a cycle this close may affect your predictions.<br><span style="font-size:11px;color:#b45309;">Are you sure?</span></ConfirmDialog>
+      @confirm="confirmShortCycle"
+    >This would make a <strong>{{ shortCycleDays }} day cycle</strong>. Most cycles are 21 days or longer, so starting one this close may affect your predictions.<br><span style="font-size:11px;color:#b45309;">Are you sure?</span></ConfirmDialog>
 
-    <!-- Adjacency dialog — tapped date sits right next to an existing cycle (owner only) -->
-    <div v-if="!isPartner" class="confirm-backdrop" :class="{ visible: adjacencyDialog.show }" @click="!adjacencyDialog.working && (adjacencyDialog.show = false)" />
-    <div v-if="!isPartner" class="confirm-modal" :class="{ open: adjacencyDialog.show }">
-      <div class="confirm-inner">
-        <div class="confirm-icon">
-          <v-icon size="28" color="#D4537E">mdi-calendar-arrow-right</v-icon>
-        </div>
-        <p class="confirm-title">Adjacent to an existing period</p>
-        <p class="confirm-desc">This day is right next to a logged cycle. What would you like to do?</p>
+    <!-- Adjacency dialog — tapped date sits right next to an existing cycle (owner only).
+         Uses ConfirmDialog's pink shell with hideActions + custom stacked buttons in #content
+         since this dialog has three choices, not a binary confirm/cancel. -->
+    <ConfirmDialog
+      v-if="!isPartner"
+      :open="adjacencyDialog.show"
+      @update:open="val => { if (!val && !adjacencyDialog.working) adjacencyDialog.show = false }"
+      icon="mdi-calendar-arrow-right"
+      icon-color="#b45309"
+      title="Adjacent to an existing period"
+      hide-actions
+    >This day is right next to a logged cycle. What would you like to do?<template #content>
         <div class="adj-actions">
           <button
             v-if="adjacencyDialog.prevCycle"
@@ -198,7 +203,7 @@
             :disabled="adjacencyDialog.working"
             @click="onAdjacencyExtendPrev"
           >
-            <v-icon size="15" style="margin-right:5px">mdi-arrow-expand-right</v-icon>
+            <v-icon size="15" color="#fff" style="margin-right:5px">mdi-arrow-expand-right</v-icon>
             Extend {{ cycleRangeLabel(adjacencyDialog.prevCycle) }} to include this day
           </button>
           <button
@@ -207,7 +212,7 @@
             :disabled="adjacencyDialog.working"
             @click="onAdjacencyExtendNext"
           >
-            <v-icon size="15" style="margin-right:5px">mdi-arrow-expand-left</v-icon>
+            <v-icon size="15" color="#fff" style="margin-right:5px">mdi-arrow-expand-left</v-icon>
             Move start of {{ cycleRangeLabel(adjacencyDialog.nextCycle) }} to this day
           </button>
           <button
@@ -218,8 +223,8 @@
             Start a new period on this day
           </button>
         </div>
-      </div>
-    </div>
+      </template>
+    </ConfirmDialog>
 
     <!-- Day panel -->
     <DetailSheet
@@ -595,7 +600,6 @@ function showHintBubble(x, date, message = "Can't log future dates", variant = '
 
 // Swipe-to-create state
 const dragRange = ref(null)
-const creating = ref(false)
 
 // Delete cycle dialog
 const showDeleteCycleDialog = ref(false)
@@ -608,9 +612,9 @@ const longCyclePendingFn = ref(null)
 const longCycleWarnedIds = new Set() // cycle IDs already warned this session
 
 // Short gap warning dialog
-const showShortGapDialog = ref(false)
-const shortGapDays = ref(0)
-const shortGapPendingFn = ref(null)
+const showShortCycleDialog = ref(false)
+const shortCycleDays = ref(0)
+const shortCyclePendingFn = ref(null)
 
 // Adjacency dialog — shown when a tapped date sits immediately next to an existing cycle
 const adjacencyDialog = ref({ show: false, prevCycle: null, nextCycle: null, pendingCell: null, working: false })
@@ -640,12 +644,8 @@ function cycleRangeLabel(cycle) {
   return `${fmt(cycle.start_date)} – ${fmt(end)}`
 }
 
-// Ovulation marking
-const markingOvulation = ref(false)
-
 // Day-by-day logging
 const tapContext = ref(null) // 'no-cycle' | 'consecutive' | 'large-gap' | 'open-cycle-day' | 'orphaned'
-const endingPeriod = ref(false)
 const removingDay = ref(false)
 
 // Adjust Cycle mode
@@ -678,10 +678,6 @@ const deletingGapDay = ref(false)
 const symptomOptions = ['Cramps', 'Headache', 'Bloating', 'Mood swings', 'Fatigue', 'Back pain', 'Nausea', 'Tender breasts']
 
 // ── Computed labels ──────────────────────────────────────────
-const todayLabel = new Date().toLocaleDateString('en-US', {
-  weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-})
-
 const monthLabel = computed(() => {
   return new Date(viewYear.value, viewMonth.value, 1)
     .toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
@@ -780,24 +776,19 @@ const dragDates = computed(() => {
   return set
 })
 
-const dragRangeLabel = computed(() => {
-  if (!dragRange.value) return ''
-  const fmt = d => new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric' })
-  if (dragRange.value.start === dragRange.value.end) return fmt(dragRange.value.start)
-  return `${fmt(dragRange.value.start)} → ${fmt(dragRange.value.end)}`
-})
-
-const PREDICT_CYCLES = 6
-
 const predictedDates = computed(() => {
   const set = new Set()
   const s = summary.value
-  if (!s?.nextPeriodDate || !s?.avgPeriodLength) return set
-  const base = new Date(s.nextPeriodDate + 'T00:00:00')
-  for (let d = 0; d < s.avgPeriodLength; d++) {
-    const day = new Date(base)
-    day.setDate(day.getDate() + d)
-    set.add(day.toISOString().split('T')[0])
+  if (!s?.avgPeriodLength) return set
+  const startDates = (s.missedPredictions ?? []).map(m => m.startDate)
+  if (s.nextPeriodDate) startDates.push(s.nextPeriodDate)
+  for (const start of startDates) {
+    const base = new Date(start + 'T00:00:00')
+    for (let d = 0; d < s.avgPeriodLength; d++) {
+      const day = new Date(base)
+      day.setDate(day.getDate() + d)
+      set.add(day.toISOString().split('T')[0])
+    }
   }
   return set
 })
@@ -852,10 +843,12 @@ const fertileDates = computed(() => {
     }
   })
 
-  // Also paint the next fertile window — it belongs to a future cycle with no DB row yet
-  if (s.nextFertileWindow) {
-    const cur = new Date(s.nextFertileWindow.start + 'T00:00:00')
-    const end = new Date(s.nextFertileWindow.end   + 'T00:00:00')
+  // Paint fertile windows for missed predictions and the next future cycle
+  const fertileWindows = (s.missedPredictions ?? []).map(m => m.fertileWindow)
+  if (s.nextFertileWindow) fertileWindows.push(s.nextFertileWindow)
+  for (const fw of fertileWindows) {
+    const cur = new Date(fw.start + 'T00:00:00')
+    const end = new Date(fw.end   + 'T00:00:00')
     while (cur <= end) {
       set.add(cur.toISOString().split('T')[0])
       cur.setDate(cur.getDate() + 1)
@@ -881,6 +874,7 @@ const predictedOvulationDates = computed(() => {
     set.add(cycle.predicted_ovulation_date)
   })
 
+  for (const m of s.missedPredictions ?? []) set.add(m.ovulationDate)
   if (s.nextOvulationDate) set.add(s.nextOvulationDate)
 
   return set
@@ -929,13 +923,6 @@ function findRelevantOpenCycle(ds) {
     .filter(c => c.end_date && c.end_date >= yesterday && c.start_date <= ds && c.review_state !== 'excluded')
     .sort((a, b) => b.start_date.localeCompare(a.start_date))[0] ?? null
 }
-
-// Reactive version for template and computed use (depends on selectedCell)
-const relevantActiveCycle = computed(() => {
-  const ds = selectedCell.value?.dateStr
-  if (!ds) return null
-  return findRelevantOpenCycle(ds)
-})
 
 const adjustCycle = computed(() =>
   adjustingCycleId.value
@@ -1015,6 +1002,16 @@ function hasDataWarning(cell) {
 
 function hasOrphanedData(cell) {
   return !!(cell.dateStr && orphanedDaySet.value.has(cell.dateStr))
+}
+
+// Single-badge priority: warning > orphan > note. Stacking three icons in a
+// 13px mobile cell becomes unreadable — show the most actionable one only.
+function topBadge(cell) {
+  if (!cell.day) return null
+  if (hasDataWarning(cell)) return 'warn'
+  if (hasOrphanedData(cell)) return 'orphan'
+  if (hasInfo(cell) && (!isPartner.value || partnerCanReadNotes.value)) return 'note'
+  return null
 }
 
 const todayStr = new Date().toISOString().split('T')[0]
@@ -1303,7 +1300,7 @@ async function quickLogDay(cell) {
   }
 
   if (['no-cycle', 'large-gap'].includes(tapContext.value)) {
-    if (guardShortGap(ds, doLog)) return
+    if (guardShortCycle(ds, doLog)) return
   }
 
   await doLog()
@@ -1412,50 +1409,54 @@ function cancelLongCycleAdjust() {
   longCyclePendingFn.value = null
 }
 
-function guardShortGap(newStartDate, fn) {
-  // Check the cycle that ends closest before newStartDate
+// Measures the would-be cycle length (start to start) against the medical 21-day
+// minimum. This matches the prediction-health retroactive flag so the proactive
+// dialog and the post-save warning fire on the same condition.
+const MIN_CYCLE_LENGTH_DAYS = 21
+function guardShortCycle(newStartDate, fn) {
+  // Cycle length from the preceding cycle's start to this new start
   const preceding = allCycles.value
-    .filter(c => c.end_date && c.end_date < newStartDate)
-    .sort((a, b) => b.end_date.localeCompare(a.end_date))[0]
+    .filter(c => c.start_date < newStartDate)
+    .sort((a, b) => b.start_date.localeCompare(a.start_date))[0]
   if (preceding) {
-    const days = Math.round(
-      (new Date(newStartDate + 'T00:00:00') - new Date(preceding.end_date + 'T00:00:00')) / 86400000
+    const cycleLen = Math.round(
+      (new Date(newStartDate + 'T00:00:00') - new Date(preceding.start_date + 'T00:00:00')) / 86400000
     )
-    if (days > 0 && days < 7) {
-      shortGapDays.value = days
-      shortGapPendingFn.value = fn
-      showShortGapDialog.value = true
+    if (cycleLen > 0 && cycleLen < MIN_CYCLE_LENGTH_DAYS) {
+      shortCycleDays.value = cycleLen
+      shortCyclePendingFn.value = fn
+      showShortCycleDialog.value = true
       return true
     }
   }
-  // Check the cycle that starts closest after newStartDate
+  // Cycle length from this new start to the following cycle's start
   const following = allCycles.value
     .filter(c => c.start_date > newStartDate)
     .sort((a, b) => a.start_date.localeCompare(b.start_date))[0]
   if (following) {
-    const days = Math.round(
+    const cycleLen = Math.round(
       (new Date(following.start_date + 'T00:00:00') - new Date(newStartDate + 'T00:00:00')) / 86400000
     )
-    if (days > 0 && days < 7) {
-      shortGapDays.value = days
-      shortGapPendingFn.value = fn
-      showShortGapDialog.value = true
+    if (cycleLen > 0 && cycleLen < MIN_CYCLE_LENGTH_DAYS) {
+      shortCycleDays.value = cycleLen
+      shortCyclePendingFn.value = fn
+      showShortCycleDialog.value = true
       return true
     }
   }
   return false
 }
 
-async function confirmShortGap() {
-  showShortGapDialog.value = false
-  const fn = shortGapPendingFn.value
-  shortGapPendingFn.value = null
+async function confirmShortCycle() {
+  showShortCycleDialog.value = false
+  const fn = shortCyclePendingFn.value
+  shortCyclePendingFn.value = null
   if (fn) await fn()
 }
 
-function cancelShortGap() {
-  showShortGapDialog.value = false
-  shortGapPendingFn.value = null
+function cancelShortCycle() {
+  showShortCycleDialog.value = false
+  shortCyclePendingFn.value = null
 }
 
 function guardLongCycle(dayCount, fn, cycleId = null) {
@@ -1766,12 +1767,6 @@ function onTouchMove(e) {
   const cellEl = el?.closest('[data-date]')
   if (!cellEl) return
   const dateStr = cellEl.dataset.date
-  if (adjustHoldTimer.value) {
-    const ps = periodHoldTouchStart.value
-    const dx = ps ? Math.abs(touch.clientX - ps.x) : 0
-    const dy = ps ? Math.abs(touch.clientY - ps.y) : 0
-  }
-
   // Propagate adjust drag on touch
   if (adjustDragActive.value) {
     adjustPreviewDate.value = dateStr
@@ -1813,22 +1808,6 @@ function onTouchEnd(e) {
   onDocumentMouseUp(touch ? { clientX: touch.clientX, clientY: touch.clientY } : {})
 }
 
-async function markOvulation() {
-  if (!ovulationCycle.value || !selectedCell.value) return
-  markingOvulation.value = true
-  try {
-    const newDate = isMarkedOvulation.value ? null : selectedCell.value.dateStr
-    await apiFetch(`${API}/period/cycles/${ovulationCycle.value.id}/ovulation`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ovulation_date: newDate })
-    })
-    await loadData()
-  } finally {
-    markingOvulation.value = false
-  }
-}
-
 async function doSwipeCreate(x, s, e) {
   const dayCount = (new Date(e + 'T00:00:00') - new Date(s + 'T00:00:00')) / 86400000 + 1
   const fmt = d => new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric' })
@@ -1836,43 +1815,38 @@ async function doSwipeCreate(x, s, e) {
 
   const doCreate = async () => {
     dragRange.value = { start: s, end: e }
-    creating.value = true
-    try {
-      const startRes = await apiFetch(`${API}/period/cycles/start`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          start_date: s,
-          predicted_start_date: summary.value?.nextPeriodDate ?? null
-        })
+    const startRes = await apiFetch(`${API}/period/cycles/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        start_date: s,
+        predicted_start_date: summary.value?.nextPeriodDate ?? null
       })
-      const { id } = await startRes.json()
-      await apiFetch(`${API}/period/cycles/${id}/end`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ end_date: e })
-      })
-      const allDays = []
-      let cur = new Date(s + 'T00:00:00')
-      const endD = new Date(e + 'T00:00:00')
-      while (cur <= endD) { allDays.push(cur.toISOString().split('T')[0]); cur.setDate(cur.getDate() + 1) }
-      await Promise.all(allDays.map(date => apiFetch(`${API}/period/cycle-days`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cycle_id: id, date })
-      })))
-      dragRange.value = null
-      dragStart.value = null
-      dragEnd.value = null
-      await loadData()
-      flashDates(allDays)
-      showHintBubble(x, s, `Period logged: ${label}`, 'green')
-    } finally {
-      creating.value = false
-    }
+    })
+    const { id } = await startRes.json()
+    await apiFetch(`${API}/period/cycles/${id}/end`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ end_date: e })
+    })
+    const allDays = []
+    let cur = new Date(s + 'T00:00:00')
+    const endD = new Date(e + 'T00:00:00')
+    while (cur <= endD) { allDays.push(cur.toISOString().split('T')[0]); cur.setDate(cur.getDate() + 1) }
+    await Promise.all(allDays.map(date => apiFetch(`${API}/period/cycle-days`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cycle_id: id, date })
+    })))
+    dragRange.value = null
+    dragStart.value = null
+    dragEnd.value = null
+    await loadData()
+    flashDates(allDays)
+    showHintBubble(x, s, `Period logged: ${label}`, 'green')
   }
 
-  if (guardShortGap(s, doCreate)) {
+  if (guardShortCycle(s, doCreate)) {
     dragStart.value = null
     dragEnd.value = null
     return
@@ -2076,6 +2050,7 @@ async function onAdjacencyExtendPrevSilent(prevCycle, cell) {
         body: JSON.stringify({ cycle_id: prevCycle.id, date: cell.dateStr })
       })
       await loadData()
+      flashDates([cell.dateStr])
       const cellEl = document.querySelector(`[data-date="${cell.dateStr}"]`)
       const x = cellEl ? cellEl.getBoundingClientRect().left + cellEl.getBoundingClientRect().width / 2 : window.innerWidth / 2
       showHintBubble(x, cell.dateStr, 'Period extended', 'green')
@@ -2105,6 +2080,7 @@ async function onAdjacencyExtendNextSilent(nextCycle, cell) {
         body: JSON.stringify({ cycle_id: nextCycle.id, date: cell.dateStr })
       })
       await loadData()
+      flashDates([cell.dateStr])
       const cellEl = document.querySelector(`[data-date="${cell.dateStr}"]`)
       const x = cellEl ? cellEl.getBoundingClientRect().left + cellEl.getBoundingClientRect().width / 2 : window.innerWidth / 2
       showHintBubble(x, cell.dateStr, 'Period start moved', 'green')
@@ -2129,6 +2105,7 @@ async function onAdjacencyExtendPrev() {
       })
       adjacencyDialog.value.show = false
       await loadData()
+      flashDates([pendingCell.dateStr])
       const cellEl = document.querySelector(`[data-date="${pendingCell.dateStr}"]`)
       const x = cellEl ? cellEl.getBoundingClientRect().left + cellEl.getBoundingClientRect().width / 2 : window.innerWidth / 2
       showHintBubble(x, pendingCell.dateStr, 'Period extended', 'green')
@@ -2159,6 +2136,7 @@ async function onAdjacencyExtendNext() {
       })
       adjacencyDialog.value.show = false
       await loadData()
+      flashDates([pendingCell.dateStr])
       const cellEl = document.querySelector(`[data-date="${pendingCell.dateStr}"]`)
       const x = cellEl ? cellEl.getBoundingClientRect().left + cellEl.getBoundingClientRect().width / 2 : window.innerWidth / 2
       showHintBubble(x, pendingCell.dateStr, 'Period start moved', 'green')
@@ -2273,24 +2251,6 @@ async function removeDay() {
   }
 }
 
-async function endActivePeriod() {
-  const active = relevantActiveCycle.value
-  const ds = selectedCell.value?.dateStr
-  if (!active || !ds) return
-  endingPeriod.value = true
-  try {
-    await apiFetch(`${API}/period/cycles/${active.id}/end`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ end_date: ds })
-    })
-    closePanel()
-    await loadData()
-  } finally {
-    endingPeriod.value = false
-  }
-}
-
 // Core: resolves cycleId and saves the cycle-day record.
 // Returns the cycleId on success, null on failure.
 async function _saveCycleDayCore(ds) {
@@ -2356,31 +2316,6 @@ async function _saveCycleDayCore(ds) {
   }
 
   return cycleId
-}
-
-async function saveAndEndPeriod() {
-  if (!selectedCell.value) return
-  saving.value = true
-  const ds = selectedCell.value.dateStr
-  try {
-    const cycleId = await _saveCycleDayCore(ds)
-    if (!cycleId) return
-    await apiFetch(`${API}/period/cycles/${cycleId}/end`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ end_date: ds })
-    })
-    justSaved.value = new Set([...justSaved.value, ds])
-    setTimeout(() => {
-      const next = new Set(justSaved.value)
-      next.delete(ds)
-      justSaved.value = next
-    }, 1500)
-    closePanel()
-    await loadData()
-  } finally {
-    saving.value = false
-  }
 }
 
 onMounted(() => {
@@ -2565,15 +2500,15 @@ onUnmounted(() => {
 /* Calendar cell badges (bottom-right icons) */
 .cal-cell-badges {
   position: absolute;
-  bottom: 2px;
+  bottom: -2px;
   right: 2px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  align-items: flex-end;
+  z-index: 5;
   pointer-events: none;
 }
 .cal-cell-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 20px;
   height: 20px;
   border-radius: 6px;
@@ -2593,6 +2528,10 @@ onUnmounted(() => {
   height: auto !important;
 }
 @media (max-width: 600px) {
+  .cal-cell-badges {
+    bottom: -2px;
+    right: 2px;
+  }
   .cal-cell-badge {
     width: 13px;
     height: 13px;
@@ -2764,6 +2703,7 @@ onUnmounted(() => {
   font-size: 8px;
   padding: 1px 5px 1px 4px;
   gap: 3px;
+  line-height: 1;
 }
 
 /* Future-date speech bubble */
@@ -3009,65 +2949,7 @@ onUnmounted(() => {
 
 
 /* Confirm modal */
-.confirm-backdrop {
-  position: fixed; inset: 0;
-  background: rgba(114,36,62,0.25);
-  z-index: 200;
-  opacity: 0; pointer-events: none;
-  transition: opacity 0.2s;
-}
-.confirm-backdrop.visible { opacity: 1; pointer-events: all; }
-
-.confirm-modal {
-  position: fixed;
-  inset: 0;
-  z-index: 201;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  pointer-events: none;
-  padding: 1.5rem;
-}
-.confirm-modal.open { pointer-events: all; }
-
-.confirm-inner {
-  background: #fff;
-  border-radius: 20px;
-  padding: 2rem 1.5rem 1.5rem;
-  width: 100%;
-  max-width: 340px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.6rem;
-  box-shadow: 0 8px 40px rgba(114,36,62,0.18);
-  transform: scale(0.92);
-  opacity: 0;
-  transition: transform 0.22s cubic-bezier(.4,0,.2,1), opacity 0.22s;
-}
-.confirm-modal.open .confirm-inner {
-  transform: scale(1);
-  opacity: 1;
-}
-
-.confirm-icon {
-  width: 52px; height: 52px;
-  background: #fff0ee;
-  border: 1px solid #f5c6c0;
-  border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  margin-bottom: 0.25rem;
-}
-.confirm-title {
-  font-size: 16px; font-weight: 600; color: #72243E;
-  margin: 0; text-align: center;
-}
-.confirm-desc {
-  font-size: 13px; color: #a0667a;
-  margin: 0; text-align: center; line-height: 1.5;
-}
-
-/* Adjacency dialog action buttons */
+/* Adjacency dialog action buttons (rendered inside ConfirmDialog #content slot) */
 .adj-actions {
   display: flex; flex-direction: column; gap: 8px;
   margin-top: 0.75rem; width: 100%;
@@ -3080,11 +2962,11 @@ onUnmounted(() => {
 }
 .adj-btn:disabled { opacity: 0.6; cursor: default; }
 .adj-btn-extend {
-  background: #FBE8EF; border: 1px solid #F4C0D1; color: #72243E;
+  background: #b45309; border: 1px solid #b45309; color: #fff;
 }
 .adj-btn-new {
-  background: #fff; border: 1px solid #e8e0e4; color: #9b7a89;
-  justify-content: center; font-size: 12px;
+  background: #fff; border: 1px solid #F4C0D1; color: #993556;
+  justify-content: center;
 }
 
 /* Flow chips */

@@ -51,7 +51,7 @@
 </template>
 
 <script setup>
-import { ref, computed, useSlots, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { ref, computed, useSlots, onMounted, onUnmounted, watch, nextTick, provide } from 'vue'
 
 const props = defineProps({
   panelBg:     { type: String, default: '#fdf5f8' },
@@ -122,6 +122,8 @@ function goTo(index) {
   el.scrollTo({ left: index * el.clientWidth, behavior: 'smooth' })
   activeIndex.value = index
 }
+
+provide('appLayoutGoTo', goTo)
 
 // Reset to first panel when breakpoint changes
 watch([isMobile, isMedium], async () => {

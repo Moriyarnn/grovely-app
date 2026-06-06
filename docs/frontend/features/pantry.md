@@ -4,10 +4,12 @@
 
 Two-layer household food system: a **Shopping List** tab (what needs to be bought) and a **Pantry** tab (what's in the house, with expiry tracking). Checking off a shopping item moves it into the pantry. The pantry drives expiry notifications and eventual recipe integration.
 
-## Planned Views
+## Views
 
-- `src/views/PantryHome.vue` — main screen, tabbed: Shopping List / Pantry
-- `src/views/PantryItemDetail.vue` — detail/edit for a single pantry item (expiry, quantity, notes)
+- `src/views/pantry/PantryShoppingList.vue` — shopping list tab
+- `src/views/pantry/PantryInventory.vue` — pantry inventory tab
+
+Item detail is handled as a bottom sheet within each view, not a separate component.
 
 ## Shopping List Tab
 
@@ -59,7 +61,6 @@ Items with no expiry date set are shown normally with no color state applied.
 **Interactions:**
 - Tap item → PantryItemDetail (edit expiry, quantity, notes; mark as used/wasted)
 - Swipe left → mark as used (removes from pantry)
-- Swipe right → add back to shopping list (replenish flow)
 - "Add to pantry" FAB — add items directly without going through shopping list
 
 **Search and filter:**
@@ -78,29 +79,17 @@ A compact summary row pinned below the tab bar on the Pantry tab:
 
 Updates live. Tapping the "expiring soon" segment scrolls to / highlights those items.
 
-## Expiry Nudge (free)
+## Expiry Nudge (free — planned)
 
-A persistent banner at the top of the Pantry tab when items are expiring within 3 days:
-> "3 items expiring soon — tap to see"
+A persistent banner at the top of the Pantry tab when items are expiring within 3 days. The `pantry_expiry_warning_days` settings key exists; UI not yet implemented.
 
-Tapping scrolls to / highlights the expiring items.
+## Shopping Wizard (planned)
 
-## Shopping Wizard (free)
+A "just got home" bulk-add mode for rapid pantry entry without going through the shopping list. Not yet implemented.
 
-A "just got home" bulk-add mode accessible from a FAB or prominent button on the Pantry tab. Designed for speed — the whole flow stays on one screen.
-
-**Flow:**
-1. Tap "I just got home" → wizard opens
-2. Type item name (autosuggest from past items) → set quantity → set expiry date or skip → tap "Next"
-3. Repeat for each item
-4. "Batch expiry" shortcut: if several items share the same date, set it once and apply to the last N items
-5. Tap "Done" → all items written to pantry at once, wizard closes
-
-The wizard does not require items to exist on the shopping list first — it's a standalone entry point.
-
-**Premium wizard extensions:**
-- Saved templates: save the current wizard session as a named template (e.g. "weekly staples") for one-tap reuse
-- Repeat last shop: pre-fills the wizard with the previous session
+**Planned premium extensions:**
+- Saved templates (e.g. "weekly staples") for one-tap reuse
+- Repeat last shop: pre-fills wizard with the previous session
 - Barcode scanner (mobile): scan item barcode to auto-fill name and category
 
 ## Recipe Crossover (premium — Phase 7+)
@@ -132,4 +121,4 @@ Both roles have full access — Pantry is a shared household feature.
 
 ## Status
 
-Shopping list live. Inventory live. Search, filter, and sort live. Move-to-pantry flow live. Backend spec: [Pantry — Backend](../../backend/pantry.md)
+Shopping list live. Inventory live. Search, filter, sort, and category chips live. Move-to-pantry flow live. Expiry tracking with 5 visual states live. Premium smart autofill live. Replenish flow (swipe right), expiry nudge banner, and shopping wizard are planned. Backend spec: [Pantry — Backend](../../backend/pantry.md)

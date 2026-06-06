@@ -100,8 +100,9 @@ Returns `null`s when there's no dated history. Free endpoint, computed on the fl
 | POST | `/` | Add item |
 | PATCH | `/:id` | Update fields or toggle `checked` |
 | DELETE | `/:id` | Remove without buying |
-| POST | `/:id/move-to-pantry` | Move checked item to pantry |
 | DELETE | `/checked` | Bulk-clear checked items |
+
+> Move-to-pantry is not a dedicated endpoint. The frontend collects item data from the shopping list and calls `POST /api/pantry` directly, which handles the add/merge logic.
 
 ### Pantry (`/api/pantry`)
 
@@ -148,12 +149,14 @@ Integrated into the daily cron:
 - `033_pantry_consume_history.sql`
 - `034_pantry_soft_delete.sql` — `deleted_at`
 - `035_shopping_list_store.sql` — `store`
+- `036_pantry_expiry_notified.sql` — `expiry_notified` flag on `pantry` (deduplicates expiry notifications)
+- `037_pantry_currency_custom_decimals.sql` — seeds `pantry_currency_decimals` setting
 
 ## File Locations
 
 ```
 grovely-backend/routes/pantry/
-├── list.js       # shopping list CRUD + move-to-pantry
+├── list.js       # shopping list CRUD
 ├── pantry.js     # pantry CRUD, merge, suggest-expiry, consume, catalog/history writes
 └── catalog.js    # free autocomplete search
 ```

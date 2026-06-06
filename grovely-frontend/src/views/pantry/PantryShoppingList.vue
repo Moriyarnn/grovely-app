@@ -44,7 +44,7 @@
         </button>
       </div>
       <div class="add-meta add-meta--two">
-        <div class="add-meta-field add-meta-field--price">
+        <div class="add-meta-field add-meta-field--qty">
           <div class="add-meta-label-row">
             <span class="add-meta-label">Quantity <span class="add-meta-optional">(optional)</span></span>
             <AppFieldToggle v-model="newQtyIsPieces" @update:model-value="onAddQtyModeToggle" label="pcs" theme="green" />
@@ -105,7 +105,9 @@
         <div class="add-meta-field add-meta-field--price">
           <div class="add-meta-label-row">
             <span class="add-meta-label">Price <span class="add-meta-optional"><span class="price-opt--mobile">(o.)</span><span class="price-opt--desktop">{{ addFormPiecesCount > 1 ? '(opt.)' : '(optional)' }}</span></span></span>
-            <AppFieldToggle v-if="addFormPiecesCount > 1" v-model="newPriceIsTotal" label="∑" theme="green" />
+            <Transition name="tot-toggle">
+              <AppFieldToggle v-if="addFormPiecesCount > 1" v-model="newPriceIsTotal" label="∑" theme="green" />
+            </Transition>
           </div>
           <div class="meta-qty-row">
             <div class="meta-price-box" @click="addPriceInput?.focus()">
@@ -259,9 +261,9 @@
     </div>
 
     <!-- Bottom action bar -->
-    <div v-if="uncheckedItems.length > 0" class="bottom-bar">
+    <div v-if="allUncheckedItems.length > 0" class="bottom-bar">
       <template v-if="!selectMode">
-        <button class="bar-btn bar-btn--primary" @click="openMoveSheet(uncheckedItems)">Move all to pantry</button>
+        <button class="bar-btn bar-btn--primary" @click="openMoveSheet(allUncheckedItems)">Move all to pantry</button>
         <div v-if="estimatedTotal > 0" class="bar-total-pill">
           <span class="bar-total-label">Cart total</span>
           <span class="bar-total-value" :title="`${pantrySymbol} ${estimatedTotal.toFixed(pantryDecimals)}`">{{ pantrySymbol }}&nbsp;{{ clampPrice(estimatedTotal, 8, pantryDecimals) }}</span>
@@ -272,7 +274,7 @@
           <button class="bar-btn bar-btn--danger" :disabled="selectedCount === 0" @click="deleteSelected">
             Delete{{ selectedCount > 0 ? ` (${selectedCount})` : '' }}
           </button>
-          <button class="bar-btn bar-btn--primary" :disabled="selectedCount === 0" @click="openMoveSheet(uncheckedItems.filter(i => selectedIds.has(i.id)))">
+          <button class="bar-btn bar-btn--primary" :disabled="selectedCount === 0" @click="openMoveSheet(allUncheckedItems.filter(i => selectedIds.has(i.id)))">
             Move{{ selectedCount > 0 ? ` (${selectedCount})` : '' }}
           </button>
         </div>
@@ -555,6 +557,7 @@
             <span v-else-if="item.pieces != null" class="move-item-qty">{{ item.pieces }} pcs</span>
             <span v-else-if="item.quantity" class="move-item-qty">{{ item.quantity }}</span>
             <div class="move-expiry-wrap">
+              <span class="move-expiry-label">Expiry</span>
               <span v-if="moveSuggested[item.id]" class="move-expiry-suggested">
                 <v-icon size="11" color="#2E7D52">mdi-lightbulb-on-outline</v-icon>
                 Suggested
@@ -564,6 +567,7 @@
                 @input="moveSuggested[item.id] = false"
                 type="date"
                 class="move-expiry-input"
+                :class="{ 'move-expiry-input--empty': !moveExpiries[item.id] }"
               />
             </div>
           </div>
@@ -708,6 +712,7 @@ const pantrySymbol = computed(() => {
 })
 const pantryDecimals = computed(() => {
   const cur = settings.value.pantry_currency ?? 'USD'
+  if (cur === 'OTHER') return parseInt(settings.value.pantry_currency_custom_decimals ?? '2', 10)
   return CURRENCIES.find(c => c.value === cur)?.decimals ?? 2
 })
 const pricePlaceholder = computed(() => pantryDecimals.value === 0 ? '0' : '0.00')
@@ -734,9 +739,13 @@ const unitPricePreview = computed(() => {
 
 const searchQuery = ref('')
 
+const allUncheckedItems = computed(() =>
+  items.value.filter(i => !i.checked)
+)
+
 const uncheckedItems = computed(() => {
   const q = searchQuery.value.toLowerCase()
-  return items.value.filter(i => !i.checked && (!q || i.name.toLowerCase().includes(q)))
+  return allUncheckedItems.value.filter(i => !q || i.name.toLowerCase().includes(q))
 })
 const checkedItems = computed(() => {
   const q = searchQuery.value.toLowerCase()
@@ -744,13 +753,13 @@ const checkedItems = computed(() => {
 })
 
 const estimatedTotal = computed(() =>
-  uncheckedItems.value
+  allUncheckedItems.value
     .filter(i => i.price != null)
     .reduce((sum, i) => sum + i.price * (i.pieces ?? 1), 0)
 )
 
 const selectedTotal = computed(() =>
-  uncheckedItems.value
+  allUncheckedItems.value
     .filter(i => i.price != null && selectedIds.value.has(i.id))
     .reduce((sum, i) => sum + i.price * (i.pieces ?? 1), 0)
 )
@@ -844,6 +853,10 @@ async function addItem() {
     newQtyIsPieces.value = false
     newStore.value = ''
     autofilledPrice.value = null
+    stashAddAmount.value       = ''
+    stashAddUnit.value         = 'g'
+    stashAddPieces.value       = ''
+    stashAddPriceIsTotal.value = false
   }
   adding.value = false
 }
@@ -890,16 +903,53 @@ const addQtySlideDir = ref('right')
 const sheetQtyIsPieces = ref(false)
 const sheetQtySlideDir = ref('right')
 
-// Slide direction only — do NOT wipe the other mode's fields. Keeping both
-// field sets intact means flipping pcs↔amount and back preserves what the user
-// entered; addItem/saveItem read the active mode and null the other, so the
-// hidden mode's leftover values never get persisted.
+// Hard toggle: clear the inactive mode's fields so derived state
+// (addFormPiecesCount, TOT toggle visibility) tracks the active mode only.
+// Stash the cleared value so flipping back restores what the user had.
+const stashAddAmount        = ref('')
+const stashAddUnit          = ref('g')
+const stashAddPieces        = ref('')
+const stashAddPriceIsTotal  = ref(false)
 function onAddQtyModeToggle(val) {
   addQtySlideDir.value = val ? 'right' : 'left'
+  if (val) {
+    stashAddAmount.value = newAmount.value
+    stashAddUnit.value   = newUnit.value
+    newAmount.value = ''
+    newUnit.value   = 'g'
+    newPieces.value = stashAddPieces.value
+    newPriceIsTotal.value = stashAddPriceIsTotal.value
+  } else {
+    stashAddPieces.value       = newPieces.value
+    stashAddPriceIsTotal.value = newPriceIsTotal.value
+    newPieces.value = ''
+    newPriceIsTotal.value = false
+    newAmount.value = stashAddAmount.value
+    newUnit.value   = stashAddUnit.value
+  }
 }
 
+const stashSheetAmount        = ref('')
+const stashSheetUnit          = ref('g')
+const stashSheetPieces        = ref('')
+const stashSheetPriceIsTotal  = ref(false)
 function onSheetQtyModeToggle(val) {
   sheetQtySlideDir.value = val ? 'right' : 'left'
+  if (val) {
+    stashSheetAmount.value = sheetForm.value.amount
+    stashSheetUnit.value   = sheetForm.value.unit
+    sheetForm.value.amount = ''
+    sheetForm.value.unit   = 'g'
+    sheetForm.value.pieces = stashSheetPieces.value
+    sheetPriceIsTotal.value = stashSheetPriceIsTotal.value
+  } else {
+    stashSheetPieces.value       = sheetForm.value.pieces
+    stashSheetPriceIsTotal.value = sheetPriceIsTotal.value
+    sheetForm.value.pieces = ''
+    sheetPriceIsTotal.value = false
+    sheetForm.value.amount = stashSheetAmount.value
+    sheetForm.value.unit   = stashSheetUnit.value
+  }
 }
 
 const sheetFormPiecesCount = computed(() => {
@@ -920,6 +970,20 @@ const sheetUnitPricePreview = computed(() => {
   const n = sheetFormPiecesCount.value
   if (isNaN(p) || p <= 0 || n < 2) return (0).toFixed(pantryDecimals.value)
   return clampPrice(p / n, sheetUnitPriceClampBudget.value, pantryDecimals.value)
+})
+
+// When TOT is on, the price field represents the total. If the user changes
+// pieces, the per-piece price should stay fixed — so scale total by the
+// new/old pieces ratio. Without this, total stays constant while per-piece
+// silently drifts, and flipping TOT off afterwards shows a surprising value.
+watch(() => sheetForm.value.pieces, (newVal, oldVal) => {
+  if (!sheetPriceIsTotal.value) return
+  const oldN = parseInt(oldVal)
+  const newN = parseInt(newVal)
+  if (isNaN(oldN) || isNaN(newN) || oldN < 2 || newN < 2) return
+  const p = parseFloat(sheetForm.value.price)
+  if (isNaN(p) || p <= 0) return
+  sheetForm.value.price = String(roundPrice(p * (newN / oldN), Math.max(pantryDecimals.value, 2)))
 })
 
 function openItemSheet(item) {
@@ -952,8 +1016,10 @@ function roundPrice(x, decimals) {
   return Number(x.toFixed(decimals))
 }
 
-// User flipped the ∑ tot. toggle in edit mode — convert the displayed
-// number so what's shown always matches the new interpretation.
+// Edit sheet opens with a stored per-piece value, so TOT must convert the
+// displayed number on toggle — otherwise save's ÷pieces would shrink the
+// stored value on every edit→TOT→save cycle. Add-form keeps TOT display-only
+// because its field starts empty and the user types a fresh number.
 function onSheetPriceTotalToggle(val) {
   const n = sheetFormPiecesCount.value
   const p = parseFloat(sheetForm.value.price)
@@ -986,6 +1052,11 @@ function switchToEdit() {
   // for re-entering a fresh total.
   sheetPriceIsTotal.value = false
   sheetQtyIsPieces.value = sheetItem.value.pieces != null && sheetItem.value.amount == null
+  // Reset stash so values from a previous edit don't leak into this item
+  stashSheetAmount.value       = ''
+  stashSheetUnit.value         = 'g'
+  stashSheetPieces.value       = ''
+  stashSheetPriceIsTotal.value = false
   sheetMode.value = 'edit'
 }
 
@@ -1095,6 +1166,9 @@ function onItemPointerDown(item) {
 
 function onItemPointerUp() {
   clearHoldTimers()
+  if (holdJustActivated) {
+    requestAnimationFrame(() => { holdJustActivated = false })
+  }
 }
 
 function onItemPointerLeave() {
@@ -1140,7 +1214,6 @@ const moveExpiries = ref({})
 const moveLoading = ref(false)
 const moveInventory = ref([])  // snapshot of pantry for merge hints
 const moveSuggested = ref({})  // item.id -> true when expiry was auto-suggested from history
-
 async function openMoveSheet(itemsToMove) {
   moveItems.value = itemsToMove
   moveExpiries.value = Object.fromEntries(
@@ -1532,7 +1605,7 @@ onMounted(() => { load(); fetchSettings(); fetchLicenseStatus() })
 
 /* Two-column row: Quantity (1/2) | Density (1/2) */
 .add-meta--two { align-items: flex-start; }
-.add-meta--two .add-meta-field--price    { flex: 1; min-width: 0; }
+.add-meta--two .add-meta-field--qty      { flex: 1; min-width: 0; }
 .add-meta--two .add-meta-field--category { flex: 1; min-width: 0; }
 
 /* Three-column row: Price (1/4) | Store (1/4) | Category (1/2) */
@@ -1562,7 +1635,16 @@ onMounted(() => { load(); fetchSettings(); fetchLicenseStatus() })
   display: flex;
   align-items: center;
   justify-content: space-between;
+  position: relative;
 }
+
+/* ∑ tot. toggle fade — same curve as price-suffix, but absolute on leave so
+   the label row doesn't reflow while it's fading out */
+.tot-toggle-enter-active,
+.tot-toggle-leave-active { transition: opacity 0.15s ease, transform 0.15s ease; }
+.tot-toggle-enter-from   { opacity: 0; transform: translateY(-4px); }
+.tot-toggle-leave-to     { opacity: 0; transform: translateY(4px); }
+.tot-toggle-leave-active { position: absolute; right: 0; top: 50%; margin-top: -8px; }
 
 .add-meta-field--category {
   flex: 1;
@@ -2098,9 +2180,25 @@ onMounted(() => { load(); fetchSettings(); fetchLicenseStatus() })
   min-width: 0;
 }
 
+.move-expiry-label {
+  position: absolute;
+  top: -1px;
+  left: 10px;
+  transform: translateY(-50%);
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6BA888;
+  background: #EAF7F0;
+  padding: 0 3px;
+  pointer-events: none;
+  z-index: 1;
+}
+
 .move-expiry-suggested {
   position: absolute;
-  top: 0;
+  top: -1px;
   right: 10px;
   transform: translateY(-50%);
   display: flex;
@@ -2122,16 +2220,19 @@ onMounted(() => { load(); fetchSettings(); fetchLicenseStatus() })
   appearance: none;
   min-width: 0;
   border: 1.5px solid #B8E6D0;
-  border-radius: 12px;
-  padding: 10px 12px;
-  font-size: 13px;
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 12px;
   font-weight: 500;
   color: #1A4D35;
-  background: #EAF7F0;
+  background: #fff;
   outline: none;
   box-sizing: border-box;
   transition: border-color 0.15s;
   cursor: pointer;
+}
+.move-expiry-input--empty {
+  color: #6BA888;
 }
 .move-expiry-input:focus { border-color: #2E7D52; }
 .move-expiry-input::-webkit-calendar-picker-indicator {

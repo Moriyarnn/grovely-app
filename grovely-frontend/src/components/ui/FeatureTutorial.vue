@@ -21,11 +21,16 @@
           </div>
 
           <!-- Slide content — caller renders via scoped slot -->
-          <Transition name="slide-fx" mode="out-in">
-            <div :key="slide" class="slide-content">
-              <slot :slide="slide" />
-            </div>
-          </Transition>
+          <div ref="slideWrapper" class="slide-wrapper">
+            <Transition name="slide-fx" mode="out-in"
+              @before-leave="onBeforeLeave"
+              @enter="onEnter"
+              @after-enter="onAfterEnter">
+              <div :key="slide" class="slide-content">
+                <slot :slide="slide" />
+              </div>
+            </Transition>
+          </div>
 
           <!-- Actions -->
           <div class="tutorial-actions">
@@ -42,7 +47,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onUnmounted } from 'vue'
+import { ref, computed, watch, nextTick, onUnmounted } from 'vue'
 
 const props = defineProps({
   storageKey: { type: String, required: true },
@@ -138,6 +143,27 @@ function quickClose() {
   emit('close')
 }
 
+// ── Slide height animation ───────────────────────────────────
+const slideWrapper = ref(null)
+
+function onBeforeLeave() {
+  const w = slideWrapper.value
+  if (w) w.style.height = w.scrollHeight + 'px'
+}
+
+function onEnter(el) {
+  const w = slideWrapper.value
+  if (!w) return
+  nextTick(() => {
+    w.style.height = el.scrollHeight + 'px'
+  })
+}
+
+function onAfterEnter() {
+  const w = slideWrapper.value
+  if (w) w.style.height = 'auto'
+}
+
 onUnmounted(() => { /* no-op; consumers manage their own timers */ })
 </script>
 
@@ -225,6 +251,13 @@ onUnmounted(() => { /* no-op; consumers manage their own timers */ })
 .dot.active {
   background: var(--tt-accent);
   transform: scale(1.3);
+}
+
+/* ── Slide wrapper (height animation) ────────────────────────── */
+.slide-wrapper {
+  width: 100%;
+  overflow: hidden;
+  transition: height 0.35s ease;
 }
 
 /* ── Slide transition ─────────────────────────────────────────── */

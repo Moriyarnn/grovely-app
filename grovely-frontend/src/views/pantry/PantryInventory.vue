@@ -60,7 +60,11 @@
                 </div>
                 <span class="pantry-item-right">
                   <span v-if="item.category" class="cat-chip" :style="{ background: catChipBg(item.category), color: catChipColor(item.category) }">{{ catLabel(item.category) }}</span>
-                  <span class="pantry-qty-col">{{ displayQty(item) }}</span>
+                  <span class="pantry-qty-col">
+                    <Transition name="qty-bump" mode="out-in">
+                      <span :key="displayQty(item)">{{ displayQty(item) }}</span>
+                    </Transition>
+                  </span>
                 </span>
               </div>
               <div class="pantry-meta" :style="{ visibility: !item.expiry_date && !item.notes ? 'hidden' : 'visible' }">
@@ -1094,6 +1098,13 @@ function formatExpiry(date) {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* Qty change fade — fires when an item's amount/pieces value updates
+   (e.g. shopping list move-to-pantry merges into an existing item) */
+.qty-bump-enter-active,
+.qty-bump-leave-active { transition: opacity 0.18s ease, transform 0.18s ease; }
+.qty-bump-enter-from   { opacity: 0; transform: translateY(-4px); }
+.qty-bump-leave-to     { opacity: 0; transform: translateY(4px); }
 
 .pieces-badge {
   font-size: 11px;

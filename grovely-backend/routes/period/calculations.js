@@ -218,17 +218,56 @@ module.exports = (db) => {
         )
       : 0
 
-    // Next period prediction — always a future date
+    // Next period prediction — always a future date.
+    // Also collect missed predictions: predicted dates that passed without a logged cycle.
     let nextPeriodDate = null
+    const missedPredictions = []
     if (lastCycle) {
       const today = new Date()
       today.setHours(0, 0, 0, 0)
+      const errorAdj = Math.round(avgPredictionError)
+
+      const pushMissed = (predDate) => {
+        const startStr = predDate.toISOString().split('T')[0]
+        const ov = new Date(predDate)
+        ov.setDate(ov.getDate() + avgCycleLength + errorAdj - avgLutealPhase)
+        const fStart = new Date(ov)
+        fStart.setDate(fStart.getDate() - 5)
+        const fEnd = new Date(ov)
+        fEnd.setDate(fEnd.getDate() + 1)
+        missedPredictions.push({
+          startDate: startStr,
+          fertileWindow: { start: fStart.toISOString().split('T')[0], end: fEnd.toISOString().split('T')[0] },
+          ovulationDate: ov.toISOString().split('T')[0]
+        })
+      }
+
+      // Between consecutive logged cycles: detect gaps wide enough for a missed prediction
+      const sorted = allCycles
+        .filter(c => c.review_state !== 'excluded' && !skippedCycleIds.has(c.id))
+        .sort((a, b) => a.start_date.localeCompare(b.start_date))
+
+      for (let i = 0; i < sorted.length - 1; i++) {
+        const gap = Math.round(
+          (new Date(sorted[i + 1].start_date) - new Date(sorted[i].start_date)) / 86400000
+        )
+        if (gap >= avgCycleLength * 1.5) {
+          const pred = new Date(sorted[i].start_date + 'T00:00:00')
+          pred.setDate(pred.getDate() + avgCycleLength + errorAdj)
+          const nextStart = new Date(sorted[i + 1].start_date + 'T00:00:00')
+          while (pred < nextStart) {
+            pushMissed(new Date(pred))
+            pred.setDate(pred.getDate() + avgCycleLength + errorAdj)
+          }
+        }
+      }
+
+      // After the last cycle: predictions that passed without being logged
       const predicted = new Date(lastCycle.start_date + 'T00:00:00')
-      predicted.setDate(predicted.getDate() + avgCycleLength + Math.round(avgPredictionError))
+      predicted.setDate(predicted.getDate() + avgCycleLength + errorAdj)
       while (predicted < today) {
-        const next = new Date(predicted)
-        next.setDate(next.getDate() + avgCycleLength)
-        if (next <= today) { predicted = next } else { break }
+        pushMissed(new Date(predicted))
+        predicted.setDate(predicted.getDate() + avgCycleLength + errorAdj)
       }
       nextPeriodDate = predicted.toISOString().split('T')[0]
     }
@@ -251,7 +290,7 @@ module.exports = (db) => {
       // mirroring how each logged cycle on the calendar has its fertile window after it
       const cycleStart = new Date(nextPeriodDate + 'T00:00:00')
       const ov = new Date(cycleStart)
-      ov.setDate(ov.getDate() + avgCycleLength - avgLutealPhase)
+      ov.setDate(ov.getDate() + avgCycleLength + Math.round(avgPredictionError) - avgLutealPhase)
       const fStart = new Date(ov)
       fStart.setDate(fStart.getDate() - 5)
       const fEnd = new Date(ov)
@@ -293,6 +332,7 @@ module.exports = (db) => {
       avgLutealPhase,
       avgPeriodLength,
       nextPeriodDate,
+      missedPredictions,
       nextFertileWindow,
       nextOvulationDate,
       ovulationDate,

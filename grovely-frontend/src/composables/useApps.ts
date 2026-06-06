@@ -29,15 +29,4 @@ export const apps = [
     bg: '#FAEEDA', border: '#FAC775', iconColor: '#854F0B',
     titleColor: '#633806', subColor: '#854F0B', badgeText: '#633806'
   },
-  {
-    name: 'Notion sync', icon: 'mdi-note-multiple-outline', active: false, route: '',
-    bg: '#E6F1FB', border: '#B5D4F4', iconColor: '#185FA5',
-    titleColor: '#0C447C', subColor: '#185FA5', badgeText: '#0C447C'
-  },
-  {
-    name: 'And more...', icon: 'mdi-dots-horizontal-circle-outline', active: false, route: '',
-    bg: '#F7F7F7', border: '#DCDCDC', iconColor: '#AAAAAA',
-    titleColor: '#888888', subColor: '#AAAAAA', badgeText: '#888888',
-    sub: 'Made with love, just for you ♡'
-  }
 ]

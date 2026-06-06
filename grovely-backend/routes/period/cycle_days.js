@@ -3,6 +3,7 @@ const router = express.Router()
 const { logPeriodEvent } = require('../../logger')
 const { requireOwner } = require('../../middleware/auth')
 const { recomputeAllPredictions } = require('./_calcHelpers')
+const { encrypt, revealPrivateFields } = require('../../utils/encryption')
 
 module.exports = (db) => {
   // Get all cycle days with cycle info (for calendar population)
@@ -16,7 +17,7 @@ module.exports = (db) => {
       GROUP BY cd.id
       ORDER BY cd.date ASC
     `).all()
-    res.json(days)
+    res.json(revealPrivateFields(db, req, 'cycle_days', days))
   })
 
   // Get all days for a cycle
@@ -29,7 +30,7 @@ module.exports = (db) => {
       GROUP BY cd.id
       ORDER BY cd.date ASC
     `).all(req.params.cycle_id)
-    res.json(days)
+    res.json(revealPrivateFields(db, req, 'cycle_days', days))
   })
 
   // Get a single day
@@ -42,7 +43,7 @@ module.exports = (db) => {
       GROUP BY cd.id
     `).get(req.params.id)
     if (!day) return res.status(404).json({ error: 'Day not found' })
-    res.json(day)
+    res.json(revealPrivateFields(db, req, 'cycle_days', day))
   })
 
   // Log a day
@@ -54,7 +55,7 @@ module.exports = (db) => {
     const result = db.prepare(`
       INSERT INTO cycle_days (cycle_id, date, flow_intensity, notes)
       VALUES (?, ?, ?, ?)
-    `).run(cycle_id, date, flow_intensity || null, notes || null)
+    `).run(cycle_id, date, flow_intensity || null, encrypt(notes || null))
 
     const cycle_day_id = result.lastInsertRowid
 
@@ -80,7 +81,7 @@ module.exports = (db) => {
 
     db.prepare(`
       UPDATE cycle_days SET flow_intensity = ?, notes = ? WHERE id = ?
-    `).run(flow_intensity || null, notes || null, id)
+    `).run(flow_intensity || null, encrypt(notes || null), id)
 
     // Replace symptoms
     if (symptoms) {
