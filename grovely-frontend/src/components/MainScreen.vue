@@ -240,7 +240,7 @@ const CHANGELOG = [
       { plan: 'Free',    text: 'App renamed to Grovely with a new mint-green brand color - installable on iOS and Android as a PWA with standalone display mode and full mobile compatibility fixes' },
       { plan: 'Premium', text: 'Notifications overhauled - any SMTP provider supported, three new partner notification types, and the full 15-type system is now a premium feature' },
       { plan: 'Premium', text: 'Per-notification message editing, on/off toggles, email personalisation with live preview, and inline config warnings all added to Settings' },
-      { plan: 'Premium', text: 'Period tracker: predictions card always visible, predicted tail on the calendar, day-precise phase marker, Calculated vs Predicted confidence labels. Pantry: Smart Autofill on the shopping list, backed by your full purchase history, fills name, amount, unit, store, and price with a green/red delta vs your usual' },
+      { plan: 'Premium', text: 'Predictions card always visible, predicted calendar tail, phase marker with confidence labels. Smart Autofill on the shopping list backed by your full purchase history' },
       { plan: 'Premium', text: 'Scheduled automatic backups - daily cron with startup catch-up, local retention and auto-prune, S3 and WebDAV remote push, full status panel in Settings' },
     ],
     mobile: [
@@ -605,10 +605,11 @@ const CHANGELOG = [
 .ms-changelog {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 0.25rem;
   padding-right: 4px;
   flex: 1;
   min-height: 0;
+  overflow-y: scroll;
 }
 
 .ms-cl-entry {
@@ -675,7 +676,7 @@ const CHANGELOG = [
   display: flex;
   align-items: baseline;
   gap: 5px;
-  padding: 7px 14px;
+  padding: 5px 14px;
   border-top: 1px solid #f8f0f4;
 }
 

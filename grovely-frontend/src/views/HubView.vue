@@ -140,6 +140,10 @@
 
           <!-- Mobile-only sign out -->
           <div class="hub-footer mobile-only">
+            <div v-if="licenseActive" class="hub-premium-thanks">
+              <v-icon size="13" color="#4ADE80">mdi-heart-outline</v-icon>
+              <span>Thanks for supporting Grovely. Your license keeps this project going.</span>
+            </div>
             <button class="hub-logout-btn" @click="logout">Sign out</button>
           </div>
 
@@ -170,15 +174,17 @@ import { usePreferences } from '../composables/usePreferences'
 import { apps } from '../composables/useApps'
 import { useAppStats } from '../composables/useAppStats'
 import { usePeriodData } from '../composables/usePeriodData'
+import { useLicense } from '../composables/useLicense'
 
 const router = useRouter()
 const { preferences, fetchPreferences, updatePreference, resetCache: resetPreferences } = usePreferences()
 const { dynamicSubs, fetchAppStats } = useAppStats()
+const { licenseActive, fetchLicenseStatus } = useLicense()
 const currentUser = ref(getUser())
 const isDev = import.meta.env.DEV
 const showSwitcher = ref(false)
 
-onMounted(() => { fetchAppStats() })
+onMounted(() => { fetchAppStats(); fetchLicenseStatus() })
 
 // Refresh on tab focus so a hub left open across midnight still shows
 // today's date and the right greeting on the next look.
@@ -514,6 +520,17 @@ onUnmounted(removeWindowListeners)
   margin-top: 1.5rem;
   padding-bottom: 0.5rem;
 }
+.hub-premium-thanks {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 11px;
+  color: #aaa;
+  line-height: 1.4;
+  margin-bottom: 10px;
+  justify-content: center;
+}
+
 .hub-logout-btn {
   font-size: 12px;
   color: #bbb;

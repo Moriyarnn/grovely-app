@@ -102,6 +102,10 @@
       </Teleport>
 
       <div class="shell-footer">
+        <div v-if="licenseActive" class="shell-premium-thanks">
+          <v-icon size="13" color="#4ADE80">mdi-heart-outline</v-icon>
+          <span>Thanks for supporting Grovely. Your license keeps this project going.</span>
+        </div>
         <button class="shell-logout-btn" @click="logout">Sign out</button>
       </div>
 
@@ -126,12 +130,14 @@ import { API, getToken, getUser, clearToken, clearUser, setToken, setUser } from
 import { usePreferences } from '../composables/usePreferences'
 import { useAppStats } from '../composables/useAppStats'
 import { usePeriodData } from '../composables/usePeriodData'
+import { useLicense } from '../composables/useLicense'
 
 const route = useRoute()
 const router = useRouter()
 const { preferences, fetchPreferences, updatePreference, resetCache: resetPreferences } = usePreferences()
 const { dynamicSubs, fetchAppStats } = useAppStats()
-if (getToken()) { fetchPreferences(); fetchAppStats() }
+const { licenseActive, fetchLicenseStatus } = useLicense()
+if (getToken()) { fetchPreferences(); fetchAppStats(); fetchLicenseStatus() }
 
 const currentUser = ref(getUser())
 
@@ -542,6 +548,16 @@ async function switchUser(role) {
   align-items: center;
   justify-content: center;
   cursor: pointer;
+}
+
+.shell-premium-thanks {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 11px;
+  color: #aaa;
+  line-height: 1.4;
+  margin-bottom: 10px;
 }
 
 .shell-logout-btn {

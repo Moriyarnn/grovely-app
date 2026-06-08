@@ -224,8 +224,8 @@ const rootStyle = computed(() => ({
     display: grid;
     grid-template-columns: minmax(0, 560px) minmax(0, 1fr);
     gap: 1rem;
-    align-items: start;
-    min-height: 100dvh;
+    align-items: stretch;
+    height: 100dvh;
     padding: 0 1.25rem;
     box-sizing: border-box;
   }
@@ -236,6 +236,8 @@ const rootStyle = computed(() => ({
     border: 1px solid var(--panel-border, #f0e8ec);
     min-height: 200px;
     margin-top: 1.25rem;
+    margin-bottom: 1.25rem;
+    overflow-y: auto;
   }
 
   .app-side-panel {
@@ -245,6 +247,8 @@ const rootStyle = computed(() => ({
     border: 1px solid var(--panel-border, #f0e8ec);
     min-height: 200px;
     margin-top: 1.25rem;
+    margin-bottom: 1.25rem;
+    overflow-y: auto;
   }
 
   /* When right panel hosts an inner swiper */

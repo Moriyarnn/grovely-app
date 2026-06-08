@@ -262,10 +262,12 @@ module.exports = (db) => {
         }
       }
 
-      // After the last cycle: predictions that passed without being logged
+      // After the last cycle: predictions that passed without being logged.
+      // A prediction whose start date is today or earlier without a corresponding
+      // logged cycle becomes a missed prediction, and the chain advances.
       const predicted = new Date(lastCycle.start_date + 'T00:00:00')
       predicted.setDate(predicted.getDate() + avgCycleLength + errorAdj)
-      while (predicted < today) {
+      while (predicted <= today) {
         pushMissed(new Date(predicted))
         predicted.setDate(predicted.getDate() + avgCycleLength + errorAdj)
       }

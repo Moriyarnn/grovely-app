@@ -5,7 +5,7 @@ WORKDIR /app
 RUN apk add --no-cache python3 make g++ curl su-exec
 
 COPY package*.json ./
-RUN npm install --build-from-source
+RUN npm ci --build-from-source
 
 COPY . .
 

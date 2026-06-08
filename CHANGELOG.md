@@ -5,6 +5,20 @@ record; the in-app "What's New" panel shows a short summary of major releases on
 
 ---
 
+## v0.12.6 - Cold-install dry run fixes
+*June 8, 2026*
+
+- Period detail panel no longer crashes when logging a day - a missing `todayStr` variable threw a ReferenceError that broke the entire Cycle Details column
+- Prediction chain now advances correctly on the day a predicted period starts - the predicted start becomes a missed prediction and the next future prediction generates automatically, instead of stalling on the current one
+- "Ends in X days" label on the Current Phase card no longer shows for free users - it was leaking premium phase data
+- Backup restore now re-fetches settings and preferences immediately so the UI reflects restored values without a page refresh
+- Login page and desktop column layout fit small laptop screens (768p) - root locks to viewport height, panels scroll internally
+- Removed unnecessary 1.12x calendar scale-up on desktop that caused overflow on smaller displays
+- Desktop AppLayout panels now stretch to equal height with internal scroll instead of growing past the viewport
+- Docker images now build with `npm ci` instead of `npm install` for reproducible installs; regenerated both lockfiles
+- README quick start now shows the URL after `docker compose up -d` with a note about custom ports
+- Backend startup log now includes `Open Grovely at http://localhost:5173`
+
 ## v0.12.5 - Private note encryption, prediction and UI fixes
 *June 6, 2026*
 

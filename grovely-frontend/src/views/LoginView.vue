@@ -76,7 +76,7 @@
           </div>
 
           <div class="branding-footer">
-            <span class="branding-version">v0.12.4</span>
+            <span class="branding-version">v0.12.6</span>
           </div>
         </div>
       </div>
@@ -155,6 +155,9 @@
         </div>
       </div>
     </div>
+
+    <!-- Mobile version -->
+    <span class="mobile-version">v0.12.6</span>
 
   </div>
 </template>
@@ -258,6 +261,8 @@ async function handleLogin() {
 @media (min-width: 768px) {
   .login-root {
     flex-direction: row;
+    height: 100dvh;
+    overflow: hidden;
   }
 }
 
@@ -274,7 +279,7 @@ async function handleLogin() {
     justify-content: center;
     background: linear-gradient(160deg, #fdf0f5 0%, #fdf0f5 50%, #f5f0fe 100%);
     padding: 3rem 3.5rem;
-    overflow: hidden;
+    overflow-y: auto;
   }
 }
 
@@ -533,6 +538,19 @@ async function handleLogin() {
   border-color: #e0e0e0 !important;
 }
 
+/* ── Mobile version ────────────────────────────────────────── */
+.mobile-version {
+  font-size: 12px;
+  color: #ccc;
+  font-weight: 500;
+  text-align: center;
+  padding-bottom: 1rem;
+}
+
+@media (min-width: 768px) {
+  .mobile-version { display: none; }
+}
+
 /* ── Form panel ─────────────────────────────────────────────── */
 .login-form-panel {
   flex: 1;
@@ -549,6 +567,7 @@ async function handleLogin() {
     justify-content: center;
     padding: 3rem;
     background: #fdf8fa;
+    overflow-y: auto;
   }
 }
 

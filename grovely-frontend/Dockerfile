@@ -1,7 +1,7 @@
 FROM node:24-alpine AS deps
 WORKDIR /app
 COPY package*.json ./
-RUN npm install
+RUN npm ci
 
 # Dev: Vite dev server with HMR (source mounted via volume at runtime)
 FROM deps AS dev

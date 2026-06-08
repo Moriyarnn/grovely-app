@@ -9,7 +9,7 @@
       <div class="phase-title-row">
         <div class="phase-title-left">
           <p class="phase-section-title">Current Phase</p>
-          <span v-if="periodEndsLabel" class="phase-ends-label">{{ periodEndsLabel }}</span>
+          <span v-if="periodEndsLabel && isPremium" class="phase-ends-label">{{ periodEndsLabel }}</span>
         </div>
         <!-- Locked teaser: Example pill + Premium pill, matching the PeriodPremiumPanel badge convention -->
         <template v-if="isLockedTeaserShown">
@@ -251,6 +251,7 @@ onMounted(() => { fetchLicenseStatus() })
 const activeWarnings = computed(() => allWarnings.value.filter(w => !w.reviewState))
 const acknowledgedWarnings = computed(() => allWarnings.value.filter(w => w.reviewState))
 
+const todayStr = new Date().toISOString().split('T')[0]
 const currentUser = ref(getUser())
 const isPartner = computed(() => currentUser.value?.role === 'owner2')
 
@@ -338,9 +339,6 @@ const cycleDayNum = computed(() => {
 
 const currentPhase = computed(() => {
   if (cycleDayNum.value === null) return null
-  // Actively logged period overrides the model — only when end_date covers today (not just the -1 day
-  // buffer the backend uses to keep the cycle open for continued logging)
-  const todayStr = new Date().toISOString().split('T')[0]
   const cc = summary.value?.currentCycle
   if (cc && (cc.end_date ?? cc.start_date) >= todayStr) {
     return { name: 'Menstrual', note: 'Rest and warmth. Energy is lower — that\'s normal.', icon: 'mdi-water', color: '#993556' }

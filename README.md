@@ -114,7 +114,7 @@ Go into the `.env` file and set the usernames and passwords for both accounts, t
 docker compose up -d
 ```
 
-Then open `http://your-server:5173`.
+Open **http://localhost:5173** and log in with the credentials you set in `.env`. If you changed the frontend port in `docker-compose.yml`, use that port instead.
 
 See [INSTALL.md](./INSTALL.md) for full instructions, including reverse proxy setups (Caddy, Nginx, Traefik, Nginx Proxy Manager), backups, license keys, and troubleshooting.
 

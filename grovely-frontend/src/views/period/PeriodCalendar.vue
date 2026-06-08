@@ -2358,13 +2358,6 @@ onUnmounted(() => {
   .period-column-root { height: 100%; overflow-y: auto; min-height: unset; }
 }
 
-@media (min-width: 769px) {
-  .period-wrapper {
-    max-width: 540px;
-    transform: scale(1.12);
-    transform-origin: top center;
-  }
-}
 
 @media (max-width: 1279px) {
   .period-wrapper {

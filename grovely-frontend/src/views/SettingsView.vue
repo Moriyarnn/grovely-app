@@ -314,6 +314,8 @@ async function onRestoreFile(e: Event) {
     const text = await file.text()
     const parsed = JSON.parse(text)
     const result = await restoreBackup(parsed)
+    await fetchSettings()
+    await fetchPreferences()
     const warn = result.warnings?.length ? ` (${result.warnings[0]})` : ''
     showMsg(`Restore complete.${warn}`)
   } catch (err: unknown) {

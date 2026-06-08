@@ -73,6 +73,7 @@ if (!jwtSecret) {
 process.env.JWT_SECRET = jwtSecret
 
 // Seed users from env on startup — only inserts if not already present
+const PLACEHOLDER_VALUES = new Set(['your_username', 'partner_username', 'change_me'])
 const seedUsers = () => {
   const pairs = [
     { username: process.env.OWNER1_USERNAME, password: process.env.OWNER1_PASSWORD, role: 'owner1' },
@@ -80,6 +81,10 @@ const seedUsers = () => {
   ]
   for (const { username, password, role } of pairs) {
     if (!username || !password) continue
+    if (PLACEHOLDER_VALUES.has(username) || PLACEHOLDER_VALUES.has(password)) {
+      console.log(`⚠️  Skipped seeding ${role} — edit your .env to replace the placeholder credentials`)
+      continue
+    }
     const existing = db.prepare('SELECT id FROM users WHERE username = ?').get(username)
     if (existing) continue
     const password_hash = bcrypt.hashSync(password, 10)
@@ -180,6 +185,7 @@ app.get('/health', (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Backend running on port ${PORT}`)
+  console.log('Grovely is ready - open the frontend in your browser (default: http://localhost:5173)')
 
   // Start notification cron — runs daily at 08:00 and catches up on startup if missed
   const { startNotifications } = require('./notifications')
