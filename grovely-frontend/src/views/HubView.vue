@@ -107,6 +107,7 @@
               }"
               :style="{ background: app.bg, borderColor: app.border }"
               @pointerdown="onCardPointerDown($event, app.name)"
+              @touchmove="onCardTouchMove"
               @click="onCardClick(app)"
             >
               <span class="app-badge" :style="{ background: app.border, color: app.badgeText }">
@@ -301,6 +302,10 @@ const ghostStyle = computed(() => {
   }
 })
 
+function onCardTouchMove(e) {
+  if (holdTimer.value || dragState.value) e.preventDefault()
+}
+
 function onCardPointerDown(e, appName) {
   if (!reorderEnabled.value) return
   pointerOrigin.value = { x: e.clientX, y: e.clientY }
@@ -410,7 +415,8 @@ onUnmounted(removeWindowListeners)
 /* ── Root layout ──────────────────────────────────────────────── */
 .hub-root {
   display: flex;
-  min-height: 100dvh;
+  height: 100dvh;
+  overflow: hidden;
   background: #fafafa;
 }
 
@@ -418,7 +424,7 @@ onUnmounted(removeWindowListeners)
 .mobile-only { display: block; }
 
 /* Reserves strip height before data loads — prevents the app grid jumping down */
-.strip-slot { min-height: 88px; }
+.strip-slot { min-height: 88px; flex-shrink: 0; }
 
 @media (max-width: 1023px) {
   .desktop-only { display: none !important; }
@@ -436,7 +442,9 @@ onUnmounted(removeWindowListeners)
 @media (min-width: 1024px) {
   .hub-root {
     display: block;
+    height: auto;
     min-height: 100dvh;
+    overflow: visible;
     background: transparent;
   }
 
@@ -455,11 +463,15 @@ onUnmounted(removeWindowListeners)
   min-width: 0;
   padding: 1.25rem;
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 /* ── Mobile header ────────────────────────────────────────────── */
 .hub-header {
   margin-bottom: 1rem;
+  flex-shrink: 0;
 }
 .hub-header-top {
   display: flex;
@@ -504,8 +516,8 @@ onUnmounted(removeWindowListeners)
 
 
 /* ── App grid ─────────────────────────────────────────────────── */
-.section-label { font-size: 10px; font-weight: 600; color: #bbb; letter-spacing: 0.07em; text-transform: uppercase; margin: 0 0 10px; }
-.app-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 1rem; }
+.section-label { font-size: 10px; font-weight: 600; color: #bbb; letter-spacing: 0.07em; text-transform: uppercase; margin: 0 0 10px; flex-shrink: 0; }
+.app-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; flex: 1; min-height: 0; align-content: start; }
 .app-card { border: 1px solid; border-radius: 12px; padding: 14px 12px; cursor: pointer; position: relative; transition: opacity 0.2s; }
 .app-card.inactive { opacity: 0.55; cursor: default; }
 .app-badge { position: absolute; top: 10px; right: 10px; border-radius: 20px; padding: 2px 7px; font-size: 9px; font-weight: 600; }
@@ -518,8 +530,10 @@ onUnmounted(removeWindowListeners)
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-top: 1.5rem;
+  margin-top: auto;
+  padding-top: 0.75rem;
   padding-bottom: 0.5rem;
+  flex-shrink: 0;
 }
 .hub-premium-thanks {
   display: flex;
@@ -550,8 +564,39 @@ onUnmounted(removeWindowListeners)
 .hub-logout-btn:hover { color: #D4537E; }
 
 
+/* ── Small-height phones — shrink gaps to fit without scroll ── */
+@media (max-height: 700px) and (max-width: 1023px) {
+  .hub-main { padding: 0.75rem; }
+  .hub-header { margin-bottom: 0.5rem; }
+  .hub-logo { height: 54px; margin: -5px 0 -3px -5px; }
+  .hub-date { margin: 2px 0 1px; }
+  .strip-slot { min-height: 72px; }
+  .section-label { margin: 0 0 6px; }
+  .app-grid { gap: 6px; }
+  .app-card { padding: 10px 10px; }
+  .app-icon { width: 28px; height: 28px; margin-bottom: 6px; }
+  .hub-footer { padding-top: 0.5rem; padding-bottom: 0.25rem; }
+}
+
+@media (max-height: 600px) and (max-width: 1023px) {
+  .hub-main { padding: 0.5rem; }
+  .hub-header { margin-bottom: 0.25rem; }
+  .hub-logo { height: 44px; margin: -4px 0 -2px -4px; }
+  .hub-subtitle { display: none; }
+  .strip-slot { min-height: 60px; }
+  .section-label { margin: 0 0 4px; }
+  .app-grid { gap: 4px; }
+  .app-card { padding: 8px 8px; border-radius: 10px; }
+  .app-icon { width: 24px; height: 24px; margin-bottom: 4px; }
+  .app-name { font-size: 12px; }
+  .app-sub { font-size: 10px; }
+  .app-badge { font-size: 8px; padding: 1px 5px; }
+  .hub-footer { padding-top: 0.25rem; padding-bottom: 0.25rem; }
+  .hub-premium-thanks { padding: 6px 8px; font-size: 10px; }
+}
+
 /* ── Drag to reorder ──────────────────────────────────────────── */
-.app-card--reorderable { cursor: grab; user-select: none; touch-action: pan-y; }
+.app-card--reorderable { cursor: grab; user-select: none; touch-action: none; }
 .app-card--placeholder { opacity: 0 !important; pointer-events: none; }
 
 .tile-move { transition: transform 180ms ease-out; }

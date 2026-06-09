@@ -195,7 +195,7 @@
             </div>
             <v-icon size="18" color="#bbb">mdi-upload-outline</v-icon>
           </div>
-          <input ref="restoreInput" type="file" accept=".json,application/json" style="display:none" @change="onRestoreFile" />
+          <input ref="restoreInput" type="file" accept="*/*" style="display:none" @change="onRestoreFile" />
 
         </div>
       </div>
@@ -299,14 +299,33 @@ async function onExport() {
   }
 }
 
-function triggerRestore() {
-  restoreInput.value?.click()
+async function triggerRestore() {
+  let file: File | undefined
+  if ('showOpenFilePicker' in window) {
+    try {
+      const [handle] = await (window as any).showOpenFilePicker({
+        types: [{ description: 'Grovely backup', accept: { 'application/json': ['.json'] } }],
+        multiple: false,
+      })
+      file = await handle.getFile()
+    } catch {
+      return
+    }
+  } else {
+    restoreInput.value?.click()
+    return
+  }
+  await processRestoreFile(file)
 }
 
 async function onRestoreFile(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
   if (!file) return
   ;(e.target as HTMLInputElement).value = ''
+  await processRestoreFile(file)
+}
+
+async function processRestoreFile(file: File) {
   try {
     const text = await file.text()
     const parsed = JSON.parse(text)

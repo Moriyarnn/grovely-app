@@ -1190,6 +1190,8 @@ function formatBytes(n: number): string {
   display: flex; flex-direction: column;
   overscroll-behavior: none;
   touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
 }
 .bk-type-scroll::-webkit-scrollbar { width: 4px; }
 .bk-type-scroll::-webkit-scrollbar-thumb { background: #e0e0e0; border-radius: 99px; }

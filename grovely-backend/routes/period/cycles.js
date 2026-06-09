@@ -33,8 +33,8 @@ module.exports = (db) => {
     ).run(start_date, predicted_start_date ?? null)
     const id = result.lastInsertRowid
     logPeriodEvent(db, { entity: 'cycle', entity_id: id, action: 'create', cycle_id: id, date: start_date })
+    recomputeAllPredictions(db)
     res.json({ id, start_date })
-    setImmediate(() => recomputeAllPredictions(db))
   })
 
   // Move a period start to an earlier date
@@ -47,8 +47,8 @@ module.exports = (db) => {
     if (start_date >= cycle.start_date) return res.status(400).json({ error: 'New start_date must be before current start_date' })
     db.prepare('UPDATE cycles SET start_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(start_date, id)
     logPeriodEvent(db, { entity: 'cycle', entity_id: id, action: 'update', cycle_id: id, date: start_date })
+    recomputeAllPredictions(db)
     res.json({ success: true })
-    setImmediate(() => recomputeAllPredictions(db))
   })
 
   // End a period (also cascade-deletes orphaned cycle_days after end_date)
@@ -65,6 +65,7 @@ module.exports = (db) => {
       db.prepare(`DELETE FROM cycle_days WHERE id IN (${placeholders})`).run(...orphaned.map(d => d.id))
     }
     logPeriodEvent(db, { entity: 'cycle', entity_id: id, action: 'update', cycle_id: id, date: end_date })
+    recomputeAllPredictions(db)
     res.json({ success: true })
   })
 
@@ -83,8 +84,8 @@ module.exports = (db) => {
     db.prepare('UPDATE cycles SET start_date = ?, end_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
       .run(newStart, newEnd, id)
     logPeriodEvent(db, { entity: 'cycle', entity_id: id, action: 'update', cycle_id: id, date: newStart })
+    recomputeAllPredictions(db)
     res.json({ id, start_date: newStart, end_date: newEnd })
-    setImmediate(() => recomputeAllPredictions(db))
   })
 
   // Set or clear review state for a flagged cycle
@@ -95,16 +96,16 @@ module.exports = (db) => {
     const id = Number(req.params.id)
     if (!db.prepare('SELECT id FROM cycles WHERE id = ?').get(id)) return res.status(404).json({ error: 'Cycle not found' })
     db.prepare('UPDATE cycles SET review_state = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(reviewState ?? null, id)
+    recomputeAllPredictions(db)
     res.json({ success: true })
-    setImmediate(() => recomputeAllPredictions(db))
   })
 
   // Set or clear ovulation date for a cycle
   router.patch('/:id/ovulation', requireOwner, (req, res) => {
     const { ovulation_date } = req.body
     db.prepare('UPDATE cycles SET ovulation_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(ovulation_date ?? null, req.params.id)
+    recomputeAllPredictions(db)
     res.json({ success: true })
-    setImmediate(() => recomputeAllPredictions(db))
   })
 
   // Delete a cycle (also removes all cycle_days and their symptoms)
@@ -120,8 +121,8 @@ module.exports = (db) => {
     db.prepare('DELETE FROM cycle_days WHERE cycle_id = ?').run(id)
     db.prepare('DELETE FROM cycles WHERE id = ?').run(id)
     if (cycle) logPeriodEvent(db, { entity: 'cycle', entity_id: id, action: 'delete', cycle_id: id, date: cycle.start_date })
+    recomputeAllPredictions(db)
     res.json({ success: true })
-    setImmediate(() => recomputeAllPredictions(db))
   })
 
   return router

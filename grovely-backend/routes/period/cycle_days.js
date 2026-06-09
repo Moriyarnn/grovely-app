@@ -147,10 +147,10 @@ module.exports = (db) => {
       }
     }
 
-    res.json({ success: true })
     if (remaining.cnt === 0 || day.date === day.start_date) {
-      setImmediate(() => recomputeAllPredictions(db))
+      recomputeAllPredictions(db)
     }
+    res.json({ success: true })
   })
 
   return router

@@ -9,7 +9,7 @@ Structured, persistent logging to the database. Every meaningful action is query
 ## Implementation
 
 - `backend/logger.js` — one function per table (e.g. `logPeriodEvent`, `logSystemError`)
-- Each function writes to the DB table **and** calls `console.log` — one call covers both
+- Each function writes to the DB table and most also call `console.log` for real-time visibility via `docker logs`. High-frequency logs (e.g. `logPeriodCalculation`) write to the DB only to avoid spamming container output.
 - All routes already receive `db`, so the logger just needs `db` passed in
 - Do **not** log personal health content (notes text, symptom names) — log only IDs, dates, and computed metadata
 - `notification_log` (migration 003) is a deduplication guard, not an audit trail — it stays separate

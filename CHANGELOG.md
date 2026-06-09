@@ -5,6 +5,23 @@ record; the in-app "What's New" panel shows a short summary of major releases on
 
 ---
 
+## v0.12.9 - Prediction stability, mobile polish, install docs
+*June 9, 2026*
+
+- Fertile window predictions on past cycles no longer depend on prediction error correction - stored predictions are now deterministic so deleting and recreating a period produces identical fertile windows
+- Prediction recompute now runs synchronously before the API response so the frontend always reads up-to-date predictions, and end-date changes also trigger a recompute (previously skipped)
+- Hub view locks to viewport height on mobile - gaps and padding shrink on short phones so the full page fits without scrolling
+- Hold-to-reorder on hub app tiles no longer triggers pull-to-refresh on Android phones
+- Backup restore file picker uses the File System Access API on Android so the OS opens the file manager instead of the photo gallery
+- Text selection disabled on scrollable lists in the backup destinations and notification type panels so dragging scrolls instead of highlighting
+- Phase card teaser for free users now shows a sample "Ends in 6 days" label matching the premium layout
+- Free users who log today no longer see a leaked Menstrual phase card - the locked teaser is shown regardless of phase confidence
+- INSTALL.md Caddy snippet aligned with Caddyfile.example - uses `handle /api/*` instead of `handle_path` with rewrite
+- INSTALL.md now links to Caddyfile.example with a curl command for users who want the full config with security headers and gzip
+- Added Caddy HTTPS certificate troubleshooting to INSTALL.md (port 80/443 forwarding for Let's Encrypt)
+- Caddyfile.example now references both compose overlay filenames, includes start and reload commands for Linux and Windows, and removes the `--build` flag from the compose commands
+- docker-compose.proxy-host.yml Caddy snippet updated to match Caddyfile.example, with health route added
+
 ## v0.12.8 - Timezone display, phase card fix, log cleanup
 *June 9, 2026*
 

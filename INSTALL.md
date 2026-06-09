@@ -100,14 +100,23 @@ docker compose -f docker-compose.yml -f docker-compose.proxy-host.yml up -d
 
 `docker-compose.proxy-host.yml` includes ready-to-paste Caddyfile and Nginx snippets at the top of the file. Replace `grovely.example.com` with your domain.
 
-**Caddy** (`/etc/caddy/Caddyfile`):
+For a full Caddyfile with security headers, gzip, and health-check routing, grab the example from the repo and replace the domain and email:
+
+```bash
+curl -O https://raw.githubusercontent.com/Moriyarnn/grovely-app/main/Caddyfile.example
+```
+
+The minimal version:
+
+**Caddy** (`/etc/caddy/Caddyfile` on Linux, `C:\caddy\Caddyfile` on Windows):
 
 ```
 grovely.example.com {
-  handle_path /api/* {
-    reverse_proxy 127.0.0.1:3000 {
-      rewrite /api{uri}
-    }
+  handle /api/* {
+    reverse_proxy 127.0.0.1:3000
+  }
+  handle /health {
+    reverse_proxy 127.0.0.1:3000
   }
   reverse_proxy 127.0.0.1:5173
 }
@@ -254,6 +263,16 @@ docker compose pull
 ### Frontend loads but login fails
 
 The browser's network tab will show where the API call went. If it's hitting `:3000` directly, you're running the standard frontend image behind a proxy. Switch to the proxy overlay (sections 2 or 3). If it's hitting `/api/...` and returning HTML, your reverse proxy isn't routing `/api/*` to the backend.
+
+### Caddy fails to get an HTTPS certificate
+
+Let's Encrypt needs to reach your server on ports 80 and 443 to verify domain ownership. If Caddy logs `Timeout during connect (likely firewall problem)` or `tls: internal error`:
+
+1. Forward ports 80 and 443 on your router to your server's LAN IP
+2. Allow inbound traffic on 80 and 443 in your OS firewall (e.g. Windows Firewall, `ufw`)
+3. Make sure your domain's DNS points to your public IP
+
+To test the proxy routing without a real certificate, temporarily replace your domain with `localhost` in the Caddyfile - Caddy will use a self-signed cert.
 
 ### Wrong timezone in notifications and cycle predictions
 

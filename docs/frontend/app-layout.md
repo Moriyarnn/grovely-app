@@ -8,11 +8,11 @@
 
 | Breakpoint | Layout |
 |---|---|
-| <1280px | Full-height swipe track — each column is a full-screen panel, navigated by horizontal swipe. Dot indicators at the bottom. |
-| ≥1280px | 2-col grid: `minmax(0, 560px)` + `1fr` |
-| ≥1600px | 3-col grid: `minmax(0, 560px)` + `1fr` + `1fr` |
+| <1024px (phone) | Full-height swipe track - all 3 columns are swipeable panels with dot indicators. DesktopShell nav hidden. |
+| 1024-1439px (tablet) | 2-col grid. Col 1 is fixed, cols 2 and 3 share the right side with inner swipe and dots. DesktopShell nav visible (350px). |
+| >=1440px (desktop) | 3-col grid: `7fr 8fr 8fr`. All columns visible, no swipe. DesktopShell nav visible (350px). |
 
-Col 1 is capped at 560px because feature primary views (calendar, list, log form) are mobile-first UIs that shouldn't stretch. Cols 2 and 3 are `1fr` — they expand to fill remaining space, which suits charts, detail panels, and analytics.
+The breakpoints account for DesktopShell's 350px nav panel which appears at 1024px+. At 1440px the content area is ~1090px, giving each of the 3 proportional columns enough breathing room. The `7fr 8fr 8fr` ratio gives col 1 (calendar, list) slightly less space than cols 2 and 3 (detail, analytics).
 
 ---
 
@@ -26,7 +26,7 @@ Each feature maps its content to columns using the same pattern:
 | **Col 2** | Detail, context, stats, predictions | Free |
 | **Col 3** | Advanced analytics, correlations, exports | Premium |
 
-Col 3 being the natural home for premium content has a useful side effect: free users on mobile never see a locked panel — col 3 is simply absent below 1600px. On desktop, premium subscribers get a third panel that feels earned.
+Col 3 is the natural home for premium content. On phone and tablet, it's accessed via swipe. On desktop, premium subscribers get a visible third panel.
 
 ---
 
@@ -78,8 +78,8 @@ Col 3 being the natural home for premium content has a useful side effect: free 
 | Slot | Renders in | Notes |
 |---|---|---|
 | default | Col 1 (`.app-main-panel`) | Card styling on desktop, transparent pass-through on mobile |
-| `col2` | Col 2 (`.app-side-panel`) | Shown at ≥1280px. Panel div not rendered if slot is empty. |
-| `col3` | Col 3 (`.app-side-panel--third`) | Shown at ≥1600px. Panel div not rendered if slot is empty. |
+| `col2` | Col 2 (`.app-side-panel`) | Visible alongside col 1 at >=1024px. Panel div not rendered if slot is empty. |
+| `col3` | Col 3 (`.app-side-panel--third`) | Visible at >=1440px, swipeable with col 2 at 1024-1439px. Panel div not rendered if slot is empty. |
 
 If a feature has no col 3 content yet, omit `#col3` — the panel won't appear.
 
@@ -120,14 +120,14 @@ HubView and LogsDashboard are full-width single-column views — they do not use
 
 ## Mobile Swipe Behavior
 
-On mobile (<1280px), `AppLayout` renders a horizontal `swipe-track` that snaps between columns. Each column becomes a `swipe-panel` that fills the full viewport height. A dot indicator row at the bottom shows position and allows tap-to-jump.
+On phone (<1024px), `AppLayout` renders a horizontal `swipe-track` that snaps between all three columns. Each column becomes a `swipe-panel` that fills the full viewport height. A dot indicator row at the bottom shows position and allows tap-to-jump. On tablet (1024-1439px), col 1 is fixed and cols 2+3 share a right-side swipe track with inner dots.
 
 **Height:** Driven by `window.visualViewport.height` (updated via `visualViewport resize` events) rather than `100dvh` or `100svh`, so the layout follows the browser URL bar smoothly during scroll. A `touchend` handler briefly enables a CSS height transition to smooth the final compositor-thread catch-up jump.
 
 **Swipe track touch handling:** The swipe track declares `touch-action: pan-x`. This tells the browser the track only claims horizontal gestures — vertical touches fall through to the column root's scroll container. Without this, the `scroll-snap-type: x mandatory` on the track intercepts vertical swipes and jumps columns instead of scrolling.
 
 **Column component contract on mobile:**
-- Root element must use `height: 100%; overflow-y: auto; min-height: unset` inside a `@media (max-width: 1279px)` override. The swipe-panel is `height: 100%; overflow: hidden` — the component root is the scroll container, not the panel.
+- Root element must use `height: 100%; overflow-y: auto; min-height: unset` inside a `@media (max-width: 1439px)` override. This applies to both phone and tablet tiers. The swipe-panel is `height: 100%; overflow: hidden` - the component root is the scroll container, not the panel.
 - Do not set a fixed height on the root. Do not use `100vh`-based or `min-height: calc(...)` values on mobile.
 
 See [UI Patterns](ui-patterns.md) for the canonical header and panel root structure every column component must follow.

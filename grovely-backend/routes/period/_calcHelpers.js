@@ -96,7 +96,7 @@ function recomputeAllPredictions(db) {
 
   if (cycles.length === 0) return
 
-  const { avgCycleLength, avgLutealPhase, avgPredictionError } = computeCycleParams(db)
+  const { avgCycleLength, avgLutealPhase } = computeCycleParams(db)
 
   const stmt = db.prepare(`
     UPDATE cycles SET
@@ -109,7 +109,7 @@ function recomputeAllPredictions(db) {
 
   db.transaction(() => {
     for (const cycle of cycles) {
-      const p = computePredictionsForCycle(cycle.start_date, avgCycleLength, avgLutealPhase, avgPredictionError)
+      const p = computePredictionsForCycle(cycle.start_date, avgCycleLength, avgLutealPhase)
       stmt.run(p.predicted_fertile_start, p.predicted_fertile_end, p.predicted_ovulation_date, cycle.id)
     }
   })()

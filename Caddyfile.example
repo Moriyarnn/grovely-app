@@ -12,11 +12,16 @@
 #   3. Replace the (email) text with yours (used for Let's Encrypt notices)
 #   4. Build the frontend with VITE_BACKEND_PORT empty so it routes through
 #      the same origin instead of trying to reach :3000 directly. The override
-#      file docker-compose.proxy.yml does this for you:
-#        docker compose -f docker-compose.yml -f docker-compose.proxy.yml up -d --build
-#   5. Reload Caddy:
+#      file docker-compose.proxy-host.yml (or docker-compose.proxy-docker.yml
+#      for a dockerized proxy) does this for you:
+#        docker compose -f docker-compose.yml -f docker-compose.proxy-host.yml up -d
+#        docker compose -f docker-compose.yml -f docker-compose.proxy-docker.yml up -d
+#   5. Start Caddy (first time):
+#        Linux:    sudo systemctl start caddy
+#        Windows:  caddy run --config C:\caddy\Caddyfile
+#      Reload after config changes:
 #        Linux:    sudo systemctl reload caddy
-#        Windows:  Restart-Service caddy   (or)   caddy reload --config C:\caddy\Caddyfile
+#        Windows:  caddy reload --config C:\caddy\Caddyfile
 
 # Optional: an email lets Let's Encrypt notify you before certs expire.
 # Leave the block out entirely if you'd rather stay anonymous.
@@ -29,7 +34,7 @@ your.domain.com {
 
 	# Backend API and health check.
 	# Use 127.0.0.1 (not localhost) — on some systems localhost resolves to ::1
-	# first, but the backend is bound to IPv4 only via docker-compose.proxy.yml.
+	# first, but the backend is bound to IPv4 only via docker-compose.proxy-host.yml.
 	handle /api/* {
 		reverse_proxy 127.0.0.1:3000
 	}

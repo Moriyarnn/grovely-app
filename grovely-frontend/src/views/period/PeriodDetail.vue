@@ -10,6 +10,7 @@
         <div class="phase-title-left">
           <p class="phase-section-title">Current Phase</p>
           <span v-if="periodEndsLabel && isPremium" class="phase-ends-label">{{ periodEndsLabel }}</span>
+          <span v-else-if="isLockedTeaserShown" class="phase-ends-label">Ends in 6 days</span>
         </div>
         <!-- Locked teaser: Example pill + Premium pill, matching the PeriodPremiumPanel badge convention -->
         <template v-if="isLockedTeaserShown">
@@ -277,10 +278,9 @@ const predictionsLocked = computed(() =>
 // Non-premium user with cycle data → show the sample teaser instead of the real phase content.
 // Gate on !isPremium (not licenseActive === false) so that while the license status is still
 // loading (licenseActive === null) or the status fetch fails, we treat the user as locked and
-// never leak the real calculated/predicted phase. New users (no anchor yet) keep the empty state.
+// never leak the real phase. New users (no anchor yet) keep the empty state.
 const isLockedTeaserShown = computed(() =>
   phaseConfidence.value !== null &&
-  phaseConfidence.value !== 'logged' &&
   !isPremium.value
 )
 

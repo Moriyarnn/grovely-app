@@ -14,13 +14,15 @@
 # Apply alongside the main compose file:
 #   docker compose -f docker-compose.yml -f docker-compose.proxy-host.yml up -d
 #
-# Example Caddyfile snippet (replace grovely.example.com with your domain):
+# Example Caddyfile snippet (replace grovely.example.com with your domain).
+# For a full config with security headers and gzip, see Caddyfile.example.
 #
 #   grovely.example.com {
-#     handle_path /api/* {
-#       reverse_proxy 127.0.0.1:3000 {
-#         rewrite /api{uri}
-#       }
+#     handle /api/* {
+#       reverse_proxy 127.0.0.1:3000
+#     }
+#     handle /health {
+#       reverse_proxy 127.0.0.1:3000
 #     }
 #     reverse_proxy 127.0.0.1:5173
 #   }
