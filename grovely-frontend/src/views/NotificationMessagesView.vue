@@ -37,7 +37,7 @@
               <div class="nm-list">
                 <div class="nm-row">
                   <div class="nm-field-body">
-                    <span class="nm-field-label">Send at</span>
+                    <span class="nm-field-label">Send at ({{ serverTimezone }})</span>
                     <span class="nm-field-value">Daily check runs at this time</span>
                   </div>
                   <button
@@ -272,6 +272,7 @@ function close() {
 }
 
 const { settings, fetchSettings, updateSetting } = useSettings()
+const serverTimezone = computed(() => settings.value.server_timezone ?? 'UTC')
 
 // ── Per-type settings (loaded from backend) ───────────────────────────────────
 

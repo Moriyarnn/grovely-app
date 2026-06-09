@@ -19,6 +19,7 @@ module.exports = (db) => {
     const rows = db.prepare('SELECT key, value FROM settings').all()
     const settings = {}
     rows.forEach(r => { settings[r.key] = r.value })
+    settings.server_timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
     res.json(settings)
   })
 

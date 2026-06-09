@@ -2345,16 +2345,20 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  min-height: calc(100vh - 2.5rem);
+  height: calc(100dvh - 2.5rem);
+  overflow: hidden;
   box-sizing: border-box;
 }
 .period-wrapper {
   padding: 1.25rem;
   max-width: 480px;
   margin: 0 auto;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
-@media (max-width: 1023px) {
+@media (max-width: 1439px) {
   .period-column-root { height: 100%; overflow-y: auto; min-height: unset; }
 }
 
@@ -2502,8 +2506,8 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 3.7cqi;
+  height: 3.7cqi;
   border-radius: 6px;
   position: relative;
 }
@@ -2513,25 +2517,12 @@ onUnmounted(() => {
   left: 50% !important;
   transform: translate(-50%, -50%) !important;
   -webkit-transform: translate(-50%, -50%) !important;
-  font-size: 16px !important;
+  font-size: 3cqi !important;
   line-height: 1 !important;
   margin: 0 !important;
   padding: 0 !important;
   width: auto !important;
   height: auto !important;
-}
-@media (max-width: 600px) {
-  .cal-cell-badges {
-    bottom: -2px;
-    right: 2px;
-  }
-  .cal-cell-badge {
-    width: 13px;
-    height: 13px;
-  }
-  .cal-cell-badge .v-icon {
-    font-size: 11px !important;
-  }
 }
 .cal-cell-badge-warn { background: rgba(254, 243, 199, 0.9); }
 .cal-cell-badge-note { background: rgba(226, 232, 240, 0.9); }
@@ -2572,6 +2563,7 @@ onUnmounted(() => {
   border-radius: 16px;
   padding: 12px;
   margin-bottom: 0.75rem;
+  container-type: inline-size;
 }
 .cal-header-row {
   display: grid;
@@ -2580,7 +2572,7 @@ onUnmounted(() => {
 }
 .cal-dow {
   text-align: center;
-  font-size: 10px;
+  font-size: max(9px, 1.9cqi);
   font-weight: 600;
   color: #993556;
   letter-spacing: 0.04em;
@@ -2609,7 +2601,7 @@ onUnmounted(() => {
 .cal-cell-day:hover { background: #F4C0D1; }
 .cal-cell-empty { cursor: default; }
 .cal-cell-faded { cursor: default; }
-.cal-cell-faded .cal-day-num { color: #D4A8B8; font-size: 13px; line-height: 1; }
+.cal-cell-faded .cal-day-num { color: #D4A8B8; line-height: 1; }
 
 .cal-saved-check {
   position: absolute;
@@ -2659,7 +2651,7 @@ onUnmounted(() => {
   z-index: 2;
 }
 
-.cal-day-num { font-size: 13px; color: #72243E; line-height: 1; }
+.cal-day-num { font-size: max(11px, 2.4cqi); color: #72243E; line-height: 1; }
 
 /* How-to hints card */
 .cal-hints {

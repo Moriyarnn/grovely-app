@@ -86,7 +86,6 @@ function logPeriodCalculation (db, {
     ovulation_date, fertile_window_start, fertile_window_end,
     is_irregular ? 1 : 0, cycle_std_dev, data_warnings_count, total_cycles_tracked
   )
-  console.log(`[log_period_calculations] source=${source} next_period=${next_period_date} avg_cycle=${avg_cycle_length} irregular=${is_irregular}`)
 }
 
 module.exports = {

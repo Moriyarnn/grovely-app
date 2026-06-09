@@ -5,6 +5,22 @@ record; the in-app "What's New" panel shows a short summary of major releases on
 
 ---
 
+## v0.12.8 - Timezone display, phase card fix, log cleanup
+*June 9, 2026*
+
+- Backup and notification time pickers now show the server timezone so users know what timezone the cron runs in
+- Current Phase card no longer blanks when missed predictions exist from historical cycle gaps (#173)
+- Removed repetitive period calculation log that spammed docker logs on every page load
+
+## v0.12.7 - Responsive layout rework
+*June 9, 2026*
+
+- AppLayout reworked to three responsive tiers accounting for DesktopShell's 350px nav: phone (<1024px) swipes all 3 panels, tablet (1024-1439px) shows 2-column grid with inner swipe, desktop (>=1440px) shows full 3-column proportional grid (7fr 8fr 8fr)
+- Period calendar uses container query units (cqi) for badges and text so everything scales proportionally with column width instead of staying fixed-size
+- Login sign-in panel spacer now shrinks on short viewports instead of pushing the form off-screen
+- Pantry inventory item borders use inset box-shadow for consistent rendering at all zoom levels
+- Column root height fixed in PantryInventory, PeriodDetail, PeriodCalendar, PantryShoppingList, and both premium panels so panels size correctly inside the layout grid
+
 ## v0.12.6 - Cold-install dry run fixes
 *June 8, 2026*
 

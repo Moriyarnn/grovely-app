@@ -28,7 +28,7 @@
           <div class="bk-list">
             <div class="bk-row">
               <div class="bk-field-body">
-                <span class="bk-field-label">Run at</span>
+                <span class="bk-field-label">Run at ({{ serverTimezone }})</span>
                 <span class="bk-field-value">Daily check runs at this time</span>
               </div>
               <button
@@ -487,6 +487,7 @@ const expandedId = ref<number | null>(null)
 
 const configuredTargetCount = computed(() => status.value?.configured_target_names.length ?? 0)
 const enabledLive = computed(() => settings.value.backup_schedule_enabled === '1')
+const serverTimezone = computed(() => settings.value.server_timezone ?? 'UTC')
 
 const keepAll = computed(() => parseInt(settings.value.backup_retention_count ?? '7', 10) <= 0)
 

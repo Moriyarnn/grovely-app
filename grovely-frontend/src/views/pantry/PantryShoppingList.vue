@@ -1379,7 +1379,7 @@ onMounted(() => { load(); fetchSettings(); fetchLicenseStatus() })
   max-width: 100%;
 }
 
-@media (max-width: 1023px) {
+@media (max-width: 1439px) {
   .shopping-root { height: 100%; overflow-y: auto; }
 }
 
