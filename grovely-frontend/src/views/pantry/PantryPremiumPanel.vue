@@ -55,7 +55,7 @@ import PremiumBadge from '@/components/ui/PremiumBadge.vue'
   box-sizing: border-box;
 }
 
-@media (max-width: 1279px) {
+@media (max-width: 1023px) {
   .premium-panel { height: 100%; overflow-y: auto; min-height: unset; }
 }
 

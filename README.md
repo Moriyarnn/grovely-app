@@ -1,5 +1,3 @@
-# Grovely
-
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="grovely-frontend/src/assets/Logo README Dark.png">

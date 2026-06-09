@@ -1379,7 +1379,7 @@ onMounted(() => { load(); fetchSettings(); fetchLicenseStatus() })
   max-width: 100%;
 }
 
-@media (max-width: 1279px) {
+@media (max-width: 1023px) {
   .shopping-root { height: 100%; overflow-y: auto; }
 }
 
@@ -1517,7 +1517,7 @@ onMounted(() => { load(); fetchSettings(); fetchLicenseStatus() })
   line-height: 1.2;
 }
 
-@media (min-width: 1280px) {
+@media (min-width: 1024px) {
   .back-chip--mobile-only { display: none; }
 }
 

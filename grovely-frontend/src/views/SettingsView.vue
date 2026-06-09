@@ -2,9 +2,6 @@
   <div class="sv-root">
 
     <div class="sv-brand">
-      <div class="sv-brand-icon">
-        <v-icon size="22" color="#993556">mdi-cog-outline</v-icon>
-      </div>
       <div class="sv-brand-body">
         <h1 class="sv-brand-title">Settings</h1>
         <p class="sv-brand-sub">Customize your experience</p>
@@ -377,7 +374,7 @@ function resetHints() {
   box-sizing: border-box;
 }
 
-@media (min-width: 1280px) {
+@media (min-width: 1024px) {
   .sv-root { padding: 2.5rem 3rem 4rem; }
 }
 
@@ -396,7 +393,7 @@ function resetHints() {
 }
 .sv-back-chip:hover { background: #FBEAF0; }
 
-@media (min-width: 1280px) {
+@media (min-width: 1024px) {
   .sv-back-chip { display: none; }
 }
 .sv-brand-icon {

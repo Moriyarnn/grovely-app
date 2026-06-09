@@ -250,7 +250,7 @@ onBeforeUnmount(() => {
 .ds-sheet--neutral .ds-footer { border-color: #ececec; }
 
 /* ── Desktop: centered modal ──────────────────────────────── */
-@media (min-width: 1280px) {
+@media (min-width: 1024px) {
   .ds-sheet {
     bottom: auto; left: 50%; right: auto;
     top: 50%;
@@ -278,7 +278,7 @@ onBeforeUnmount(() => {
    sizing untouched. 'large' is for content-heavy sheets. */
 .ds-sheet--size-large { max-height: 92vh; }
 
-@media (min-width: 1280px) {
+@media (min-width: 1024px) {
   .ds-sheet--size-large {
     width: min(680px, 92vw);
     height: min(760px, 90vh);
@@ -297,7 +297,7 @@ onBeforeUnmount(() => {
 .ds-sheet--scroll-contained { overflow: hidden; }
 .ds-sheet--scroll-contained .ds-body { overflow: hidden; }
 
-@media (max-width: 1279px) {
+@media (max-width: 1023px) {
   .ds-sheet--scroll-contained { height: 88vh; }
 }
 
@@ -305,7 +305,7 @@ onBeforeUnmount(() => {
    Only on mobile; desktop height comes from the size rules above.
    overflow-y stays auto (inherited from .ds-sheet) so the sheet
    still scrolls if content ever exceeds this height. */
-@media (max-width: 1279px) {
+@media (max-width: 1023px) {
   .ds-sheet--mh { height: var(--ds-mh); }
 }
 
@@ -314,7 +314,7 @@ onBeforeUnmount(() => {
    Single-class selector, declared after the base .ds-sheet desktop
    rule, so it wins by source order. overflow-y stays auto, so very
    tall content still scrolls within the 88vh cap. */
-@media (min-width: 1280px) {
+@media (min-width: 1024px) {
   .ds-sheet--hug { height: auto; max-height: 88vh; }
 }
 </style>

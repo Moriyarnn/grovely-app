@@ -141,8 +141,8 @@
           <!-- Mobile-only sign out -->
           <div class="hub-footer mobile-only">
             <div v-if="licenseActive" class="hub-premium-thanks">
-              <v-icon size="13" color="#4ADE80">mdi-heart-outline</v-icon>
-              <span>Thanks for supporting Grovely. Your license keeps this project going.</span>
+              <v-icon size="16" color="#993556">mdi-heart</v-icon>
+              <span>Thanks for supporting Grovely.<br>Your license keeps this project going.</span>
             </div>
             <button class="hub-logout-btn" @click="logout">Sign out</button>
           </div>
@@ -420,11 +420,11 @@ onUnmounted(removeWindowListeners)
 /* Reserves strip height before data loads — prevents the app grid jumping down */
 .strip-slot { min-height: 88px; }
 
-@media (max-width: 1279px) {
+@media (max-width: 1023px) {
   .desktop-only { display: none !important; }
 }
 
-@media (min-width: 1280px) {
+@media (min-width: 1024px) {
   .mobile-only { display: none !important; }
 }
 
@@ -433,7 +433,7 @@ onUnmounted(removeWindowListeners)
   display: none;
 }
 
-@media (min-width: 1280px) {
+@media (min-width: 1024px) {
   .hub-root {
     display: block;
     min-height: 100dvh;
@@ -516,19 +516,26 @@ onUnmounted(removeWindowListeners)
 /* ── Mobile footer / sign out ─────────────────────────────────── */
 .hub-footer {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
   margin-top: 1.5rem;
   padding-bottom: 0.5rem;
 }
 .hub-premium-thanks {
   display: flex;
-  align-items: flex-start;
-  gap: 6px;
+  align-items: center;
+  gap: 8px;
   font-size: 11px;
-  color: #aaa;
+  color: #993556;
   line-height: 1.4;
-  margin-bottom: 10px;
-  justify-content: center;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border: 1.5px solid #F4C0D1;
+  border-radius: 10px;
+  background: #FDF6F9;
+  justify-content: flex-start;
+  width: 100%;
+  text-align: left;
 }
 
 .hub-logout-btn {

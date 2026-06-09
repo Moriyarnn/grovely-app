@@ -272,6 +272,16 @@ module.exports = (db) => {
         predicted.setDate(predicted.getDate() + avgCycleLength + errorAdj)
       }
       nextPeriodDate = predicted.toISOString().split('T')[0]
+
+      // Drop missed predictions that overlap with an actually logged cycle.
+      // When the user logs a period on a predicted date, the prediction is no longer "missed".
+      const loggedRanges = allCycles.filter(c => c.review_state !== 'excluded')
+      for (let i = missedPredictions.length - 1; i >= 0; i--) {
+        const pDate = missedPredictions[i].startDate
+        if (loggedRanges.some(c => c.start_date <= pDate && (c.end_date ?? c.start_date) >= pDate)) {
+          missedPredictions.splice(i, 1)
+        }
+      }
     }
 
     // Fertile window and ovulation — read from stored predictions on the most recent cycle

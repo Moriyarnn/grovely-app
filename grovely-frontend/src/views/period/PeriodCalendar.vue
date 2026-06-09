@@ -2354,12 +2354,12 @@ onUnmounted(() => {
   margin: 0 auto;
 }
 
-@media (max-width: 1279px) {
+@media (max-width: 1023px) {
   .period-column-root { height: 100%; overflow-y: auto; min-height: unset; }
 }
 
 
-@media (max-width: 1279px) {
+@media (max-width: 1023px) {
   .period-wrapper {
     max-width: 100%;
     transform: none;
@@ -2393,11 +2393,11 @@ onUnmounted(() => {
 }
 .back-chip:hover { background: #fdf5f8; }
 
-@media (min-width: 1280px) {
+@media (min-width: 1024px) {
   .back-chip--mobile-only { display: none; }
 }
 
-@media (min-width: 1280px) {
+@media (min-width: 1024px) {
   .period-wrapper {
     transform: none;
     margin: 0;

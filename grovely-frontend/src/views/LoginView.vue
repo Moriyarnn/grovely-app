@@ -566,6 +566,7 @@ async function handleLogin() {
     align-items: flex-start;
     justify-content: center;
     padding: 3rem;
+    padding-bottom: 2rem;
     background: #fdf8fa;
     overflow-y: auto;
   }
@@ -593,8 +594,8 @@ async function handleLogin() {
   .form-header-spacer {
     display: block;
     width: 100%;
-    flex-shrink: 0;
-    min-height: 295px;
+    height: 295px;
+    flex-shrink: 1;
   }
 }
 

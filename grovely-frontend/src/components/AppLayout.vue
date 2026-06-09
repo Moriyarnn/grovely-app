@@ -1,7 +1,7 @@
 <template>
   <div class="app-layout" :class="{ 'app-layout--mobile': isMobile, 'app-layout--settling': isMobile && isSettling }" :style="rootStyle" @touchend="onTouchEnd">
 
-    <!-- Mobile (<1280px): full-width swipe through all panels -->
+    <!-- Mobile (<1024px): full-width swipe through all panels -->
     <template v-if="isMobile">
       <div class="swipe-track" ref="swipeTrack" @scroll.passive="onScroll">
         <div class="swipe-panel"><slot /></div>
@@ -17,21 +17,28 @@
       </div>
     </template>
 
-    <!-- Medium (1280–1599px): 2-col grid, right col swipes col2↔col3 -->
+    <!-- Desktop (≥1024px): 3-col grid, no swipe -->
+    <template v-else>
+      <div class="app-main-panel"><slot /></div>
+      <div v-if="hasCol2" class="app-side-panel"><slot name="col2" /></div>
+      <div v-if="hasCol3" class="app-side-panel"><slot name="col3" /></div>
+    </template>
+
+    <!-- DISABLED: Medium breakpoint (2-col, right col swipes col2↔col3)
+         To restore: add isMedium ref + matchMedia for (min-width: 1024px) and (max-width: 1599px),
+         change desktop grid to 2-col at 1024px and 3-col at 1600px, update all child component
+         breakpoints back to 1024/1599 split. All child roots need height:100% at max-width:1599px.
+
     <template v-else-if="isMedium">
       <div class="app-main-panel"><slot /></div>
-      <div v-if="hasCol2" class="app-side-panel" :class="{ 'app-side-panel--swiping': hasCol3 }">
+      <div v-if="hasCol2" class="app-side-panel app-side-panel--swiping">
         <template v-if="hasCol3">
           <div class="swipe-track swipe-track--inner" ref="swipeTrack" @scroll.passive="onScroll">
             <div class="swipe-panel"><slot name="col2" /></div>
             <div class="swipe-panel"><slot name="col3" /></div>
           </div>
           <div class="dots dots--inner">
-            <button
-              v-for="i in 2" :key="i"
-              class="dot" :class="{ 'dot--active': activeIndex === i - 1 }"
-              @click="goTo(i - 1)"
-            />
+            <button v-for="i in 2" :key="i" class="dot" :class="{ 'dot--active': activeIndex === i - 1 }" @click="goTo(i - 1)" />
           </div>
         </template>
         <template v-else>
@@ -40,12 +47,13 @@
       </div>
     </template>
 
-    <!-- Large (≥1600px): 3-col grid, no swipe -->
-    <template v-else>
-      <div class="app-main-panel"><slot /></div>
-      <div v-if="hasCol2" class="app-side-panel"><slot name="col2" /></div>
-      <div v-if="hasCol3" class="app-side-panel app-side-panel--third"><slot name="col3" /></div>
-    </template>
+    CSS needed:
+    .app-side-panel--swiping { display: flex; flex-direction: column; overflow: hidden; }
+    .swipe-track--inner { flex: 1; }
+    .dots--inner { flex-shrink: 0; padding: 8px 0; border-top: 1px solid var(--panel-border, #f0e8ec); }
+    At 1024px: grid-template-columns: minmax(0, 560px) minmax(0, 1fr);
+    At 1600px: grid-template-columns: minmax(0, 560px) minmax(0, 1fr) minmax(0, 1fr);
+    -->
 
   </div>
 </template>
@@ -63,29 +71,22 @@ const hasCol2 = computed(() => !!slots.col2)
 const hasCol3 = computed(() => !!slots.col3)
 const panelCount = computed(() => 1 + (hasCol2.value ? 1 : 0) + (hasCol3.value ? 1 : 0))
 
-// Initialise synchronously so there's no layout flash on first paint
 const isMobile = ref(typeof window !== 'undefined'
-  ? window.matchMedia('(max-width: 1279px)').matches : false)
-const isMedium = ref(typeof window !== 'undefined'
-  ? window.matchMedia('(min-width: 1280px) and (max-width: 1599px)').matches : false)
+  ? window.matchMedia('(max-width: 1023px)').matches : false)
 
-let mqMobile, mqMedium
-function updateBreakpoints() {
+let mqMobile
+function updateBreakpoint() {
   isMobile.value = mqMobile.matches
-  isMedium.value = mqMedium.matches
 }
 
 onMounted(() => {
-  mqMobile = window.matchMedia('(max-width: 1279px)')
-  mqMedium = window.matchMedia('(min-width: 1280px) and (max-width: 1599px)')
-  mqMobile.addEventListener('change', updateBreakpoints)
-  mqMedium.addEventListener('change', updateBreakpoints)
+  mqMobile = window.matchMedia('(max-width: 1023px)')
+  mqMobile.addEventListener('change', updateBreakpoint)
   window.visualViewport?.addEventListener('resize', onViewportResize)
 })
 
 onUnmounted(() => {
-  mqMobile?.removeEventListener('change', updateBreakpoints)
-  mqMedium?.removeEventListener('change', updateBreakpoints)
+  mqMobile?.removeEventListener('change', updateBreakpoint)
   window.visualViewport?.removeEventListener('resize', onViewportResize)
   clearTimeout(settleTimer)
 })
@@ -100,7 +101,6 @@ function onViewportResize() {
 }
 
 function onTouchEnd() {
-  // Briefly enable height transition so the final viewport jump animates instead of teleporting
   isSettling.value = true
   clearTimeout(settleTimer)
   settleTimer = setTimeout(() => { isSettling.value = false }, 350)
@@ -125,8 +125,7 @@ function goTo(index) {
 
 provide('appLayoutGoTo', goTo)
 
-// Reset to first panel when breakpoint changes
-watch([isMobile, isMedium], async () => {
+watch(isMobile, async () => {
   activeIndex.value = 0
   await nextTick()
   swipeTrack.value?.scrollTo({ left: 0, behavior: 'instant' })
@@ -162,11 +161,10 @@ const rootStyle = computed(() => ({
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
-  touch-action: pan-x; /* only claim horizontal gestures so vertical scroll reaches column roots */
+  touch-action: pan-x;
 }
 .swipe-track::-webkit-scrollbar { display: none; }
 
-/* Mobile: fill remaining height so dots sit at the bottom */
 .app-layout--mobile .swipe-track {
   flex: 1;
   min-height: 0;
@@ -180,13 +178,12 @@ const rootStyle = computed(() => ({
   background: var(--panel-bg);
 }
 
-/* Mobile panels are bounded; column roots own vertical scrolling */
 .app-layout--mobile .swipe-panel {
   height: 100%;
   overflow: hidden;
 }
 
-/* ── Dots shared ─────────────────────────────────────────────── */
+/* ── Dots ─────────────────────────────────────────────────────── */
 .dots {
   display: flex;
   justify-content: center;
@@ -210,7 +207,6 @@ const rootStyle = computed(() => ({
   transform: scale(1.25);
 }
 
-/* ── Mobile dots: anchored to bottom of the flex layout ─────── */
 .dots--mobile {
   flex-shrink: 0;
   padding: 10px 0 calc(10px + env(safe-area-inset-bottom));
@@ -218,11 +214,11 @@ const rootStyle = computed(() => ({
   border-top: 1px solid #f0f0f0;
 }
 
-/* ── Medium desktop (1280–1599px): 2-col grid ───────────────── */
-@media (min-width: 1280px) {
+/* ── Desktop (≥1024px): 3-col grid ────────────────────────────── */
+@media (min-width: 1024px) {
   .app-layout {
     display: grid;
-    grid-template-columns: minmax(0, 560px) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 560px) minmax(0, 1fr) minmax(0, 1fr);
     gap: 1rem;
     align-items: stretch;
     height: 100dvh;
@@ -238,7 +234,9 @@ const rootStyle = computed(() => ({
     margin-top: 1.25rem;
     margin-bottom: 1.25rem;
     overflow-y: auto;
+    scrollbar-width: none;
   }
+  .app-main-panel::-webkit-scrollbar { display: none; }
 
   .app-side-panel {
     display: block;
@@ -249,35 +247,8 @@ const rootStyle = computed(() => ({
     margin-top: 1.25rem;
     margin-bottom: 1.25rem;
     overflow-y: auto;
+    scrollbar-width: none;
   }
-
-  /* When right panel hosts an inner swiper */
-  .app-side-panel--swiping {
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-
-  .swipe-track--inner {
-    flex: 1;
-  }
-
-  /* Desktop inner dots: sit at bottom of the right column card */
-  .dots--inner {
-    flex-shrink: 0;
-    padding: 8px 0;
-    border-top: 1px solid var(--panel-border, #f0e8ec);
-  }
-}
-
-/* ── Large desktop (≥1600px): 3-col grid ───────────────────── */
-@media (min-width: 1600px) {
-  .app-layout {
-    grid-template-columns: minmax(0, 560px) minmax(0, 1fr) minmax(0, 1fr);
-  }
-
-  .app-side-panel--third {
-    display: block;
-  }
+  .app-side-panel::-webkit-scrollbar { display: none; }
 }
 </style>

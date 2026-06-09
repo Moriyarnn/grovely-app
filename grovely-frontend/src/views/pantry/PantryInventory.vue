@@ -887,7 +887,7 @@ function formatExpiry(date) {
   max-width: 100%;
 }
 
-@media (max-width: 1279px) {
+@media (max-width: 1023px) {
   .inventory-root { height: 100%; overflow-y: auto; }
 }
 
@@ -1006,13 +1006,13 @@ function formatExpiry(date) {
 /* Pantry items */
 .pantry-item {
   background: #EAF7F0;
-  border: 1px solid #C8E8D8;
+  box-shadow: inset 0 0 0 1px #C8E8D8;
   border-radius: 8px;
   padding: 8px 10px;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  transition: border-color 0.15s;
+  transition: box-shadow 0.15s;
   flex-shrink: 0;
   cursor: pointer;
   justify-content: flex-start;
@@ -1024,20 +1024,20 @@ function formatExpiry(date) {
 .pantry-item:hover { filter: brightness(0.97); }
 
 .pantry-item.expiry--soon {
-  border-color: #fbbf24;
+  box-shadow: inset 0 0 0 1px #fbbf24;
   background: #fffdf0;
 }
 .pantry-item.expiry--very-soon {
-  border-color: #fb923c;
+  box-shadow: inset 0 0 0 1px #fb923c;
   background: #fff8f4;
 }
 .pantry-item.expiry--today {
-  border-color: #f87171;
+  box-shadow: inset 0 0 0 1px #f87171;
   background: #fff5f5;
   animation: pulse-red 2s infinite;
 }
 .pantry-item.expiry--expired {
-  border-color: #e0e0e0;
+  box-shadow: inset 0 0 0 1px #e0e0e0;
   background: #f9f9f9;
 }
 .expiry--expired .pantry-qty-col { color: #b0b0b0; }
@@ -1048,8 +1048,8 @@ function formatExpiry(date) {
 }
 
 @keyframes pulse-red {
-  0%, 100% { border-color: #f87171; }
-  50% { border-color: #dc2626; }
+  0%, 100% { box-shadow: inset 0 0 0 1px #f87171; }
+  50% { box-shadow: inset 0 0 0 1px #dc2626; }
 }
 
 .pantry-item-main {

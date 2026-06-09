@@ -4,7 +4,7 @@
     <!-- Brand -->
     <div class="ms-brand">
       <div class="ms-brand-body">
-        <h1 class="ms-brand-title">Grovely</h1>
+        <h1 class="ms-brand-title">Your Hub</h1>
         <p class="ms-brand-date">{{ todayLabel }}</p>
       </div>
       <button v-if="showBack" class="ms-back-chip" @click="router.back()">
@@ -59,7 +59,7 @@
         What's new
         <span v-if="hasUnread" class="ms-unread-dot" />
       </p>
-      <AppScroller class="ms-changelog" theme="pink">
+      <AppScroller class="ms-changelog" theme="pink" always-visible>
         <div v-for="entry in CHANGELOG" :key="entry.version" class="ms-cl-entry">
           <div class="ms-cl-head">
             <div class="ms-cl-head-left">
@@ -404,7 +404,7 @@ const CHANGELOG = [
   overflow: hidden;
 }
 
-@media (min-width: 1280px) {
+@media (min-width: 1024px) {
   .ms-root {
     padding: 2.5rem 3rem 2.5rem;
   }
@@ -430,7 +430,7 @@ const CHANGELOG = [
 }
 .ms-back-chip:hover { background: #FBEAF0; }
 
-@media (min-width: 1280px) {
+@media (min-width: 1024px) {
   .ms-back-chip { display: none; }
 }
 
@@ -438,7 +438,7 @@ const CHANGELOG = [
 .ms-brand-title {
   font-size: 22px;
   font-weight: 600;
-  color: #1a1a1a;
+  color: #993556;
   margin: 0 0 3px;
   letter-spacing: -0.01em;
 }
@@ -535,11 +535,11 @@ const CHANGELOG = [
   gap: 8px;
 }
 
-@media (max-width: 1279px) {
+@media (max-width: 1023px) {
   .ms-stat { grid-column: span 2; }
 }
 
-@media (min-width: 1280px) {
+@media (min-width: 1024px) {
   .ms-stats {
     grid-template-columns: repeat(6, 1fr);
   }
@@ -666,7 +666,7 @@ const CHANGELOG = [
 /* ── Desktop items — full descriptions, shown ≥1280px ────────── */
 .ms-cl-desktop-items { display: none; }
 
-@media (min-width: 1280px) {
+@media (min-width: 1024px) {
   .ms-cl-desktop-items { display: block; }
   .ms-cl-mobile-items  { display: none; }
 }

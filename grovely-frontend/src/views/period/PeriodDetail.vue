@@ -295,17 +295,21 @@ const recentCycle = computed(() => {
 
 // Day 1 of the cycle today belongs to.
 // Three cases, in priority order:
-//   1. A missed prediction exists (predicted period passed without being logged) → anchor to the most recent one.
-//   2. There's an actively logged cycle → its raw start_date.
+//   1. There's an actively logged cycle → its raw start_date (always wins over predictions).
+//   2. A missed prediction exists (predicted period passed without being logged) → anchor to the most recent one.
 //   3. Otherwise → the most recent logged cycle's raw start_date (Luteal tail of the previous one).
-// Reads raw cycles rows directly — this is a discrete classifier (phase buckets), it cannot lean
-// on smoothed/derived values without drifting across day boundaries. See issue #146.
 const phaseAnchorDate = computed(() => {
   const s = summary.value
   if (!s) return null
-  const missed = s.missedPredictions ?? []
-  if (missed.length) return missed[missed.length - 1].startDate
   if (s.currentCycle) return s.currentCycle.start_date
+  const maxDay = (s.avgCycleLength || 35) + 14
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const recent = (s.missedPredictions ?? [])
+    .filter(m => {
+      const d = new Date(m.startDate + 'T00:00:00')
+      return Math.floor((today - d) / 86400000) < maxDay
+    })
+  if (recent.length) return recent[recent.length - 1].startDate
   const latest = allCycles.value.length
     ? allCycles.value.reduce((a, b) => (a.start_date > b.start_date ? a : b))
     : null
@@ -319,12 +323,19 @@ const phaseAnchorDate = computed(() => {
 const phaseConfidence = computed(() => {
   const s = summary.value
   if (!s || cycleDayNum.value === null) return null
-  if (s.missedPredictions?.length) return 'predicted'
-  // Active cycle whose logged range covers today → Menstrual is directly observed
   const cc = s.currentCycle
-  if (cc && cc.start_date <= todayStr && (cc.end_date ?? cc.start_date) >= todayStr && currentPhase.value?.name === 'Menstrual') {
-    return 'logged'
+  if (cc) {
+    if (cc.start_date <= todayStr && (cc.end_date ?? cc.start_date) >= todayStr && currentPhase.value?.name === 'Menstrual') {
+      return 'logged'
+    }
+    return 'calculated'
   }
+  const maxDay = (s.avgCycleLength || 35) + 14
+  const now = new Date(); now.setHours(0, 0, 0, 0)
+  const hasRecentMissed = (s.missedPredictions ?? []).some(m =>
+    Math.floor((now - new Date(m.startDate + 'T00:00:00')) / 86400000) < maxDay
+  )
+  if (hasRecentMissed) return 'predicted'
   return 'calculated'
 })
 
@@ -487,7 +498,7 @@ function formatDateShort(dateStr) {
   box-sizing: border-box;
 }
 
-@media (max-width: 1279px) {
+@media (max-width: 1023px) {
   .period-detail-root { height: 100%; overflow-y: auto; min-height: unset; }
 }
 
@@ -511,7 +522,7 @@ function formatDateShort(dateStr) {
   position: relative;
 }
 
-@media (min-width: 1280px) {
+@media (min-width: 1024px) {
   .phase-card { min-height: 160px; }
 }
 .phase-title-row {

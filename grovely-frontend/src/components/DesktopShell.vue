@@ -103,8 +103,8 @@
 
       <div class="shell-footer">
         <div v-if="licenseActive" class="shell-premium-thanks">
-          <v-icon size="13" color="#4ADE80">mdi-heart-outline</v-icon>
-          <span>Thanks for supporting Grovely. Your license keeps this project going.</span>
+          <v-icon size="16" color="#993556">mdi-heart</v-icon>
+          <span>Thanks for supporting Grovely.<br>Your license keeps this project going.</span>
         </div>
         <button class="shell-logout-btn" @click="logout">Sign out</button>
       </div>
@@ -373,7 +373,7 @@ async function switchUser(role) {
 }
 
 /* collapse on mobile + tablet */
-@media (max-width: 1279px) {
+@media (max-width: 1023px) {
   .shell-nav {
     width: 0;
     opacity: 0;
@@ -401,7 +401,7 @@ async function switchUser(role) {
 .shell-content::-webkit-scrollbar-thumb { border-radius: 99px; background: #d4d4d4; }
 .shell-content::-webkit-scrollbar-thumb:hover { background: #adadad; }
 
-@media (max-width: 1279px) {
+@media (max-width: 1023px) {
   .shell-content {
     height: auto;
     overflow-y: visible;
@@ -552,12 +552,16 @@ async function switchUser(role) {
 
 .shell-premium-thanks {
   display: flex;
-  align-items: flex-start;
-  gap: 6px;
+  align-items: center;
+  gap: 8px;
   font-size: 11px;
-  color: #aaa;
+  color: #993556;
   line-height: 1.4;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border: 1.5px solid #F4C0D1;
+  border-radius: 10px;
+  background: #FDF6F9;
 }
 
 .shell-logout-btn {
