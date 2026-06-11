@@ -5,6 +5,20 @@ record; the in-app "What's New" panel shows a short summary of major releases on
 
 ---
 
+## v0.12.10 - README and LICENSE cleanup
+*June 11, 2026*
+
+- Added project copyright notice to LICENSE file
+- Centered personal intro paragraph on README
+- Added Current Phase card (premium) and delete cycle (free) to README feature list
+- Consolidated Smart Autofill as a named premium feature in README
+- Corrected notification count to 18 in README
+- Roadmap dates updated to Q3/Q4 2026
+- Added multi-language support (Q4) and themes (Future) to roadmap
+- Updated period tracker screenshot
+
+---
+
 ## v0.12.9 - Prediction stability, mobile polish, install docs
 *June 9, 2026*
 
