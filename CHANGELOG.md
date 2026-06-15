@@ -5,6 +5,15 @@ record; the in-app "What's New" panel shows a short summary of major releases on
 
 ---
 
+## v0.12.11 - Partner UX and mobile browser hub fix
+*June 15, 2026*
+
+- Partner read-only notice moved to the calendar view, visible before any interaction
+- All calendar write attempts as partner now show a 'Period logging is read-only' bubble instead of silently doing nothing
+- Hub premium thanks bubble no longer squished into the app grid on mobile browser (non-PWA)
+
+---
+
 ## v0.12.10 - README and LICENSE cleanup
 *June 11, 2026*
 

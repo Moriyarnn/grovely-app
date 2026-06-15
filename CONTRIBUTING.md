@@ -21,4 +21,4 @@ Feature PRs are not accepted without prior discussion. Open an issue first and w
 
 ## Licensing
 
-By submitting a pull request you agree that your contribution may be included in both the open source (AGPL-3.0) and commercial versions of Grovely.
+By submitting a pull request you agree that your contribution may be used in any part of Grovely, including premium features.

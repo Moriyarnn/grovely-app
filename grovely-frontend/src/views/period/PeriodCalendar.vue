@@ -137,6 +137,12 @@
           </div>
         </template>
 
+        <!-- Partner read-only notice -->
+        <div v-if="isPartner" class="cal-partner-notice">
+          <v-icon size="14" color="#993556">mdi-eye-outline</v-icon>
+          <span>You're viewing as partner - period data is read-only</span>
+        </div>
+
       </div>
 
     <!-- First-launch tutorial (also triggered by ? button) -->
@@ -596,6 +602,13 @@ function showHintBubble(x, date, message = "Can't log future dates", variant = '
   const clampedX = Math.max(wRect.left + 80, Math.min(x, wRect.right - 80))
   hintBubble.value = { visible: true, x: clampedX, y, message, variant }
   hintBubbleTimer = setTimeout(() => { hintBubble.value.visible = false }, 1500)
+}
+function showPartnerBubble(ds, x) {
+  if (x == null) {
+    const el = document.querySelector(`[data-date="${ds}"]`)
+    x = el ? el.getBoundingClientRect().left + el.getBoundingClientRect().width / 2 : window.innerWidth / 2
+  }
+  showHintBubble(x, ds, 'Period logging is read-only')
 }
 
 // Swipe-to-create state
@@ -1213,7 +1226,10 @@ function onDayClick(cell) {
   }
 
   // Partner can't log — nothing to show on non-period days
-  if (isPartner.value && ['no-cycle', 'consecutive', 'large-gap'].includes(context)) return
+  if (isPartner.value && ['no-cycle', 'consecutive', 'large-gap'].includes(context)) {
+    showPartnerBubble(ds)
+    return
+  }
 
   // Quick-log: immediately save new period days without opening a form
   if (['no-cycle', 'consecutive', 'large-gap'].includes(context)) {
@@ -1249,7 +1265,7 @@ function onDayClick(cell) {
 
   if (!logged) {
     // In a cycle but no cycle_day record (drag-created or legacy)
-    if (isPartner.value) return  // nothing to show partner
+    if (isPartner.value) { showPartnerBubble(ds); return }
     mode.value = 'view'
     form.value = { flow_intensity: '', symptoms: [], notes: '' }
     return
@@ -1628,7 +1644,7 @@ function onDocumentMouseUp(ev = {}) {
     dragStart.value = null
     dragEnd.value = null
     if (startDate > todayStr && !periodDates.value.has(startDate)) {
-      if (ev.clientX != null) showHintBubble(ev.clientX, startDate)
+      if (ev.clientX != null) (isPartner.value ? showPartnerBubble(startDate, ev.clientX) : showHintBubble(ev.clientX, startDate))
       return
     }
     if (cell && cell.day && !cell.faded) onDayClick(cell)
@@ -1638,6 +1654,13 @@ function onDocumentMouseUp(ev = {}) {
   const s = dragStart.value <= dragEnd.value ? dragStart.value : dragEnd.value
   const e = dragStart.value <= dragEnd.value ? dragEnd.value : dragStart.value
   dragMoved.value = false
+
+  if (isPartner.value) {
+    dragStart.value = null
+    dragEnd.value = null
+    if (ev.clientX != null) showPartnerBubble(e, ev.clientX)
+    return
+  }
 
   if (e > todayStr) {
     dragStart.value = null
@@ -1653,7 +1676,6 @@ function onDocumentMouseUp(ev = {}) {
     return
   }
 
-  if (isPartner.value) { dragStart.value = null; dragEnd.value = null; return }
   doSwipeCreate(ev.clientX ?? window.innerWidth / 2, s, e)
 }
 
@@ -2682,6 +2704,21 @@ onUnmounted(() => {
 .cal-hint:last-child { margin-bottom: 0; }
 .cal-hint > span:first-of-type { flex: 1; }
 .cal-hint :deep(.v-icon) { flex-shrink: 0; margin-top: 1px; }
+
+/* Partner read-only notice */
+.cal-partner-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #FDF2F5;
+  border: 1px solid #F4C0D1;
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin: 4px 0 1rem;
+  font-size: 12px;
+  color: #72243E;
+  line-height: 1.4;
+}
 
 .drag-hint-badge-wrap { display: inline-flex; align-items: center; flex-shrink: 0; }
 .drag-hint-badge-wrap :deep(.premium-badge) {

@@ -166,12 +166,6 @@
       </div>
     </div>
 
-    <!-- Partner read-only notice -->
-    <div v-if="isPartner" class="notice-card">
-      <v-icon size="14" color="#993556">mdi-eye-outline</v-icon>
-      <span class="notice-text">You're viewing as partner — period data is read-only</span>
-    </div>
-
     <!-- Prediction health — always visible -->
     <div class="warnings-card" :class="{ 'warnings-card--clean': !activeWarnings.length }">
       <p class="warnings-section-title">Prediction Health</p>
@@ -828,19 +822,6 @@ function formatDateShort(dateStr) {
   margin-top: 14px;
   line-height: 1.4;
 }
-
-/* Partner notice */
-.notice-card {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: #FDF2F5;
-  border: 1px solid #F4C0D1;
-  border-radius: 12px;
-  padding: 10px 12px;
-  flex-shrink: 0;
-}
-.notice-text { font-size: 12px; color: #72243E; line-height: 1.4; }
 
 /* Prediction health card */
 .warnings-section-title {

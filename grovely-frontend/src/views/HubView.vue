@@ -415,8 +415,8 @@ onUnmounted(removeWindowListeners)
 /* ── Root layout ──────────────────────────────────────────────── */
 .hub-root {
   display: flex;
-  height: 100dvh;
-  overflow: hidden;
+  min-height: 100dvh;
+  overflow-y: auto;
   background: #fafafa;
 }
 
@@ -465,7 +465,7 @@ onUnmounted(removeWindowListeners)
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: visible;
 }
 
 /* ── Mobile header ────────────────────────────────────────────── */
