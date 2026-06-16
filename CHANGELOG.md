@@ -5,6 +5,14 @@ record; the in-app "What's New" panel shows a short summary of major releases on
 
 ---
 
+## v0.12.13 - README update
+*June 16, 2026*
+
+- Expanded the README with the free and premium feature breakdown
+- Added license and support links (Ko-fi and GitHub Sponsors)
+
+---
+
 ## v0.12.12 - Screenshots gallery
 *June 16, 2026*
 

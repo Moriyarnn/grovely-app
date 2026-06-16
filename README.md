@@ -165,6 +165,28 @@ See [INSTALL.md](./INSTALL.md) for full instructions, including reverse proxy se
 
 No telemetry. No phone-home. No external calls unless you configure SMTP, and that's opt-in. Your data never leaves your server.
 
+## Pricing
+
+Grovely is **open core** - the core is free forever, and the premium tier funds continued development.
+
+**Free (AGPL-3.0):**
+- Period tracker - calendar, flow intensity, predictions, fertile windows
+- Both partner accounts
+- Shared grocery list and pantry with expiry tracking
+- Manual on-demand backups
+
+**Premium - $20/year (monthly option available):**
+- Full notification system - all 18 types, partner-facing versions, any SMTP provider
+- Scheduled automatic backups - local retention plus S3-compatible and WebDAV remote push
+- Smart Autofill on the shopping list - purchase history autocomplete with price delta
+- Adjust Cycle and the Current Phase card on the period tracker
+
+More premium features are on the [roadmap](#roadmap), and the price stays $20/year regardless of what's added. The license check is readable offline JWT verification against a public key baked into the image - no license server, no phone-home, validates with no network call ever.
+
+**Get a license → https://grovely.lemonsqueezy.com/**
+
+Prefer to support without premium? You can sponsor development on [Ko-fi](https://ko-fi.com/sebastianverdugo) or [GitHub Sponsors](https://github.com/sponsors/Moriyarnn).
+
 ## License
 
 AGPL-3.0 open core. Email notifications, automatic backups, and advanced features require a $20/year offline license key - offline validation, no server calls.
