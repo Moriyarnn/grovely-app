@@ -80,6 +80,42 @@
 - Reverse proxy ready - ships overlay files for Caddy, Nginx, Traefik, and dockerized proxy setups
 - SQLite database - no external DB server, everything in one file you own
 
+## Screenshots
+
+### Desktop
+
+<p align="center">
+  <img src="docs/screenshots/Login.png" width="85%" />
+</p>
+<p align="center"><em>Private household hub - the landing and sign-in page</em></p>
+
+<p align="center">
+  <img src="docs/screenshots/Period tracker.png" width="85%" />
+</p>
+<p align="center"><em>Period tracker - calendar with logged cycle, current phase, and predictions</em></p>
+
+<p align="center">
+  <img src="docs/screenshots/Pantry.png" width="85%" />
+</p>
+<p align="center"><em>Shared shopping list and pantry inventory with expiry tracking</em></p>
+
+### Mobile
+
+<p align="center">
+  <img src="docs/screenshots/Mobile Inventory.jpg" width="30%" />
+  <img src="docs/screenshots/Mobile Backups.jpg" width="30%" />
+  <img src="docs/screenshots/Mobile Notifications.jpg" width="30%" />
+</p>
+<p align="center"><em>Pantry inventory · Scheduled backups · Notification settings</em></p>
+
+### Demos
+
+<p align="center">
+  <img src="docs/screenshots/Period Tracker Demo.gif" width="30%" />
+  <img src="docs/screenshots/Pantry Shopping List Demo.gif" width="30%" />
+</p>
+<p align="center"><em>Drag to log a period and adjust a cycle · Add an item and move it to the pantry</em></p>
+
 ## Roadmap
 
 **Next (Q3 2026)**

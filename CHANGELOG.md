@@ -5,6 +5,14 @@ record; the in-app "What's New" panel shows a short summary of major releases on
 
 ---
 
+## v0.12.12 - Screenshots gallery
+*June 16, 2026*
+
+- Added a screenshots gallery under docs/screenshots with the app's main views and the period tracker and shopping list demo clips
+- Added a Screenshots section to the README (desktop, mobile, and demos) embedding them inline
+
+---
+
 ## v0.12.11 - Partner UX and mobile browser hub fix
 *June 15, 2026*
 
