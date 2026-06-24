@@ -3,7 +3,8 @@ const router = express.Router()
 const { logPeriodEvent } = require('../../logger')
 const { requireOwner } = require('../../middleware/auth')
 const { recomputeAllPredictions } = require('./_calcHelpers')
-const { encrypt, revealPrivateFields } = require('../../utils/encryption')
+const { encrypt, revealPrivateFields, partnerSettingEnabled } = require('../../utils/encryption')
+const { emitActivity } = require('../../realtime')
 
 module.exports = (db) => {
   // Get all cycle days with cycle info (for calendar population)
@@ -71,12 +72,13 @@ module.exports = (db) => {
     `).run(cycle_id, cycle_id)
 
     logPeriodEvent(db, { entity: 'cycle_day', entity_id: cycle_day_id, action: 'create', cycle_id, date })
+    emitActivity(req, { type: 'period.change', action: 'create', dates: [date] })
     res.json({ id: cycle_day_id, cycle_id, date })
   })
 
   // Update a day
   router.patch('/:id', requireOwner, (req, res) => {
-    const { flow_intensity, notes, symptoms } = req.body
+    const { flow_intensity, notes, symptoms, visibleChange } = req.body
     const id = Number(req.params.id)
 
     db.prepare(`
@@ -92,6 +94,16 @@ module.exports = (db) => {
 
     const updated = db.prepare('SELECT cycle_id, date FROM cycle_days WHERE id = ?').get(id)
     if (updated) logPeriodEvent(db, { entity: 'cycle_day', entity_id: id, action: 'update', cycle_id: updated.cycle_id, date: updated.date })
+
+    // Live activity: a notes-only edit must not notify the partner when notes are
+    // hidden from them - otherwise they get a bubble for a change they cannot see,
+    // signalling that private notes were written. The client sends visibleChange
+    // (did flow/symptoms change). The partner_can_read_notes setting is checked
+    // here (authoritative). Absent flag defaults to notifying (safe). Note CONTENT
+    // confidentiality is enforced separately by revealPrivateFields, not here.
+    if (visibleChange !== false || partnerSettingEnabled(db, 'partner_can_read_notes')) {
+      emitActivity(req, { type: 'period.change', action: 'update', dates: updated ? [updated.date] : [] })
+    }
 
     res.json({ success: true })
   })
@@ -150,6 +162,7 @@ module.exports = (db) => {
     if (remaining.cnt === 0 || day.date === day.start_date) {
       recomputeAllPredictions(db)
     }
+    emitActivity(req, { type: 'period.change', action: 'delete', dates: [day.date] })
     res.json({ success: true })
   })
 

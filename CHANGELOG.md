@@ -5,6 +5,20 @@ record; the in-app "What's New" panel shows a short summary of major releases on
 
 ---
 
+## v0.13.0 - live updates between partners and launch prep
+*June 23, 2026*
+
+- Live activity - when one partner makes a change the other partner sees it instantly with a brief bubble showing who did what. Bulk moves show a single counted bubble. Can be disabled per account in Settings
+- Current Phase card accuracy improved - active cycle takes priority over stale gap predictions, confidence badge correctly shows Logged or Calculated when a period is active
+- Predictions now advance when a period is not logged - missed predictions persist on the calendar with fertile windows and ovulation markers
+- Private period notes encrypted at rest - partner cannot read them even from an exported backup
+- Easy install scripts for Linux, Mac, and Windows - guided interactive setup, no manual config file editing needed
+- Version-pinned release assets - every GitHub release now includes a docker-compose.yml and .env stamped with that version so installs are reproducible
+- Backend refuses to start if placeholder credentials are still set in .env, preventing accidental insecure deployments
+- Partner read-only notice moved to calendar info section, all write attempts now show a clear read-only bubble
+
+---
+
 ## v0.12.13 - README update
 *June 16, 2026*
 

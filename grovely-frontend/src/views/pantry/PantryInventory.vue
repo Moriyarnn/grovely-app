@@ -576,15 +576,41 @@ async function load() {
   animEnabled.value = true
 }
 
+// Live activity — surgical merge of another account's inventory changes. An add
+// may be a merge into an existing row (backend merges same name/unit/expiry), so
+// replace by id when present, otherwise insert. Only active while mounted.
+function applyInvEvent(ev) {
+  if (ev.type === 'pantry.inv.add') {
+    if (!ev.row) return
+    const idx = items.value.findIndex(i => i.id === ev.row.id)
+    if (idx >= 0) items.value[idx] = ev.row
+    else items.value.push(ev.row)
+  } else if (ev.type === 'pantry.inv.modify') {
+    if (ev.removed) {
+      items.value = items.value.filter(i => i.id !== ev.id)
+    } else if (ev.row) {
+      const idx = items.value.findIndex(i => i.id === ev.row.id)
+      if (idx >= 0) items.value[idx] = ev.row
+      else items.value.push(ev.row)
+    }
+  }
+}
+function onActivity(e) { applyInvEvent(e.detail || {}) }
+function onResync() { load() }
+
 onMounted(() => {
   load()
   fetchSettings()
   itemsArea.value?.$el?.addEventListener('touchstart', onItemsAreaTouchStart, { passive: true })
   itemsArea.value?.$el?.addEventListener('touchmove', onItemsAreaTouchMove, { passive: false })
+  window.addEventListener('grovely:activity', onActivity)
+  window.addEventListener('grovely:resync', onResync)
 })
 onUnmounted(() => {
   itemsArea.value?.$el?.removeEventListener('touchstart', onItemsAreaTouchStart)
   itemsArea.value?.$el?.removeEventListener('touchmove', onItemsAreaTouchMove)
+  window.removeEventListener('grovely:activity', onActivity)
+  window.removeEventListener('grovely:resync', onResync)
 })
 defineExpose({ reload: load })
 

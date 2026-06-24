@@ -1980,10 +1980,16 @@ async function saveGapDay() {
       await apiFetch(`${API}/period/gap-days/${gapDayLog.value.id}`, { method: 'DELETE' })
     } else if (hasData) {
       if (gapDayLog.value) {
+        // Gap days have no flow; the only partner-visible field is symptoms (the
+        // marker already exists for an edit). A notes-only edit sets visibleChange
+        // false so the partner is not notified of a hidden-note change. Ovulation
+        // is a separate route below and notifies on its own.
+        const beforeSym = [...gapSelectedSymptoms.value].sort().join(',')
+        const afterSym = [...gapForm.value.symptoms].sort().join(',')
         await apiFetch(`${API}/period/gap-days/${gapDayLog.value.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ notes: gapForm.value.notes || null, symptoms: gapForm.value.symptoms })
+          body: JSON.stringify({ notes: gapForm.value.notes || null, symptoms: gapForm.value.symptoms, visibleChange: beforeSym !== afterSym })
         })
       } else {
         await apiFetch(`${API}/period/gap-days`, {
@@ -2314,13 +2320,20 @@ async function _saveCycleDayCore(ds) {
   if (!cycleId) return null
 
   if (existing) {
+    // visibleChange tells the backend whether anything the partner can SEE changed
+    // (flow or symptoms). A notes-only edit (notes are private) sets this false so
+    // the partner is not notified of a change they cannot see. See live-activity docs.
+    const beforeSym = (existing.symptoms ? String(existing.symptoms).split(',').map(s => s.trim()).filter(Boolean) : []).sort().join(',')
+    const afterSym = [...(form.value.symptoms || [])].sort().join(',')
+    const visibleChange = (form.value.flow_intensity || null) !== (existing.flow_intensity || null) || beforeSym !== afterSym
     await apiFetch(`${API}/period/cycle-days/${existing.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         flow_intensity: form.value.flow_intensity || null,
         notes: form.value.notes || null,
-        symptoms: form.value.symptoms
+        symptoms: form.value.symptoms,
+        visibleChange
       })
     })
   } else {
@@ -2340,6 +2353,19 @@ async function _saveCycleDayCore(ds) {
   return cycleId
 }
 
+// Live activity — another account changed period data. Refetch the whole
+// calendar (gap days and period days come from separate endpoints, so each
+// renders as its true type). No cell pulse: for cycle-level edits the changed
+// date isn't necessarily where the user is looking, so a highlight reads as
+// arbitrary. The bubble announces the change; the calendar just refreshes.
+// Only active while the calendar is mounted (page-conditional).
+async function onActivity(e) {
+  const ev = e.detail || {}
+  if (ev.type !== 'period.change') return
+  await loadData()
+}
+function onResync() { loadData() }
+
 onMounted(() => {
   resetView()
   loadData()
@@ -2348,12 +2374,16 @@ onMounted(() => {
   document.addEventListener('mouseup', onDocumentMouseUp)
   document.addEventListener('touchend', onTouchEnd, { passive: true })
   document.addEventListener('keydown', onAdjustKeydown)
+  window.addEventListener('grovely:activity', onActivity)
+  window.addEventListener('grovely:resync', onResync)
 })
 
 onUnmounted(() => {
   document.removeEventListener('mouseup', onDocumentMouseUp)
   document.removeEventListener('touchend', onTouchEnd)
   document.removeEventListener('keydown', onAdjustKeydown)
+  window.removeEventListener('grovely:activity', onActivity)
+  window.removeEventListener('grovely:resync', onResync)
   if (hintBubbleTimer) clearTimeout(hintBubbleTimer)
   if (touchResetTimer) clearTimeout(touchResetTimer)
   if (adjustHoldTimer.value) clearTimeout(adjustHoldTimer.value)

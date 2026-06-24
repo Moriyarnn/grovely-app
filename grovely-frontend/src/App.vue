@@ -14,6 +14,7 @@
         </Transition>
       </router-view>
     </v-main>
+    <ActivityToast v-if="showShell" />
     <Teleport to="body">
       <div v-if="envLabel" class="env-badge">{{ envLabel }}</div>
     </Teleport>
@@ -24,6 +25,7 @@
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import DesktopShell from './components/DesktopShell.vue'
+import ActivityToast from './components/ActivityToast.vue'
 import { getToken } from './api'
 const route = useRoute()
 const showShell = computed(() => route.name !== 'login' && !!getToken())

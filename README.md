@@ -2,7 +2,7 @@
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="grovely-frontend/src/assets/Logo README Dark.png">
     <source media="(prefers-color-scheme: light)" srcset="grovely-frontend/src/assets/Logo README Light.png">
-    <img src="grovely-frontend/src/assets/Logo README Light.png" width="220" />
+    <img src="grovely-frontend/src/assets/Logo README Light.png" width="220" alt="Grovely" />
   </picture>
 </p>
 
@@ -139,21 +139,34 @@
 
 ## Quick Start
 
+### Easy install (recommended)
+
+1. Make sure [Docker Desktop](https://docs.docker.com/get-docker/) is installed and running
+2. Download the installer for your system:
+   - **Linux / Mac:** [run-to-install.sh](https://grovely.org/install/run-to-install.sh)
+   - **Windows:** [run-to-install.ps1](https://grovely.org/install/run-to-install.ps1)
+3. Run it:
+   - **Linux / Mac:** open a terminal where you saved the file and run `bash run-to-install.sh`
+   - **Windows:** right-click `run-to-install.ps1` and choose "Run with PowerShell"
+4. Follow the instructions on screen to set up your accounts. Once done, you will be given the option to open Grovely in your browser automatically.
+
+Open **http://localhost:5173** and log in.
+
+### Manual install
+
 ```bash
 mkdir grovely && cd grovely
 curl -O https://raw.githubusercontent.com/Moriyarnn/grovely-app/main/docker-compose.yml
 curl -o .env https://raw.githubusercontent.com/Moriyarnn/grovely-app/main/.env.example
 ```
 
-Go into the `.env` file and set the usernames and passwords for both accounts, then run:
+Edit `.env` and set the usernames and passwords for both accounts, then:
 
 ```bash
 docker compose up -d
 ```
 
-Open **http://localhost:5173** and log in with the credentials you set in `.env`. If you changed the frontend port in `docker-compose.yml`, use that port instead.
-
-See [INSTALL.md](./INSTALL.md) for full instructions, including reverse proxy setups (Caddy, Nginx, Traefik, Nginx Proxy Manager), backups, license keys, and troubleshooting.
+See [INSTALL.md](./INSTALL.md) for full instructions including reverse proxy setups (Caddy, Nginx, Traefik, Nginx Proxy Manager), backups, license keys, and troubleshooting.
 
 ## Tech Stack
 

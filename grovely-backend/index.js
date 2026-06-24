@@ -73,7 +73,7 @@ if (!jwtSecret) {
 process.env.JWT_SECRET = jwtSecret
 
 // Seed users from env on startup — only inserts if not already present
-const PLACEHOLDER_VALUES = new Set(['your_username', 'partner_username', 'change_me'])
+const PLACEHOLDER_VALUES = new Set(['your_username', 'partner_username', 'your-username', 'partner-username', 'user1', 'user2', 'change_me', 'change-me', 'you', 'partner'])
 const seedUsers = () => {
   const pairs = [
     { username: process.env.OWNER1_USERNAME, password: process.env.OWNER1_PASSWORD, role: 'owner1' },
@@ -95,6 +95,16 @@ const seedUsers = () => {
 
 seedUsers()
 
+const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get().count
+if (userCount === 0) {
+  console.error('\n❌ Grovely cannot start: no users are configured.')
+  console.error('   Open your .env file and set real values for:')
+  console.error('     OWNER1_USERNAME, OWNER1_PASSWORD')
+  console.error('     OWNER2_USERNAME, OWNER2_PASSWORD')
+  console.error('   Then restart the container.\n')
+  process.exit(1)
+}
+
 // Encrypt any pre-existing plaintext private notes at rest (idempotent —
 // already-encrypted rows are skipped). See utils/encryption.js.
 const { encryptExistingRows } = require('./utils/encryption')
@@ -105,6 +115,30 @@ if (encryptedCount > 0) console.log(`🔒 Encrypted ${encryptedCount} existing p
 const { requireAuth } = require('./middleware/auth')
 const authRouter = require('./routes/auth')(db)
 app.use('/api/auth', authRouter)
+
+// Live activity — SSE stream. EventSource cannot send an Authorization header,
+// so the token arrives as a query param (fine behind HTTPS on a self-hosted
+// box). See realtime/index.js for the broadcast model.
+const jwt = require('jsonwebtoken')
+const { addClient, removeClient } = require('./realtime')
+app.get('/api/events', (req, res) => {
+  let user
+  try {
+    user = jwt.verify(req.query.token, process.env.JWT_SECRET)
+  } catch {
+    return res.status(401).end()
+  }
+  res.set({
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    Connection: 'keep-alive',
+    'X-Accel-Buffering': 'no' // disable proxy buffering (nginx)
+  })
+  res.flushHeaders?.()
+  res.write('retry: 3000\n\n')
+  const connId = addClient(user.id, res)
+  req.on('close', () => removeClient(connId))
+})
 
 // Routes
 const cyclesRouter = require('./routes/period/cycles')(db)

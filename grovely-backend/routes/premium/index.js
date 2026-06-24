@@ -5,6 +5,7 @@ const backupsRouter = require('./backups');
 const { requireOwner } = require('../../middleware/auth');
 const { logPeriodEvent } = require('../../logger');
 const { recomputeAllPredictions } = require('../period/_calcHelpers');
+const { emitActivity } = require('../../realtime');
 
 // Scheduled backup management (status, history, run-now, verify)
 router.use('/backups', backupsRouter);
@@ -128,6 +129,7 @@ router.patch('/period/cycles/:id/adjust', requireOwner, (req, res) => {
   db.prepare('UPDATE cycles SET start_date = ?, end_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
     .run(newStart, newEnd, id);
   logPeriodEvent(db, { entity: 'cycle', entity_id: id, action: 'update', cycle_id: id, date: newStart });
+  emitActivity(req, { type: 'period.change', action: 'cycle', dates: [newStart] });
   res.json({ id, start_date: newStart, end_date: newEnd });
   setImmediate(() => recomputeAllPredictions(db));
 });

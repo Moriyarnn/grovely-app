@@ -3,7 +3,7 @@ name: grovely-prod
 services:
   frontend:
     container_name: grovely-prod-frontend
-    image: ghcr.io/moriyarnn/grovely-frontend:latest
+    image: ghcr.io/moriyarnn/grovely-frontend:${GROVELY_VERSION:-latest}
     # `build:` stays defined so the reverse-proxy overlay (docker-compose.proxy.yml)
     # can rebuild with VITE_BACKEND_PORT="". Default `docker compose up` pulls the
     # image above; pass --build to build locally instead.
@@ -28,7 +28,7 @@ services:
 
   backend:
     container_name: grovely-prod-backend
-    image: ghcr.io/moriyarnn/grovely-backend:latest
+    image: ghcr.io/moriyarnn/grovely-backend:${GROVELY_VERSION:-latest}
     # `build:` stays defined for parity with frontend and for users who want
     # `--build` to work. Default `docker compose up` pulls the image above.
     build: ./grovely-backend

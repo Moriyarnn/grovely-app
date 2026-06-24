@@ -1,6 +1,7 @@
 const express = require('express')
 const router = express.Router()
 const { convertToUnit, normalizeUnit } = require('../../utils/units')
+const { emitActivity } = require('../../realtime')
 
 const VALID_CATEGORIES = ['produce', 'dairy', 'meat', 'bakery', 'frozen', 'dry_goods', 'beverages', 'other']
 const VALID_STATUSES = ['active', 'used', 'wasted']
@@ -270,7 +271,9 @@ module.exports = (db) => {
       pantryItemId,
     })
 
-    res.status(201).json(db.prepare('SELECT * FROM pantry WHERE id = ?').get(pantryItemId))
+    const savedItem = db.prepare('SELECT * FROM pantry WHERE id = ?').get(pantryItemId)
+    emitActivity(req, { type: 'pantry.inv.add', item: savedItem.name, row: savedItem })
+    res.status(201).json(savedItem)
   })
 
   // PATCH update fields
@@ -311,7 +314,9 @@ module.exports = (db) => {
         .run(density.density, density.density_unit, now, req.params.id)
     }
 
-    res.json(db.prepare('SELECT * FROM pantry WHERE id = ?').get(req.params.id))
+    const updatedItem = db.prepare('SELECT * FROM pantry WHERE id = ?').get(req.params.id)
+    emitActivity(req, { type: 'pantry.inv.modify', action: 'edit', id: Number(req.params.id), removed: false, row: updatedItem })
+    res.json(updatedItem)
   })
 
   // PATCH consume partial or full amount
@@ -328,7 +333,9 @@ module.exports = (db) => {
       if (currentPieces < 2) return res.status(400).json({ error: 'item does not have multiple pieces' })
       const newPieces = currentPieces - 1
       db.prepare('UPDATE pantry SET pieces = ?, updated_at = ? WHERE id = ?').run(newPieces, now, req.params.id)
-      return res.json({ removed: false, item: db.prepare('SELECT * FROM pantry WHERE id = ?').get(req.params.id) })
+      const markedRow = db.prepare('SELECT * FROM pantry WHERE id = ?').get(req.params.id)
+      emitActivity(req, { type: 'pantry.inv.modify', action: 'consume', id: Number(req.params.id), removed: false, row: markedRow })
+      return res.json({ removed: false, item: markedRow })
     }
 
     if (item.amount === null || item.amount === undefined) {
@@ -338,13 +345,16 @@ module.exports = (db) => {
           // Partial pieces consume
           db.prepare('UPDATE pantry SET pieces = ?, updated_at = ? WHERE id = ?').run(item.pieces - piecesConsumed, now, req.params.id)
           writeConsumeHistory(db, { name: item.name, pieces: piecesConsumed, price: item.price, event: action === 'use' ? 'used' : 'wasted', pantryItemId: item.id })
-          return res.json({ removed: false, item: db.prepare('SELECT * FROM pantry WHERE id = ?').get(req.params.id) })
+          const partialPiecesRow = db.prepare('SELECT * FROM pantry WHERE id = ?').get(req.params.id)
+          emitActivity(req, { type: 'pantry.inv.modify', action: 'consume', id: Number(req.params.id), removed: false, row: partialPiecesRow })
+          return res.json({ removed: false, item: partialPiecesRow })
         }
       }
       // Full pieces consume
       const status = action === 'use' ? 'used' : 'wasted'
       db.prepare('UPDATE pantry SET status = ?, updated_at = ? WHERE id = ?').run(status, now, req.params.id)
       writeConsumeHistory(db, { name: item.name, pieces: item.pieces, price: item.price, event: status, pantryItemId: item.id })
+      emitActivity(req, { type: 'pantry.inv.modify', action: 'consume', id: Number(req.params.id), removed: true })
       return res.json({ removed: true })
     }
 
@@ -369,13 +379,16 @@ module.exports = (db) => {
       const status = action === 'use' ? 'used' : 'wasted'
       db.prepare('UPDATE pantry SET status = ?, updated_at = ? WHERE id = ?').run(status, now, req.params.id)
       writeConsumeHistory(db, { name: item.name, amount: item.amount, unit: item.unit, price: item.price, event: status, pantryItemId: item.id })
+      emitActivity(req, { type: 'pantry.inv.modify', action: 'consume', id: Number(req.params.id), removed: true })
       return res.json({ removed: true })
     }
 
     // Partial amount consume
     db.prepare('UPDATE pantry SET amount = ?, updated_at = ? WHERE id = ?').run(newAmount, now, req.params.id)
     writeConsumeHistory(db, { name: item.name, amount: consumedInItemUnit, unit: item.unit, price: item.price, event: action === 'use' ? 'used' : 'wasted', pantryItemId: item.id })
-    res.json({ removed: false, item: db.prepare('SELECT * FROM pantry WHERE id = ?').get(req.params.id) })
+    const partialAmountRow = db.prepare('SELECT * FROM pantry WHERE id = ?').get(req.params.id)
+    emitActivity(req, { type: 'pantry.inv.modify', action: 'consume', id: Number(req.params.id), removed: false, row: partialAmountRow })
+    res.json({ removed: false, item: partialAmountRow })
   })
 
   // PATCH set status (used / wasted)
@@ -389,6 +402,9 @@ module.exports = (db) => {
     if (status === 'used' || status === 'wasted') {
       writeConsumeHistory(db, { name: item.name, amount: item.amount, unit: item.unit, pieces: item.pieces, price: item.price, event: status, pantryItemId: item.id })
     }
+    const statusRow = db.prepare('SELECT * FROM pantry WHERE id = ?').get(req.params.id)
+    const removed = status === 'used' || status === 'wasted'
+    emitActivity(req, { type: 'pantry.inv.modify', action: 'status', id: Number(req.params.id), removed, row: removed ? undefined : statusRow })
     res.json({ ok: true })
   })
 
@@ -398,6 +414,7 @@ module.exports = (db) => {
     if (!item) return res.status(404).json({ error: 'Item not found' })
     db.prepare('UPDATE pantry SET deleted_at = ?, updated_at = ? WHERE id = ?')
       .run(new Date().toISOString(), new Date().toISOString(), req.params.id)
+    emitActivity(req, { type: 'pantry.inv.modify', action: 'delete', id: Number(req.params.id), removed: true })
     res.json({ ok: true })
   })
 

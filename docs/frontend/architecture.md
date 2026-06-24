@@ -45,6 +45,15 @@ Each feature is split into two files: a thin route-wrapper (`FeatureHome.vue`) t
 
 HubView and Settings are single full-width views — they do not use `AppLayout`.
 
+## Live Activity (real-time sync)
+
+`ActivityToast.vue` (mounted in `App.vue` when logged in) owns a single SSE
+connection to `/api/events` via `useRealtime.ts`. Incoming events from other
+household accounts drive a coalescing bubble queue (one `AppToast` at a time)
+and a `grovely:activity` window event that mounted feature views listen to for
+in-place, page-conditional animations. See
+[Feature — Live Activity](features/live-activity.md).
+
 ## Views & Components
 ```
 src/

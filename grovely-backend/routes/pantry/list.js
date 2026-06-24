@@ -1,5 +1,6 @@
 const express = require('express')
 const router = express.Router()
+const { emitActivity } = require('../../realtime')
 
 const VALID_CATEGORIES = ['produce', 'dairy', 'meat', 'bakery', 'frozen', 'dry_goods', 'beverages', 'other']
 const CATEGORY_ORDER = VALID_CATEGORIES.join("','")
@@ -70,12 +71,15 @@ module.exports = (db) => {
       'INSERT INTO shopping_list (name, quantity, category, added_by, price, notes, amount, unit, density, density_unit, pieces, store) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     ).run(name.trim(), quantity?.trim() || null, cat, userId, priceVal, notes?.trim() || null, amountVal, unit || null, densityVal, densityUnitVal, piecesVal, store?.trim() || null)
     const item = db.prepare('SELECT * FROM shopping_list WHERE id = ?').get(result.lastInsertRowid)
+    emitActivity(req, { type: 'pantry.list.add', item: item.name, row: item })
     res.status(201).json(item)
   })
 
   // DELETE bulk-clear all checked items — must be before /:id
   router.delete('/checked', (req, res) => {
+    const cleared = db.prepare('SELECT id FROM shopping_list WHERE checked = 1').all().map(r => r.id)
     db.prepare('DELETE FROM shopping_list WHERE checked = 1').run()
+    emitActivity(req, { type: 'pantry.list.modify', action: 'clear', ids: cleared })
     res.json({ ok: true })
   })
 
@@ -146,7 +150,14 @@ module.exports = (db) => {
       db.prepare('UPDATE shopping_list SET store = ? WHERE id = ?').run(store?.trim() || null, id)
     }
 
-    res.json(db.prepare('SELECT * FROM shopping_list WHERE id = ?').get(id))
+    const updated = db.prepare('SELECT * FROM shopping_list WHERE id = ?').get(id)
+    emitActivity(req, {
+      type: 'pantry.list.modify',
+      action: checked !== undefined ? 'check' : 'edit',
+      id: Number(id),
+      row: updated
+    })
+    res.json(updated)
   })
 
   // DELETE single item
@@ -154,6 +165,9 @@ module.exports = (db) => {
     const item = db.prepare('SELECT id FROM shopping_list WHERE id = ?').get(req.params.id)
     if (!item) return res.status(404).json({ error: 'Item not found' })
     db.prepare('DELETE FROM shopping_list WHERE id = ?').run(req.params.id)
+    // A move-to-pantry deletes the list item as a side-effect; sync it but
+    // suppress its bubble (the move itself raises the only bubble we want).
+    emitActivity(req, { type: 'pantry.list.modify', action: 'delete', id: Number(req.params.id), silent: req.query.via === 'move' })
     res.json({ ok: true })
   })
 

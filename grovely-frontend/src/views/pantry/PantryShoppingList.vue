@@ -600,7 +600,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { API, apiFetch } from '../../api'
 import AppScroller from '@/components/ui/AppScroller.vue'
 import AppCheckbox from '@/components/ui/AppCheckbox.vue'
@@ -1313,7 +1313,10 @@ async function confirmMove() {
         store:        item.store ?? null,
       }),
     })
-    await apiFetch(`${API}/pantry/list/${item.id}`, { method: 'DELETE' })
+    // ?via=move marks this delete as a side-effect of the move so the other
+    // account syncs the removal without a separate "modified the shopping list"
+    // bubble (the move already raises a "moved to the pantry" bubble).
+    await apiFetch(`${API}/pantry/list/${item.id}?via=move`, { method: 'DELETE' })
     items.value = items.value.filter(i => i.id !== item.id)
   }
   emit('moved')
@@ -1363,7 +1366,37 @@ function onAutocompleteSelect(row) {
   newStore.value = row.store ?? ''
 }
 
-onMounted(() => { load(); fetchSettings(); fetchLicenseStatus() })
+// Live activity — surgical merge of another account's shopping-list changes into
+// the reactive array; the existing item-scale TransitionGroup animates them in.
+// Only active while this view is mounted (page-conditional animation).
+function applyListEvent(ev) {
+  if (ev.type === 'pantry.list.add') {
+    if (ev.row && !items.value.some(i => i.id === ev.row.id)) items.value.push(ev.row)
+  } else if (ev.type === 'pantry.list.modify') {
+    if (ev.action === 'delete') {
+      items.value = items.value.filter(i => i.id !== ev.id)
+    } else if (ev.action === 'clear') {
+      const ids = ev.ids || []
+      items.value = items.value.filter(i => !ids.includes(i.id))
+    } else if (ev.row) {
+      const idx = items.value.findIndex(i => i.id === ev.row.id)
+      if (idx >= 0) items.value[idx] = ev.row
+      else items.value.push(ev.row)
+    }
+  }
+}
+function onActivity(e) { applyListEvent(e.detail || {}) }
+function onResync() { load() }
+
+onMounted(() => {
+  load(); fetchSettings(); fetchLicenseStatus()
+  window.addEventListener('grovely:activity', onActivity)
+  window.addEventListener('grovely:resync', onResync)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('grovely:activity', onActivity)
+  window.removeEventListener('grovely:resync', onResync)
+})
 </script>
 
 <style scoped>

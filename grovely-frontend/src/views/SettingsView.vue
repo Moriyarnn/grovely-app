@@ -29,7 +29,7 @@
       </div>
 
       <div class="sv-subgroup">
-        <p class="sv-sub-label">Appearance</p>
+        <p class="sv-sub-label">Main</p>
         <div class="sv-list">
           <div class="sv-row sv-row--stub">
             <span class="sv-label">Language / locale</span>
@@ -98,6 +98,32 @@
           <div class="sv-row sv-row--stub">
             <span class="sv-label">Themes</span>
             <span class="sv-soon">Coming soon</span>
+          </div>
+          <div class="sv-row">
+            <div class="sv-label-group">
+              <span class="sv-label">Broadcast my activity</span>
+              <span class="sv-sublabel">Let your household see when you make changes</span>
+            </div>
+            <button
+              class="sv-switch"
+              :class="{ 'sv-switch--on': liveBroadcast }"
+              role="switch"
+              :aria-checked="liveBroadcast"
+              @click="updatePreference('live_activity_broadcast', liveBroadcast ? '0' : '1')"
+            ><span class="sv-switch-knob" /></button>
+          </div>
+          <div class="sv-row">
+            <div class="sv-label-group">
+              <span class="sv-label">Show live activity</span>
+              <span class="sv-sublabel">See live updates and bubbles from your household</span>
+            </div>
+            <button
+              class="sv-switch"
+              :class="{ 'sv-switch--on': liveReceive }"
+              role="switch"
+              :aria-checked="liveReceive"
+              @click="updatePreference('live_activity_receive', liveReceive ? '0' : '1')"
+            ><span class="sv-switch-knob" /></button>
           </div>
         </div>
       </div>
@@ -264,6 +290,10 @@ const premiumGateOpen = ref(false)
 
 const notifLocked = computed(() => licenseActive.value === false)
 const backupsLocked = computed(() => licenseActive.value === false)
+
+// Live activity toggles — per-user preferences, default on when the row is absent.
+const liveBroadcast = computed(() => (preferences.value.live_activity_broadcast ?? '1') === '1')
+const liveReceive = computed(() => (preferences.value.live_activity_receive ?? '1') === '1')
 
 function onNotifMessagesClick() {
   if (licenseActive.value === true) {
@@ -474,6 +504,22 @@ function resetHints() {
 .sv-label { font-size: 14px; color: #1a1a1a; }
 .sv-label-group { display: flex; flex-direction: column; gap: 2px; }
 .sv-sublabel { font-size: 12px; color: #8e8e93; }
+
+/* Live activity switches */
+.sv-switch {
+  position: relative; flex-shrink: 0;
+  width: 40px; height: 24px; border-radius: 999px;
+  border: none; background: #d9d9de; cursor: pointer; padding: 0;
+  transition: background 0.18s ease;
+}
+.sv-switch--on { background: #993556; }
+.sv-switch-knob {
+  position: absolute; top: 2px; left: 2px;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+  transition: transform 0.18s ease;
+}
+.sv-switch--on .sv-switch-knob { transform: translateX(16px); }
 
 .sv-row-end { display: flex; align-items: center; gap: 7px; flex-shrink: 0; }
 .sv-soon {

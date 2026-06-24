@@ -1,5 +1,10 @@
 # API Endpoints
 
+## Live Activity (SSE)
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/events?token=<jwt>` | Server-Sent Events stream. Pushes live activity from other accounts. Token passed as a query param (EventSource cannot set headers). See [Live Activity](live-activity.md). |
+
 ## Cycles
 | Method | Path | Description |
 |--------|------|-------------|

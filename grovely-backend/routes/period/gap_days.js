@@ -1,7 +1,8 @@
 const express = require('express')
 const router = express.Router()
 const { requireOwner } = require('../../middleware/auth')
-const { encrypt, revealPrivateFields } = require('../../utils/encryption')
+const { encrypt, revealPrivateFields, partnerSettingEnabled } = require('../../utils/encryption')
+const { emitActivity } = require('../../realtime')
 
 module.exports = (db) => {
   // Get all gap day logs. Gap logs belong to the period owner (owner1 is the
@@ -20,7 +21,7 @@ module.exports = (db) => {
 
   // Create a gap day log
   router.post('/', requireOwner, (req, res) => {
-    const { date, notes, symptoms } = req.body
+    const { date, notes, symptoms, visibleChange } = req.body
     if (!date) return res.status(400).json({ error: 'date is required' })
 
     const result = db.prepare(`
@@ -38,6 +39,11 @@ module.exports = (db) => {
       symptoms.forEach(s => ins.run(id, s))
     }
 
+    // See cycle_days PATCH: suppress notes-only changes when notes are hidden
+    // from the partner. visibleChange = did symptoms change (gap days have no flow).
+    if (visibleChange !== false || partnerSettingEnabled(db, 'partner_can_read_notes')) {
+      emitActivity(req, { type: 'period.change', action: 'create', dates: [date] })
+    }
     res.json({ id, date })
   })
 
@@ -47,7 +53,8 @@ module.exports = (db) => {
     const row = db.prepare('SELECT id FROM gap_day_logs WHERE id = ? AND user_id = ?').get(id, req.user.id)
     if (!row) return res.status(404).json({ error: 'Not found' })
 
-    const { notes, symptoms } = req.body
+    const { notes, symptoms, visibleChange } = req.body
+    const existing = db.prepare('SELECT date FROM gap_day_logs WHERE id = ?').get(id)
     db.prepare('UPDATE gap_day_logs SET notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
       .run(encrypt(notes || null), id)
 
@@ -59,17 +66,24 @@ module.exports = (db) => {
       }
     }
 
+    // Suppress notes-only edits when notes are hidden from the partner (symptoms
+    // are the only partner-visible gap-day field; the marker already exists).
+    if (visibleChange !== false || partnerSettingEnabled(db, 'partner_can_read_notes')) {
+      emitActivity(req, { type: 'period.change', action: 'update', dates: existing ? [existing.date] : [] })
+    }
     res.json({ success: true })
   })
 
   // Delete a gap day log
   router.delete('/:id', requireOwner, (req, res) => {
     const id = Number(req.params.id)
-    const row = db.prepare('SELECT id FROM gap_day_logs WHERE id = ? AND user_id = ?').get(id, req.user.id)
+    const row = db.prepare('SELECT id, date FROM gap_day_logs WHERE id = ? AND user_id = ?').get(id, req.user.id)
     if (!row) return res.status(404).json({ error: 'Not found' })
 
     db.prepare('DELETE FROM gap_day_symptoms WHERE gap_day_id = ?').run(id)
     db.prepare('DELETE FROM gap_day_logs WHERE id = ?').run(id)
+    // Deleting removes the visible gap-day marker for the partner - always notify.
+    emitActivity(req, { type: 'period.change', action: 'delete', dates: [row.date] })
     res.json({ success: true })
   })
 

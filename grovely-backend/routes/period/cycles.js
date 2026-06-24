@@ -3,6 +3,7 @@ const router = express.Router()
 const { logPeriodEvent } = require('../../logger')
 const { requireOwner } = require('../../middleware/auth')
 const { recomputeAllPredictions } = require('./_calcHelpers')
+const { emitActivity } = require('../../realtime')
 
 module.exports = (db) => {
   // Get all cycles with last logged day
@@ -34,6 +35,7 @@ module.exports = (db) => {
     const id = result.lastInsertRowid
     logPeriodEvent(db, { entity: 'cycle', entity_id: id, action: 'create', cycle_id: id, date: start_date })
     recomputeAllPredictions(db)
+    emitActivity(req, { type: 'period.change', action: 'cycle', dates: [start_date] })
     res.json({ id, start_date })
   })
 
@@ -48,6 +50,7 @@ module.exports = (db) => {
     db.prepare('UPDATE cycles SET start_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(start_date, id)
     logPeriodEvent(db, { entity: 'cycle', entity_id: id, action: 'update', cycle_id: id, date: start_date })
     recomputeAllPredictions(db)
+    emitActivity(req, { type: 'period.change', action: 'cycle', dates: [start_date] })
     res.json({ success: true })
   })
 
@@ -66,6 +69,7 @@ module.exports = (db) => {
     }
     logPeriodEvent(db, { entity: 'cycle', entity_id: id, action: 'update', cycle_id: id, date: end_date })
     recomputeAllPredictions(db)
+    emitActivity(req, { type: 'period.change', action: 'cycle', dates: [end_date] })
     res.json({ success: true })
   })
 
@@ -85,6 +89,7 @@ module.exports = (db) => {
       .run(newStart, newEnd, id)
     logPeriodEvent(db, { entity: 'cycle', entity_id: id, action: 'update', cycle_id: id, date: newStart })
     recomputeAllPredictions(db)
+    emitActivity(req, { type: 'period.change', action: 'cycle', dates: [newStart] })
     res.json({ id, start_date: newStart, end_date: newEnd })
   })
 
@@ -97,6 +102,7 @@ module.exports = (db) => {
     if (!db.prepare('SELECT id FROM cycles WHERE id = ?').get(id)) return res.status(404).json({ error: 'Cycle not found' })
     db.prepare('UPDATE cycles SET review_state = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(reviewState ?? null, id)
     recomputeAllPredictions(db)
+    emitActivity(req, { type: 'period.change', action: 'cycle', dates: [] })
     res.json({ success: true })
   })
 
@@ -105,6 +111,7 @@ module.exports = (db) => {
     const { ovulation_date } = req.body
     db.prepare('UPDATE cycles SET ovulation_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(ovulation_date ?? null, req.params.id)
     recomputeAllPredictions(db)
+    emitActivity(req, { type: 'period.change', action: 'cycle', dates: [] })
     res.json({ success: true })
   })
 
@@ -122,6 +129,7 @@ module.exports = (db) => {
     db.prepare('DELETE FROM cycles WHERE id = ?').run(id)
     if (cycle) logPeriodEvent(db, { entity: 'cycle', entity_id: id, action: 'delete', cycle_id: id, date: cycle.start_date })
     recomputeAllPredictions(db)
+    emitActivity(req, { type: 'period.change', action: 'cycle', dates: cycle ? [cycle.start_date] : [] })
     res.json({ success: true })
   })
 

@@ -162,6 +162,7 @@ module.exports = {
   decrypt,
   isEncrypted,
   revealPrivateFields,
+  partnerSettingEnabled,
   encryptExistingRows,
   PRIVATE_FIELDS,
 }

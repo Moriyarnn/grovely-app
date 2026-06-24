@@ -232,6 +232,25 @@ const stats = computed(() => [
 // Both arrays are required on every entry.
 const CHANGELOG = [
   {
+    version: 'v0.13.0',
+    title: 'Live updates + Launch prep',
+    date: 'June 23, 2026',
+    fixes: [178, 176, 177, 173, 90, 103, 167, 168, 169, 171, 172, 170],
+    items: [
+      { plan: 'Free',    text: 'Live activity - partner changes appear instantly with a brief bubble showing who did what. Can be disabled per account in Settings' },
+      { plan: 'Free',    text: 'Current Phase card accuracy improved - active cycle takes priority over stale gap predictions, confidence badge shows Logged or Calculated correctly' },
+      { plan: 'Free',    text: 'Easy install scripts for Linux, Mac, and Windows - guided setup, no manual config file editing needed' },
+      { plan: 'Free',    text: 'Private period notes encrypted at rest - partner cannot read them even from an exported backup' },
+      { plan: 'Free',    text: 'Predictions now advance when a period is not logged - missed predictions persist on the calendar with fertile windows and ovulation markers' },
+    ],
+    mobile: [
+      { plan: 'Free',    text: 'Live activity - partner changes appear instantly with a brief bubble' },
+      { plan: 'Free',    text: 'Current Phase card accuracy improved' },
+      { plan: 'Free',    text: 'Easy install scripts for Linux, Mac, and Windows' },
+      { plan: 'Free',    text: 'Predictions advance when a period is not logged' },
+    ],
+  },
+  {
     version: 'v0.12.0',
     title: 'Grovely + PWA + Notifications + Backups',
     date: 'May 21, 2026',

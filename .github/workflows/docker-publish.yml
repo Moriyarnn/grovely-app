@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   packages: write
 
 jobs:
@@ -88,3 +88,33 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.name }}
           cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+
+  release-assets:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract version
+        id: version
+        run: echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare release assets
+        run: |
+          mkdir release
+          # Stamp GROVELY_VERSION and output as .env (ready to use, no rename needed)
+          sed "s/^GROVELY_VERSION=.*/GROVELY_VERSION=${{ steps.version.outputs.tag }}/" .env.example > release/.env
+          cp docker-compose.yml release/docker-compose.yml
+          cp docker-compose.proxy-host.yml release/docker-compose.proxy-host.yml
+          cp docker-compose.proxy-docker.yml release/docker-compose.proxy-docker.yml
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release/docker-compose.yml
+            release/docker-compose.proxy-host.yml
+            release/docker-compose.proxy-docker.yml
+            release/.env
