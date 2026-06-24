@@ -33,10 +33,10 @@ mkdir grovely && cd grovely
 
 ```bash
 curl -O https://raw.githubusercontent.com/Moriyarnn/grovely-app/main/docker-compose.yml
-curl -o .env https://raw.githubusercontent.com/Moriyarnn/grovely-app/main/.env.example
+curl -o .env https://raw.githubusercontent.com/Moriyarnn/grovely-app/main/example.env
 ```
 
-The `.env.example` file is the canonical reference for every supported variable, with inline notes explaining what each one does (accounts, license, SMTP, backups, timezone, etc.). Open it, fill in `OWNER1_*` and `OWNER2_*`, leave the rest commented until you need it.
+The `example.env` file is the canonical reference for every supported variable, with inline notes explaining what each one does (accounts, license, SMTP, backups, timezone, etc.). Open it, fill in `OWNER1_*` and `OWNER2_*`, leave the rest commented until you need it.
 
 If you'd rather start from scratch, the absolute minimum to boot Grovely is:
 
@@ -48,7 +48,7 @@ OWNER2_PASSWORD=change-me
 DISABLE_EMAIL=true
 ```
 
-Drop that into a file called `.env` next to `docker-compose.yml` and you're ready. Pull `.env.example` later when you want to enable notifications, backups, or a license.
+Drop that into a file called `.env` next to `docker-compose.yml` and you're ready. Pull `example.env` later when you want to enable notifications, backups, or a license.
 
 ### Step 3 (optional): validate your `.env`
 
@@ -82,7 +82,7 @@ Use this when your reverse proxy runs directly on the host OS, not in Docker. Gr
 mkdir grovely && cd grovely
 curl -O https://raw.githubusercontent.com/Moriyarnn/grovely-app/main/docker-compose.yml
 curl -O https://raw.githubusercontent.com/Moriyarnn/grovely-app/main/docker-compose.proxy-host.yml
-curl -o .env https://raw.githubusercontent.com/Moriyarnn/grovely-app/main/.env.example
+curl -o .env https://raw.githubusercontent.com/Moriyarnn/grovely-app/main/example.env
 ```
 
 Fill in your `.env` (see Step 2 of section 1).
@@ -160,7 +160,7 @@ If you already have a shared network with a different name (e.g. `web`, `traefik
 mkdir grovely && cd grovely
 curl -O https://raw.githubusercontent.com/Moriyarnn/grovely-app/main/docker-compose.yml
 curl -O https://raw.githubusercontent.com/Moriyarnn/grovely-app/main/docker-compose.proxy-docker.yml
-curl -o .env https://raw.githubusercontent.com/Moriyarnn/grovely-app/main/.env.example
+curl -o .env https://raw.githubusercontent.com/Moriyarnn/grovely-app/main/example.env
 ```
 
 Fill in your `.env` (see Step 2 of section 1).
@@ -185,7 +185,7 @@ For Traefik, you'd typically use container labels. For Nginx Proxy Manager, add 
 
 ## Configuration
 
-Everything Grovely accepts is documented inline in [`.env.example`](https://github.com/Moriyarnn/grovely-app/blob/main/.env.example), with comments explaining each variable. The quick summary:
+Everything Grovely accepts is documented inline in [`example.env`](https://github.com/Moriyarnn/grovely-app/blob/main/example.env), with comments explaining each variable. The quick summary:
 
 **Required**
 

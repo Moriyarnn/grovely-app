@@ -105,7 +105,7 @@ jobs:
         run: |
           mkdir release
           # Stamp GROVELY_VERSION and output as .env (ready to use, no rename needed)
-          sed "s/^GROVELY_VERSION=.*/GROVELY_VERSION=${{ steps.version.outputs.tag }}/" .env.example > release/.env
+          sed "s/^GROVELY_VERSION=.*/GROVELY_VERSION=${{ steps.version.outputs.tag }}/" example.env > release/example.env
           cp docker-compose.yml release/docker-compose.yml
           cp docker-compose.proxy-host.yml release/docker-compose.proxy-host.yml
           cp docker-compose.proxy-docker.yml release/docker-compose.proxy-docker.yml
@@ -117,4 +117,4 @@ jobs:
             release/docker-compose.yml
             release/docker-compose.proxy-host.yml
             release/docker-compose.proxy-docker.yml
-            release/.env
+            release/example.env

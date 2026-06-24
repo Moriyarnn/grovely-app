@@ -28,7 +28,7 @@ echo
 if [ ! -f "$ENV_FILE" ]; then
   err "$ENV_FILE not found in the current directory."
   echo "       Download the template with:"
-  echo "         curl -o .env https://raw.githubusercontent.com/Moriyarnn/grovely-app/main/.env.example"
+  echo "         curl -o .env https://raw.githubusercontent.com/Moriyarnn/grovely-app/main/example.env"
   exit 1
 fi
 
@@ -106,7 +106,7 @@ else
     info "LICENSE_KEY is set but DISABLE_EMAIL=true — premium email notifications are disabled. Set DISABLE_EMAIL=false to receive period, fertile window, and pantry alerts."
   else
     if [ "$mail_configured" = "false" ]; then
-      warn "Email is enabled (DISABLE_EMAIL=false) and you have a license, but MAIL_USER/MAIL_PASSWORD are unset. Notifications will not send. See .env.example for SMTP setup."
+      warn "Email is enabled (DISABLE_EMAIL=false) and you have a license, but MAIL_USER/MAIL_PASSWORD are unset. Notifications will not send. See example.env for SMTP setup."
     fi
     if [ -z "$account1_email" ] || [ "$account1_email" = "you@example.com" ]; then
       warn "ACCOUNT1_EMAIL is unset or still the placeholder — no notifications will reach the primary owner."
@@ -114,7 +114,7 @@ else
   fi
 
   if [ -z "$s3_any" ] && [ -z "$webdav_any" ]; then
-    info "No off-site backup target configured (BACKUP_S3_* or BACKUP_WEBDAV_*). The premium scheduled backup runs locally only. The free in-app manual backup is always available. See .env.example for off-site setup."
+    info "No off-site backup target configured (BACKUP_S3_* or BACKUP_WEBDAV_*). The premium scheduled backup runs locally only. The free in-app manual backup is always available. See example.env for off-site setup."
   fi
 
   # If any S3 var is set, require the full set

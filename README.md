@@ -157,7 +157,7 @@ Open **http://localhost:5173** and log in.
 ```bash
 mkdir grovely && cd grovely
 curl -O https://raw.githubusercontent.com/Moriyarnn/grovely-app/main/docker-compose.yml
-curl -o .env https://raw.githubusercontent.com/Moriyarnn/grovely-app/main/.env.example
+curl -o .env https://raw.githubusercontent.com/Moriyarnn/grovely-app/main/example.env
 ```
 
 Edit `.env` and set the usernames and passwords for both accounts, then:
