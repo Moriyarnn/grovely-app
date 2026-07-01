@@ -34,7 +34,7 @@ Both flows write to the same tables and produce the same shape of data.
 
 ## Calculations (`GET /api/period/calculations/summary`)
 
-Returns the following for the frontend summary strip. The notification cron has its own `getSummary()` in `notifications/index.js` that *mirrors* this logic as a simpler variant (no stored-prediction reuse, no prediction-error correction) — this endpoint is the authoritative one.
+Returns the following for the frontend summary strip. The notification cron has its own `getSummary()` in `notifications/index.js` that *mirrors* this logic as a simpler variant: it computes `nextPeriodDate` inline (same `avgPredictionError` correction) and reads the fertile window and ovulation from the stored predictions via the shared `upcomingFertileWindow` helper, so notification emails, this endpoint, and the calendar always agree. This endpoint is the authoritative one.
 
 | Field | Description |
 |-------|-------------|
@@ -49,6 +49,8 @@ Returns the following for the frontend summary strip. The notification cron has 
 | `dataWarnings` | Future-dated cycles, sub-21-day gaps, and over-10-day period entries are surfaced (and excluded from averages) here. |
 
 Predictions unlock once there are ≥2 measurable cycle gaps (or 1 cycle when a `period_cycle_seed` is set, `minCyclesRequired` = 1). Below that, prediction fields return `null` and `note` explains the threshold.
+
+**Prediction-accuracy correction.** `avgPredictionError` is a recency-weighted EMA of how far past predictions landed from actual cycle starts (pairs more than ±14 days apart are excluded as artifacts such as backlogged history or skipped cycles; excluded means *not counted*, not counted as zero). It is applied to `nextPeriodDate` and, via `recomputeAllPredictions` in `_calcHelpers.js`, baked into the stored fertile-window and ovulation predictions - so the calendar, PeriodDetail, and notification emails shift together instead of disagreeing. **Known limitation:** the correction is currently one-sided. Because `predicted_start_date` is frozen at log time and is always a future-dated projection, a logged cycle's error (`actual − predicted`) is effectively always ≤ 0, so the correction can pull predictions earlier but never later. Tracked in issue #183.
 
 **Lead-up reminder suppression.** The notification cron's "X days before period" reminders are gated on `!currentCycle` *and* an exactly-N-day prediction distance. Logging a period — day-by-day or as a retrospective range — stops them on the next daily run, both because `currentCycle` becomes non-null and because the prediction recalculates forward by ~one cycle. An email already sent earlier the same day is not retracted. Full contract in [notifications.md](notifications.md#days-before-period-reminder-suppression-contract).
 

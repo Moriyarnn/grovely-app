@@ -205,7 +205,7 @@
             </div>
           </div>
           <div v-if="sheetItem?.quantity && sheetItem?.amount == null && sheetItem?.pieces == null" class="legacy-qty-hint">
-            Previously: {{ sheetItem.quantity }} — enter below to convert
+            Previously: {{ sheetItem.quantity }} - enter below to convert
           </div>
           <div class="edit-inline-row">
             <div class="item-edit-field item-edit-field--expiry">
@@ -314,7 +314,7 @@
       <template v-else>
         <div class="expired-clean">
           <v-icon size="14" color="#16a34a">mdi-check-circle-outline</v-icon>
-          <span class="expired-clean-text">No expired items — pantry is fresh</span>
+          <span class="expired-clean-text">No expired items - pantry is fresh</span>
         </div>
       </template>
     </div>
@@ -676,11 +676,11 @@ const consumeDescription = computed(() => {
       }
       return `${n} of ${consumeItem.value.pieces} pieces marked as ${verb}. ${consumeItem.value.pieces - n} remaining.`
     }
-    return `No tracked amount — this will mark the item as ${verb} and remove it from your pantry.`
+    return `No tracked amount - this will mark the item as ${verb} and remove it from your pantry.`
   }
   if (consumeIsAll.value) {
     const totalStr = clampNumber(consumeItem.value.amount, 8)
-    return `${totalStr} ${consumeItem.value.unit} — the full amount will be removed from your pantry.`
+    return `${totalStr} ${consumeItem.value.unit} - the full amount will be removed from your pantry.`
   }
   const consumed = parseFloat(consumeAmount.value) || 0
   if (!consumed) return `Enter how much you ${verb}.`
@@ -688,7 +688,7 @@ const consumeDescription = computed(() => {
   const sameUnit = consumeUnit.value === itemUnit
   const convertedConsumed = convertToUnit(consumed, consumeUnit.value, itemUnit, consumeItem.value.density, consumeItem.value.density_unit)
   if (convertedConsumed === null) {
-    return `Can't convert ${consumeUnit.value} to ${itemUnit} — please use a compatible unit.`
+    return `Can't convert ${consumeUnit.value} to ${itemUnit} - please use a compatible unit.`
   }
   const remainder = parseFloat((consumeItem.value.amount - convertedConsumed).toPrecision(8))
   const consumedStr = clampNumber(consumed, 8)
@@ -702,7 +702,7 @@ const consumeDensityHint = computed(() => {
   if (!consumeItem.value) return ''
   if (consumeItem.value.density && consumeItem.value.density_unit) {
     const densityStr = clampNumber(consumeItem.value.density, 8)
-    return `Density ${densityStr} ${consumeItem.value.density_unit} — extra units available.`
+    return `Density ${densityStr} ${consumeItem.value.density_unit} - extra units available.`
   }
   const itemUnit = consumeItem.value.unit
   const isWeight = ['g', 'kg'].includes(itemUnit)

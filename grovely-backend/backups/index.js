@@ -358,11 +358,11 @@ function getTableColumns (db, table) {
 
 function restoreFromSnapshot (db, backup, { recompute } = {}) {
   if (!backup?.meta || !backup?.data) {
-    return { status: 400, error: 'Invalid backup file — missing meta or data.' }
+    return { status: 400, error: 'Invalid backup file - missing meta or data.' }
   }
   const { schema_version, min_compatible_schema } = backup.meta
   if (typeof schema_version !== 'number' || typeof min_compatible_schema !== 'number') {
-    return { status: 400, error: 'Invalid backup file — meta fields must be numbers.' }
+    return { status: 400, error: 'Invalid backup file - meta fields must be numbers.' }
   }
 
   const currentSchema = getSchemaVersion(db)
@@ -393,7 +393,7 @@ function restoreFromSnapshot (db, backup, { recompute } = {}) {
         if (!Array.isArray(rows) || rows.length === 0) continue
         const currentColumns = getTableColumns(db, table)
         if (!currentColumns) {
-          warnings.push(`Table "${table}" not found in your app — skipped.`)
+          warnings.push(`Table "${table}" not found in your app - skipped.`)
           continue
         }
         for (const row of rows) {

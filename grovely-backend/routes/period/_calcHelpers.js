@@ -96,7 +96,7 @@ function recomputeAllPredictions(db) {
 
   if (cycles.length === 0) return
 
-  const { avgCycleLength, avgLutealPhase } = computeCycleParams(db)
+  const { avgCycleLength, avgLutealPhase, avgPredictionError } = computeCycleParams(db)
 
   const stmt = db.prepare(`
     UPDATE cycles SET
@@ -109,10 +109,49 @@ function recomputeAllPredictions(db) {
 
   db.transaction(() => {
     for (const cycle of cycles) {
-      const p = computePredictionsForCycle(cycle.start_date, avgCycleLength, avgLutealPhase)
+      const p = computePredictionsForCycle(cycle.start_date, avgCycleLength, avgLutealPhase, avgPredictionError)
       stmt.run(p.predicted_fertile_start, p.predicted_fertile_end, p.predicted_ovulation_date, cycle.id)
     }
   })()
 }
 
-module.exports = { computeCycleParams, computePredictionsForCycle, recomputeAllPredictions }
+// Returns the upcoming fertile window + ovulation for the most recent cycle, mirroring
+// the calendar/PeriodDetail logic so the email never disagrees with the UI:
+//   1. the stored window on lastCycle, while it hasn't fully passed (end >= today)
+//   2. otherwise advance through successive predicted cycles (the missed-prediction /
+//      nextFertileWindow chain) until a window whose end is today or later
+// `today` is a 'YYYY-MM-DD' string; ISO dates compare correctly as strings.
+function upcomingFertileWindow(db, lastCycle, today) {
+  if (!lastCycle) return { fertileWindow: null, ovulationDate: null }
+
+  // 1. Stored window on the most recent cycle — same value the calendar paints
+  if (lastCycle.predicted_fertile_start && lastCycle.predicted_fertile_end
+      && lastCycle.predicted_fertile_end >= today) {
+    return {
+      fertileWindow: { start: lastCycle.predicted_fertile_start, end: lastCycle.predicted_fertile_end },
+      ovulationDate: lastCycle.ovulation_date ?? lastCycle.predicted_ovulation_date ?? null
+    }
+  }
+
+  // 2. Stored window has passed un-logged — advance to the next predicted window
+  const { avgCycleLength, avgLutealPhase, avgPredictionError } = computeCycleParams(db)
+  const step = avgCycleLength + Math.round(avgPredictionError)
+  if (step <= 0) return { fertileWindow: null, ovulationDate: null } // guard against runaway loop
+
+  let anchor = lastCycle.start_date
+  for (let i = 0; i < 24; i++) {
+    const p = computePredictionsForCycle(anchor, avgCycleLength, avgLutealPhase, avgPredictionError)
+    if (p.predicted_fertile_end >= today) {
+      return {
+        fertileWindow: { start: p.predicted_fertile_start, end: p.predicted_fertile_end },
+        ovulationDate: p.predicted_ovulation_date
+      }
+    }
+    const next = new Date(anchor + 'T00:00:00')
+    next.setDate(next.getDate() + step)
+    anchor = next.toISOString().split('T')[0]
+  }
+  return { fertileWindow: null, ovulationDate: null }
+}
+
+module.exports = { computeCycleParams, computePredictionsForCycle, recomputeAllPredictions, upcomingFertileWindow }

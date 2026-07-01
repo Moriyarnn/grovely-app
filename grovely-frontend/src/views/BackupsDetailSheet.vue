@@ -10,12 +10,14 @@
   >
     <div class="bk-body" :class="{ 'bk-body--no-warnings': !hasWarnings }">
 
-      <!-- Env-var warnings -->
-      <div v-if="status && !status.enabled" class="bk-warning bk-warning--soft">
+      <!-- Env-var / state warnings. Hidden in the demo: there is no server to
+           configure remotes on, and the enable toggle is gated, so these nags
+           would be noise. -->
+      <div v-if="!isDemo && status && !status.enabled" class="bk-warning bk-warning--soft">
         <v-icon size="14" color="#a16207">mdi-information-outline</v-icon>
         <span>Scheduled backups are off. Enable below to start the daily run; manual exports are unaffected.</span>
       </div>
-      <div v-if="status && status.enabled && configuredTargetCount === 0" class="bk-warning bk-warning--soft">
+      <div v-if="!isDemo && status && status.enabled && configuredTargetCount === 0" class="bk-warning bk-warning--soft">
         <v-icon size="14" color="#a16207">mdi-information-outline</v-icon>
         <span>No remote destination configured. Snapshots will be written locally only.</span>
       </div>
@@ -46,7 +48,7 @@
                 type="time"
                 class="bk-time-input"
                 :value="settings.backup_schedule_time ?? '03:00'"
-                @change="e => updateSetting('backup_schedule_time', (e.target as HTMLInputElement).value)"
+                @change="onScheduleTimeChange"
               />
             </div>
           </div>
@@ -353,7 +355,7 @@
                       max="365"
                       class="bk-number-input"
                       :value="settings.backup_retention_count ?? '7'"
-                      @change="e => updateSetting('backup_retention_count', (e.target as HTMLInputElement).value)"
+                      @change="onRetentionChange"
                     />
                     <span class="bk-retention-suffix">snapshots</span>
                   </div>
@@ -481,6 +483,24 @@ function close() {
 
 const { settings, fetchSettings, updateSetting } = useSettings()
 
+// Build-time demo flag (literal false in the normal build, so demo-only
+// branches dead-code eliminate).
+const isDemo = __DEMO__
+
+// DEMO GATE: backups are a server-only feature (cron, remote storage, disk). In
+// the demo the menu is fully browsable - the read endpoints run for real - but
+// every action that would change or transfer something shows the self-host
+// dialog instead. Returns true when handled (demo), so callers early-return.
+// The dynamic import inside `if (__DEMO__)` dead-code eliminates in the normal
+// build, so this entire path leaves the production bundle.
+function demoGate(): boolean {
+  if (__DEMO__) {
+    import('../composables/useDemo').then(m => m.openDemoFeature('scheduled-backups'))
+    return true
+  }
+  return false
+}
+
 const status  = ref<StatusPayload | null>(null)
 const history = ref<BackupRow[]>([])
 const expandedId = ref<number | null>(null)
@@ -494,6 +514,7 @@ const keepAll = computed(() => parseInt(settings.value.backup_retention_count ??
 const previousRetention = ref('7')
 
 async function toggleKeepAll() {
+  if (demoGate()) return
   if (keepAll.value) {
     await updateSetting('backup_retention_count', previousRetention.value)
   } else {
@@ -503,6 +524,7 @@ async function toggleKeepAll() {
 }
 
 const hasWarnings = computed(() => {
+  if (isDemo) return false
   if (!status.value) return false
   if (!status.value.enabled) return true
   if (status.value.enabled && configuredTargetCount.value === 0) return true
@@ -543,6 +565,7 @@ const runSending = ref(false)
 const runResult  = ref<'ok' | 'partial' | 'error' | null>(null)
 
 async function runNow() {
+  if (demoGate()) return
   if (runSending.value) return
   runSending.value = true
   runResult.value  = null
@@ -567,7 +590,17 @@ async function runNow() {
 
 // ── Toggle ──────────────────────────────────────────────────────────────────
 
+function onScheduleTimeChange(e: Event) {
+  if (demoGate()) return
+  updateSetting('backup_schedule_time', (e.target as HTMLInputElement).value)
+}
+function onRetentionChange(e: Event) {
+  if (demoGate()) return
+  updateSetting('backup_retention_count', (e.target as HTMLInputElement).value)
+}
+
 async function toggleEnabled() {
+  if (demoGate()) return
   const next = enabledLive.value ? '0' : '1'
   await updateSetting('backup_schedule_enabled', next)
   await refresh()
@@ -694,6 +727,7 @@ const storageDestinations = computed(() => destinationsList.value)
 // ── Destination toggle + Enable all ─────────────────────────────────────────
 
 async function toggleDestination(id: 'local' | 's3' | 'webdav') {
+  if (demoGate()) return
   if (id === 'local') return
   const key = id === 's3' ? 'backup_dest_s3_enabled' : 'backup_dest_webdav_enabled'
   const cur = settings.value[key] === '1'
@@ -703,6 +737,7 @@ async function toggleDestination(id: 'local' | 's3' | 'webdav') {
 const enableAllFlash = ref(false)
 
 async function enableAllDestinations() {
+  if (demoGate()) return
   const dests = status.value?.destinations
   if (dests?.s3.config_state === 'configured')     await updateSetting('backup_dest_s3_enabled',     '1')
   if (dests?.webdav.config_state === 'configured') await updateSetting('backup_dest_webdav_enabled', '1')
@@ -813,6 +848,7 @@ const downloadFlashFile = ref<string | null>(null)
 const downloadErrorFile = ref<string | null>(null)
 
 async function downloadFile(file: AvailableFile) {
+  if (demoGate()) return
   if (downloadingFile.value) return
   downloadingFile.value  = file.filename
   downloadErrorFile.value = null
@@ -861,6 +897,7 @@ const restoreErrorFile    = ref<string | null>(null)
 const restoreConfirmFile  = ref<AvailableFile | null>(null)
 
 function confirmRestore(file: AvailableFile) {
+  if (demoGate()) return
   restoreConfirmFile.value = file
 }
 

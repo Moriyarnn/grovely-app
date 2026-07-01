@@ -112,6 +112,11 @@ function handleMessage(e: MessageEvent): void {
 }
 
 function connect(): void {
+  // DEMO GATE: the live-activity stream is a real SSE connection to the server.
+  // The demo is single-user and runs entirely in the tab, so it never opens one
+  // (keeps the "nothing leaves your browser" guarantee literally true). Compiled
+  // out of the normal build.
+  if (__DEMO__) return
   if (es) return
   const token = getToken()
   if (!token) return

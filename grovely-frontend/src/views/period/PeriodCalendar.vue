@@ -174,7 +174,7 @@
       confirm-label="Yes, apply"
       confirm-color="#b45309"
       @confirm="confirmLongCycleAdjust"
-    >This would make the period <strong>{{ longCycleDays }} days</strong> long — most periods last 3–7 days.<br><span style="font-size:11px;color:#b45309;">Are you sure you want to apply this change?</span></ConfirmDialog>
+    >This would make the period <strong>{{ longCycleDays }} days</strong> long - most periods last 3-7 days.<br><span style="font-size:11px;color:#b45309;">Are you sure you want to apply this change?</span></ConfirmDialog>
 
     <!-- Short cycle warning dialog. Fires when the new cycle would be < 21 days long
          (start to start), matching the prediction-health threshold so the proactive

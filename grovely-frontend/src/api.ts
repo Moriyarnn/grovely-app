@@ -37,20 +37,36 @@ export function clearUser(): void {
 
 const STATS_INVALIDATING_PATHS = ['/period', '/pantry']
 
+// In the demo build, all /api calls are served by an in-browser backend instead
+// of the network (see src/demo). The demo bootstrap registers its handler here
+// before the app mounts; `__DEMO__` keeps this null and the branch eliminated in
+// the normal build.
+type DemoHandler = (url: string, options: RequestInit) => Promise<Response>
+let demoHandler: DemoHandler | null = null
+export function setDemoHandler(fn: DemoHandler): void {
+  demoHandler = fn
+}
+
 export async function apiFetch(url: string, options: RequestInit = {}): Promise<Response> {
-  const token = getToken()
-  const res = await fetch(url, {
-    ...options,
-    headers: {
-      ...(options.headers as Record<string, string>),
-      ...(token ? { Authorization: `Bearer ${token}` } : {})
-    }
-  })
-  if (res.status === 401) {
-    clearToken()
-    clearUser()
-    if (window.location.pathname !== '/login') {
-      window.location.href = '/login'
+  let res: Response
+  if (__DEMO__ && demoHandler) {
+    // Served entirely in the tab - no token, no network, never a 401.
+    res = await demoHandler(url, options)
+  } else {
+    const token = getToken()
+    res = await fetch(url, {
+      ...options,
+      headers: {
+        ...(options.headers as Record<string, string>),
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      }
+    })
+    if (res.status === 401) {
+      clearToken()
+      clearUser()
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login'
+      }
     }
   }
   const method = (options.method ?? 'GET').toUpperCase()
@@ -65,7 +81,7 @@ export async function exportBackup(): Promise<void> {
   try {
     res = await apiFetch(`${API}/backup/export`)
   } catch {
-    throw new Error('Could not reach the server — check your connection.')
+    throw new Error('Could not reach the server - check your connection.')
   }
   if (!res.ok) throw new Error(`Export failed (server returned ${res.status})`)
   const blob = await res.blob()
@@ -86,7 +102,7 @@ export async function restoreBackup(backup: unknown): Promise<{ success: boolean
   })
   const text = await res.text()
   let json: { error?: string; success?: boolean; warnings?: string[] }
-  try { json = JSON.parse(text) } catch { throw new Error(`Server error ${res.status} — backup may be too large or server unavailable`) }
+  try { json = JSON.parse(text) } catch { throw new Error(`Server error ${res.status} - backup may be too large or server unavailable`) }
   if (!res.ok) throw new Error(json.error ?? 'Restore failed')
   return json as { success: boolean; warnings?: string[] }
 }

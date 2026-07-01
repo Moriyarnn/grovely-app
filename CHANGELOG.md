@@ -5,6 +5,16 @@ record; the in-app "What's New" panel shows a short summary of major releases on
 
 ---
 
+## v0.14.0 - live in-browser demo
+*June 30, 2026*
+
+- Live in-browser demo - try the full app, with premium unlocked, right in the browser with no install or signup
+- The demo runs entirely client-side, isolated per visitor and reset on refresh, so nothing ever leaves your browser
+- Fertile window and ovulation predictions now match across the calendar, the PeriodDetail card, and notification emails
+- Notification startup catch-up is no longer skipped when a license is added or notifications enabled mid-day and the app restarts
+
+---
+
 ## v0.13.0 - live updates between partners and launch prep
 *June 23, 2026*
 

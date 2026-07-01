@@ -8,7 +8,7 @@
         <PremiumBadge />
       </div>
       <p class="premium-card-title">Waste / Use Tracking</p>
-      <p class="premium-card-desc">Items marked as used or wasted are logged — monthly summary shows your most-wasted categories and consumption patterns</p>
+      <p class="premium-card-desc">Items marked as used or wasted are logged - monthly summary shows your most-wasted categories and consumption patterns</p>
     </div>
 
     <div class="premium-card">
@@ -35,7 +35,7 @@
         <PremiumBadge />
       </div>
       <p class="premium-card-title">Store Price Analytics</p>
-      <p class="premium-card-desc">Assign shopping list items to specific retailers and compare prices across stores — see where you save the most over time</p>
+      <p class="premium-card-desc">Assign shopping list items to specific retailers and compare prices across stores - see where you save the most over time</p>
     </div>
   </div>
 </template>

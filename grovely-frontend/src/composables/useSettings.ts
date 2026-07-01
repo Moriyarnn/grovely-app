@@ -41,13 +41,13 @@ export function useSettings() {
       if (!res.ok) {
         settings.value = { ...settings.value, [key]: prev }
         if (res.status === 403) return 'Only the owner can change this setting.'
-        return 'Could not save setting — check your connection.'
+        return 'Could not save setting - check your connection.'
       }
       window.dispatchEvent(new Event('appstats:invalidate'))
       return null
     } catch {
       settings.value = { ...settings.value, [key]: prev }
-      return 'Could not save setting — check your connection.'
+      return 'Could not save setting - check your connection.'
     }
   }
 

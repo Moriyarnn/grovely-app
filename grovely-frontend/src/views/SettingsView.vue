@@ -304,6 +304,9 @@ function onNotifMessagesClick() {
 }
 
 function onBackupsClick() {
+  // In the demo the sheet opens so visitors can explore the backups menu; the
+  // action buttons inside are individually gated to the self-host dialog. The
+  // read endpoints (/status, /history) run for real against the in-browser DB.
   if (licenseActive.value === true) {
     backupsSheetOpen.value = true
   } else {
@@ -321,6 +324,8 @@ function showMsg(msg: string, isError = false) {
 }
 
 async function onExport() {
+  // DEMO GATE: manual export hits the server's /api/backup route.
+  if (__DEMO__) { import('../composables/useDemo').then(m => m.openDemoFeature('backup-export')); return }
   try {
     await exportBackup()
     showMsg('Backup downloaded.')
@@ -330,6 +335,8 @@ async function onExport() {
 }
 
 async function triggerRestore() {
+  // DEMO GATE: restore hits the server's /api/backup route.
+  if (__DEMO__) { import('../composables/useDemo').then(m => m.openDemoFeature('backup-restore')); return }
   let file: File | undefined
   if ('showOpenFilePicker' in window) {
     try {

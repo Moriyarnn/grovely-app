@@ -84,7 +84,7 @@ const stripCards = computed(() => {
       if (s.ovulationDate === todayStr) {
         fertileMsg = isOwner ? 'Today is your predicted ovulation day' : 'Today is her predicted ovulation day'
       } else if (today >= fStart && today <= fEnd) {
-        fertileMsg = `Fertile window active — ends ${fEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+        fertileMsg = `Fertile window active - ends ${fEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
       } else if (today < fStart) {
         const daysUntil = Math.round((fStart - today) / 86400000)
         if (daysUntil <= 5) fertileMsg = `Fertile window starts in ${daysUntil} day${daysUntil !== 1 ? 's' : ''}`

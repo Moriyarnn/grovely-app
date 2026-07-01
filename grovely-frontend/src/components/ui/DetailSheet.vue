@@ -2,12 +2,12 @@
   <Teleport to="body">
     <div
       class="ds-backdrop"
-      :class="[`ds-backdrop--${theme}`, { 'ds-backdrop--visible': open }]"
+      :class="[`ds-backdrop--${theme}`, { 'ds-backdrop--visible': open, 'ds-backdrop--elevated': elevated }]"
       @pointerdown.prevent="$emit('update:open', false)"
     />
     <div
       class="ds-sheet"
-      :class="[`ds-sheet--${theme}`, `ds-sheet--size-${size}`, `ds-sheet--scroll-${scroll}`, { 'ds-sheet--open': open, 'ds-sheet--mh': mobileHeight, 'ds-sheet--hug': hugContent }]"
+      :class="[`ds-sheet--${theme}`, `ds-sheet--size-${size}`, `ds-sheet--scroll-${scroll}`, { 'ds-sheet--open': open, 'ds-sheet--mh': mobileHeight, 'ds-sheet--hug': hugContent, 'ds-sheet--elevated': elevated }]"
       :style="mobileHeight ? { '--ds-mh': mobileHeight } : undefined"
     >
       <div class="ds-inner">
@@ -60,6 +60,11 @@ const props = defineProps({
   // metadata (e.g. PantryShoppingList "category · qty"). 'plain' =
   // normal-case descriptive sentence sitting tight under the title.
   subtitleStyle: { type: String, default: 'label' }, // 'label' | 'plain'
+  // Strictly opt-in. Raises the sheet above the standard sheet layer so a
+  // sheet opened from *within* another DetailSheet (which teleports to body
+  // later and would otherwise paint on top at the shared z-index) sits in
+  // front. Default false = original z-index, untouched.
+  elevated: { type: Boolean, default: false },
   // Strictly opt-in, same rule as `size`/`scroll`. When set (any CSS length,
   // e.g. '70vh'), the sheet takes this fixed height on mobile (<1280px)
   // instead of sizing to content — used to make sibling sheets the same
@@ -137,6 +142,9 @@ onBeforeUnmount(() => {
   transition: opacity 0.3s;
 }
 .ds-backdrop--visible { opacity: 1; pointer-events: all; }
+/* Elevated tier: above a standard sheet (100/101) so a sheet opened from
+   inside another sheet stacks in front regardless of teleport order. */
+.ds-backdrop--elevated { z-index: 200; }
 .ds-backdrop--pink    { background: rgba(114, 36, 62, 0.22); }
 .ds-backdrop--green   { background: rgba(26,  77, 53, 0.22); }
 .ds-backdrop--neutral { background: rgba(0,   0,  0,  0.32); }
@@ -156,6 +164,7 @@ onBeforeUnmount(() => {
   flex-direction: column;
 }
 .ds-sheet--open { transform: translateY(0); }
+.ds-sheet--elevated { z-index: 201; }
 
 .ds-sheet { scrollbar-width: thin; scrollbar-color: #d4d4d4 transparent; }
 .ds-sheet--pink    { scrollbar-color: #F4C0D1 transparent; }

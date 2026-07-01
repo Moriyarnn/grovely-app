@@ -142,10 +142,10 @@
           <!-- Mobile-only sign out -->
           <div class="hub-footer mobile-only">
             <div v-if="licenseActive" class="hub-premium-thanks">
-              <v-icon size="16" color="#993556">mdi-heart</v-icon>
-              <span>Thanks for supporting Grovely.<br>Your license keeps this project going.</span>
+              <v-icon size="16" color="#993556">{{ premiumNote.icon }}</v-icon>
+              <span>{{ premiumNote.line1 }}<br><a v-if="premiumNote.href" class="hub-premium-cta" :href="premiumNote.href">{{ premiumNote.line2 }}</a><span v-else>{{ premiumNote.line2 }}</span></span>
             </div>
-            <button class="hub-logout-btn" @click="logout">Sign out</button>
+            <button class="hub-logout-btn" @click="logout">{{ isDemo ? 'Exit demo' : 'Sign out' }}</button>
           </div>
 
           <!-- Floating reorder hint (mobile only, first visit) -->
@@ -205,7 +205,33 @@ function onVisibility() { if (!document.hidden) now.value = new Date() }
 onMounted(() => document.addEventListener('visibilitychange', onVisibility))
 onUnmounted(() => document.removeEventListener('visibilitychange', onVisibility))
 
+// In the demo there is no real session to end; sign-off becomes an exit link
+// back to the marketing site. Dead-branch on __DEMO__ so the prod build is
+// unaffected and the URL is stripped from the normal bundle.
+const isDemo = __DEMO__
+
+// Premium footer copy. Built from a __DEMO__ ternary so the demo variant (and
+// its grovely.org URL) is dead-code-eliminated from the normal bundle - the
+// template only references premiumNote.*, never the demo string literals.
+const premiumNote = __DEMO__
+  ? {
+      icon: 'mdi-star-four-points',
+      line1: "You're previewing Grovely with premium unlocked.",
+      line2: 'Get it at grovely.org →',
+      href: 'https://grovely.org',
+    }
+  : {
+      icon: 'mdi-heart',
+      line1: 'Thanks for supporting Grovely.',
+      line2: 'Your license keeps this project going.',
+      href: '',
+    }
+
 function logout() {
+  if (__DEMO__) {
+    window.location.href = 'https://grovely.org'
+    return
+  }
   clearToken()
   clearUser()
   resetPreferences()
@@ -550,6 +576,13 @@ onUnmounted(removeWindowListeners)
   justify-content: flex-start;
   width: 100%;
   text-align: left;
+}
+.hub-premium-cta {
+  color: #993556;
+  font-weight: 700;
+  text-decoration: none;
+}
+.hub-premium-cta:hover { text-decoration: underline;
 }
 
 .hub-logout-btn {

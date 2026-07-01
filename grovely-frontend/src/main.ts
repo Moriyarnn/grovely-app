@@ -19,7 +19,19 @@ const vuetify = createVuetify({
   }
 })
 
-const app = createApp(App)
-app.use(router)
-app.use(vuetify)
-app.mount('#app')
+async function bootstrap() {
+  // Demo build: stand up the in-browser backend (sql.js + real routes) before
+  // the app mounts, so the first API calls are already served locally. The
+  // dynamic import keeps the entire demo subtree out of the normal bundle.
+  if (__DEMO__) {
+    const { initDemoBackend } = await import('./demo')
+    await initDemoBackend()
+  }
+
+  const app = createApp(App)
+  app.use(router)
+  app.use(vuetify)
+  app.mount('#app')
+}
+
+bootstrap()

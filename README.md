@@ -119,13 +119,13 @@
 ## Roadmap
 
 **Next (Q3 2026)**
-- SSO/OIDC support - Authelia, Authentik, Cloudflare Access
-- Sleep tracker - manual logging, weekly chart, morning nudge notification, partner sync (premium)
 - Pantry premium expansion - waste and use tracking with monthly summaries, reorder suggestions based on your repurchase history, store price analytics, shopping wizard, Home Assistant webhook (premium)
+- Advanced period analytics - cycle data export (CSV/PDF), symptom pattern prediction, trend detection, cycle correlation over time, BBT and OPK logging (premium)
+- SSO/OIDC support - Authelia, Authentik, Cloudflare Access
 
 **Later (Q4 2026)**
+- Sleep tracker - manual logging, weekly chart, morning nudge notification, partner sync (premium)
 - Exercise tracker - log workouts, phase-aware energy suggestions, cycle correlation (premium)
-- Advanced period analytics - cycle data export (CSV/PDF), symptom pattern prediction, trend detection, cycle correlation over time, BBT and OPK logging (premium)
 - Push notifications for browser and PWA
 - Multi-language support
 

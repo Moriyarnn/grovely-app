@@ -15,6 +15,8 @@
       </router-view>
     </v-main>
     <ActivityToast v-if="showShell" />
+    <component :is="DemoFeatureDialog" v-if="DemoFeatureDialog" />
+    <component :is="DemoBanner" v-if="DemoBanner && showShell" />
     <Teleport to="body">
       <div v-if="envLabel" class="env-badge">{{ envLabel }}</div>
     </Teleport>
@@ -22,11 +24,22 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, defineAsyncComponent } from 'vue'
 import { useRoute } from 'vue-router'
 import DesktopShell from './components/DesktopShell.vue'
 import ActivityToast from './components/ActivityToast.vue'
 import { getToken } from './api'
+
+// Demo-only: the "available when you self-host" dialog. Async + __DEMO__-gated
+// so it (and its content) are dead-code eliminated from the normal build.
+const DemoFeatureDialog = __DEMO__
+  ? defineAsyncComponent(() => import('./components/DemoFeatureDialog.vue'))
+  : null
+// Demo-only persistent "runs entirely in your browser" trust strip. Same
+// async + __DEMO__ gating so it is dead-code eliminated from the normal build.
+const DemoBanner = __DEMO__
+  ? defineAsyncComponent(() => import('./components/DemoBanner.vue'))
+  : null
 const route = useRoute()
 const showShell = computed(() => route.name !== 'login' && !!getToken())
 const env = import.meta.env.VITE_ENV

@@ -10,7 +10,9 @@
   >
     <div class="nm-body">
 
-          <template v-if="emailStatus">
+          <!-- Env-config nags are irrelevant in the demo (no server to set MAIL_* on),
+               so hide the whole warning block there. -->
+          <template v-if="emailStatus && !isDemo">
             <div v-if="!emailStatus.smtp" class="nm-email-warning">
               <v-icon size="14" color="#b45309">mdi-alert-circle-outline</v-icon>
               <span>Email delivery is not configured. Set <code>MAIL_HOST</code>, <code>MAIL_USER</code>, and <code>MAIL_PASSWORD</code> in your environment.</span>
@@ -285,6 +287,9 @@ async function fetchTypeSettings() {
   } catch { /* non-fatal */ }
 }
 
+// Demo flag (build-time constant). In the normal build this is the literal
+// false, so the demo-only branches below dead-code eliminate.
+const isDemo = __DEMO__
 const emailStatus = ref<{ smtp: boolean; account1: boolean; account2: boolean; configured: boolean } | null>(null)
 
 async function fetchEmailStatus() {
@@ -312,6 +317,8 @@ const testCountdown = ref(0)
 const testResult    = ref<'sent' | 'error' | null>(null)
 
 async function sendTestEmail() {
+  // DEMO GATE: sending a real email needs the server's SMTP config.
+  if (__DEMO__) { import('../composables/useDemo').then(m => m.openDemoFeature('test-email')); return }
   if (testSending.value || testCountdown.value > 0) return
   testSending.value = true
   try {
@@ -386,7 +393,7 @@ const PERIOD_TYPES = [
   { id: 'cycle_summary',           label: 'Cycle summary',              when: 'When a new period is logged',         message: "Your cycle summary is ready. Your last cycle was {duration} days." },
   { id: 'partner_period_starting', label: 'Partner: period starting',   when: '3 days before (sent to partner)',    message: "Just a heads up, her period is expected to start in 3 days." },
   { id: 'partner_fertile_window',  label: 'Partner: fertile window',    when: 'When window opens (sent to partner)', message: "Her fertile window has started today." },
-  { id: 'partner_period_ended',    label: 'Partner: period ended',      when: 'After period ends — sent to partner', message: "Her period has ended." },
+  { id: 'partner_period_ended',    label: 'Partner: period ended',      when: 'After period ends - sent to partner', message: "Her period has ended." },
 ]
 
 const PANTRY_TYPES = [
@@ -545,6 +552,8 @@ function startEditType(t: { id: string; message: string }) {
   editingTypeValue.value = typeSettings.value[t.id]?.custom_message ?? ''
 }
 async function saveEditType() {
+  // DEMO GATE: saving a customised message needs a server to persist it.
+  if (__DEMO__) { import('../composables/useDemo').then(m => m.openDemoFeature('notification-edit')); editingTypeId.value = null; return }
   const id  = editingTypeId.value!
   const msg = editingTypeValue.value.trim() || null
   typeSettings.value = {
@@ -586,6 +595,8 @@ function startEdit(key: string) {
   editingValue.value = settings.value[key] ?? ''
 }
 function saveEdit(key: string) {
+  // DEMO GATE: saving an edited notification field needs a server to persist it.
+  if (__DEMO__) { import('../composables/useDemo').then(m => m.openDemoFeature('notification-edit')); editingKey.value = null; return }
   updateSetting(key, editingValue.value)
   editingKey.value = null
 }

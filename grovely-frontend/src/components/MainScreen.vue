@@ -232,6 +232,24 @@ const stats = computed(() => [
 // Both arrays are required on every entry.
 const CHANGELOG = [
   {
+    version: 'v0.14.0',
+    title: 'Live in-browser demo',
+    date: 'June 30, 2026',
+    fixes: [181, 182, 174],
+    items: [
+      { plan: 'Free',    text: 'Live in-browser demo - try the full app, with premium unlocked, right in the browser with no install or signup' },
+      { plan: 'Free',    text: 'The demo runs entirely client-side, isolated per visitor and reset on refresh, so nothing ever leaves your browser' },
+      { plan: 'Free',    text: 'Fertile window and ovulation predictions now match across the calendar, the detail card, and notification emails' },
+      { plan: 'Free',    text: 'Notification startup catch-up is no longer skipped when a license is added or notifications enabled mid-day and the app restarts' },
+    ],
+    mobile: [
+      { plan: 'Free',    text: 'Live in-browser demo - try the full app with no install' },
+      { plan: 'Free',    text: 'Demo runs entirely in your browser, reset on refresh' },
+      { plan: 'Free',    text: 'Fertile window and ovulation now match across all screens' },
+      { plan: 'Free',    text: 'Notification catch-up fires after a mid-day license change' },
+    ],
+  },
+  {
     version: 'v0.13.0',
     title: 'Live updates + Launch prep',
     date: 'June 23, 2026',

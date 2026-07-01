@@ -16,6 +16,7 @@ const cron = require('node-cron')
 const nodemailer = require('nodemailer')
 const { logSystemError, logNotificationRunStart, logNotificationRunEnd, logNotificationSend } = require('../logger')
 const { licensePayload } = require('../middleware/license')
+const { upcomingFertileWindow } = require('../routes/period/_calcHelpers')
 
 // ---------------------------------------------------------------------------
 // Mailer
@@ -197,29 +198,12 @@ function getSummary (db) {
     nextPeriodDate = predicted.toISOString().split('T')[0]
   }
 
-  // Personalised luteal phase
-  const lutealRows = db.prepare(`
-    SELECT CAST(julianday(next_c.start_date) - julianday(c.ovulation_date) AS INTEGER) AS luteal_length
-    FROM cycles c
-    JOIN cycles next_c ON next_c.start_date = (SELECT MIN(start_date) FROM cycles WHERE start_date > c.start_date)
-    WHERE c.ovulation_date IS NOT NULL AND c.start_date <= date('now')
-  `).all().filter(r => r.luteal_length >= 7 && r.luteal_length <= 20)
-
-  const avgLutealPhase = lutealRows.length > 0
-    ? Math.round(lutealRows.slice(1).reduce((est, r) => ALPHA * r.luteal_length + (1 - ALPHA) * est, lutealRows[0].luteal_length))
-    : 14
-
-  // Fertile window + ovulation
-  let fertileWindow = null
-  let ovulationDate = null
-  if (nextPeriodDate) {
-    const ov = new Date(nextPeriodDate)
-    ov.setDate(ov.getDate() - avgLutealPhase)
-    ovulationDate = ov.toISOString().split('T')[0]
-    const fs = new Date(ov); fs.setDate(fs.getDate() - 5)
-    const fe = new Date(ov); fe.setDate(fe.getDate() + 1)
-    fertileWindow = { start: fs.toISOString().split('T')[0], end: fe.toISOString().split('T')[0] }
-  }
+  // Fertile window + ovulation — read from stored predictions on the most recent
+  // cycle (same source as the calendar) to guarantee both surfaces always agree
+  const fertileWindow = lastCycle?.predicted_fertile_start
+    ? { start: lastCycle.predicted_fertile_start, end: lastCycle.predicted_fertile_end }
+    : null
+  const ovulationDate = lastCycle?.ovulation_date ?? lastCycle?.predicted_ovulation_date ?? null
 
   // Is there an active cycle right now?
   const currentCycle = db.prepare(`
@@ -276,7 +260,7 @@ const NOTIFICATION_TYPES = [
     subject: () => '💗 Your period is coming in 3 days',
     html: ({ nextPeriodDate }) => wrap(`
       <h2 style="color:#c06;">Hey ${_runContext.greeting} 💕</h2>
-      <p>Just a little heads-up — your period is expected in <strong>3 days</strong> (around <strong>${nextPeriodDate}</strong>).</p>
+      <p>Just a little heads-up - your period is expected in <strong>3 days</strong> (around <strong>${nextPeriodDate}</strong>).</p>
       <p>Maybe a good time to make sure you have everything you need. You've got this! 🌸</p>`)
   },
 
@@ -315,7 +299,7 @@ const NOTIFICATION_TYPES = [
     subject: () => '🌷 Period is a few days late',
     html: () => wrap(`
       <h2 style="color:#c06;">Hey ${_runContext.greeting} 🌷</h2>
-      <p>Your period is a few days late — don't stress, bodies can be unpredictable sometimes!</p>
+      <p>Your period is a few days late - don't stress, bodies can be unpredictable sometimes!</p>
       <p>Take it easy, I'm thinking of you 💗</p>`)
   },
 
@@ -328,7 +312,7 @@ const NOTIFICATION_TYPES = [
     subject: () => '📊 Your periods have been a little unpredictable lately',
     html: () => wrap(`
       <h2 style="color:#c06;">Hey ${_runContext.greeting} 💗</h2>
-      <p>Your periods have been a little all over the place lately — sometimes earlier, sometimes later than usual.</p>
+      <p>Your periods have been a little all over the place lately - sometimes earlier, sometimes later than usual.</p>
       <p>That's pretty normal and can happen for all kinds of reasons. Just thought you should know 🌸</p>`)
   },
 
@@ -366,7 +350,7 @@ const NOTIFICATION_TYPES = [
     subject: () => '🌟 Today is your predicted ovulation day',
     html: () => wrap(`
       <h2 style="color:#c06;">Hey ${_runContext.greeting} 🌟</h2>
-      <p>Today is your <strong>predicted ovulation day</strong> — your peak fertility day this cycle.</p>
+      <p>Today is your <strong>predicted ovulation day</strong> - your peak fertility day this cycle.</p>
       <p>Take care of yourself! 💗</p>`)
   },
 
@@ -393,7 +377,7 @@ const NOTIFICATION_TYPES = [
     html: ({ nextPeriodDate }) => wrap(`
       <h2 style="color:#c06;">Hey ${_runContext.greeting} 🫂</h2>
       <p>Your period is expected in about <strong>5 days</strong> (around ${nextPeriodDate}), which means the PMS window may be starting.</p>
-      <p>Be extra kind to yourself this week — snacks, warmth, and rest are all valid. I love you! 💗</p>`)
+      <p>Be extra kind to yourself this week - snacks, warmth, and rest are all valid. I love you! 💗</p>`)
   },
 
 
@@ -443,7 +427,7 @@ const NOTIFICATION_TYPES = [
         <h2 style="color:#c06;">Your period just ended 🌸</h2>
         <p>Your period lasted <strong>${periodLength} day${periodLength !== 1 ? 's' : ''}</strong> (${cycle.start_date} → ${cycle.end_date}).</p>
         <p>Your average cycle length is currently <strong>${avgCycleLength} days</strong>.</p>
-        <p>Rest up — you did great 💗</p>`)
+        <p>Rest up - you did great 💗</p>`)
     }
   },
 
@@ -465,7 +449,7 @@ const NOTIFICATION_TYPES = [
       const list = items.map(i => `<li>${i.name}${i.quantity ? ` (${i.quantity})` : ''}</li>`).join('')
       return wrap(`
         <h2 style="color:#c45309;">Items expiring today 🧊</h2>
-        <p>These items in your pantry expire today — use them up before they go to waste!</p>
+        <p>These items in your pantry expire today - use them up before they go to waste!</p>
         <ul style="padding-left:1.5em;line-height:1.8;">${list}</ul>`)
     }
   },
@@ -492,7 +476,7 @@ const NOTIFICATION_TYPES = [
       const list = items.map(i => {
         const days = Math.round((new Date(i.expiry_date) - new Date()) / 86400000)
         const when = days === 1 ? 'tomorrow' : `in ${days} days`
-        return `<li>${i.name}${i.quantity ? ` (${i.quantity})` : ''} — expires <strong>${when}</strong></li>`
+        return `<li>${i.name}${i.quantity ? ` (${i.quantity})` : ''} - expires <strong>${when}</strong></li>`
       }).join('')
       return wrap(`
         <h2 style="color:#c45309;">Items expiring soon 🧊</h2>
@@ -527,11 +511,11 @@ const NOTIFICATION_TYPES = [
       const list = items.map(i => {
         const daysAgo = Math.round((new Date() - new Date(i.expiry_date)) / 86400000)
         const when = daysAgo === 1 ? 'yesterday' : `${daysAgo} days ago`
-        return `<li>${i.name}${i.quantity ? ` (${i.quantity})` : ''} — expired <strong>${when}</strong></li>`
+        return `<li>${i.name}${i.quantity ? ` (${i.quantity})` : ''} - expired <strong>${when}</strong></li>`
       }).join('')
       return wrap(`
         <h2 style="color:#c45309;">Items past their expiry date 🧊</h2>
-        <p>These pantry items have already expired — you may want to check them:</p>
+        <p>These pantry items have already expired - you may want to check them:</p>
         <ul style="padding-left:1.5em;line-height:1.8;">${list}</ul>`)
     }
   },
@@ -549,7 +533,7 @@ const NOTIFICATION_TYPES = [
     check: ({ nextPeriodDate, currentCycle, today }) =>
       !!process.env.ACCOUNT2_EMAIL &&
       !currentCycle && !!nextPeriodDate && daysBetween(nextPeriodDate, today) === 3,
-    subject: () => '💗 Heads up — her period is coming in 3 days',
+    subject: () => '💗 Heads up - her period is coming in 3 days',
     html: ({ nextPeriodDate }) => wrap(`
       <h2 style="color:#c06;">Heads up 💕</h2>
       <p>Her period is expected in <strong>3 days</strong> (around <strong>${nextPeriodDate}</strong>).</p>
@@ -593,12 +577,12 @@ const NOTIFICATION_TYPES = [
     html: ({ today, avgCycleLength }, db) => {
       const yesterday = addDays(today, -1)
       const cycle = db.prepare('SELECT * FROM cycles WHERE end_date = ?').get(yesterday)
-      if (!cycle) return wrap('<p>Her period just ended — she may appreciate some extra care today! 🌸</p>')
+      if (!cycle) return wrap('<p>Her period just ended - she may appreciate some extra care today! 🌸</p>')
       const periodLength = daysBetween(cycle.end_date, cycle.start_date) + 1
       return wrap(`
         <h2 style="color:#c06;">Her period just ended 🌸</h2>
         <p>Her period lasted <strong>${periodLength} day${periodLength !== 1 ? 's' : ''}</strong> (${cycle.start_date} → ${cycle.end_date}).</p>
-        <p>Her average cycle length is <strong>${avgCycleLength} days</strong> — so next time is coming eventually.</p>
+        <p>Her average cycle length is <strong>${avgCycleLength} days</strong> - so next time is coming eventually.</p>
         <p>She may appreciate some extra care and rest right now. 💗</p>`)
     }
   },
@@ -641,7 +625,7 @@ const NOTIFICATION_TYPES = [
 
       return wrap(`
         <h2 style="color:#c06;">A new cycle has begun 📊</h2>
-        <p>Your last cycle was <strong>${cycleLength} day${cycleLength !== 1 ? 's' : ''}</strong> long — your average is <strong>${avgCycleLength} days</strong>.</p>
+        <p>Your last cycle was <strong>${cycleLength} day${cycleLength !== 1 ? 's' : ''}</strong> long - your average is <strong>${avgCycleLength} days</strong>.</p>
         <p>Your period lasted <strong>${periodLength} day${periodLength !== 1 ? 's' : ''}</strong> (${prevCycle.start_date} → ${prevCycle.end_date}).</p>
         ${ovulationLine}
         <p>Here's to a smooth new cycle 💗</p>`)
@@ -685,13 +669,6 @@ async function runNotifications (db, trigger = 'scheduled') {
       .forEach(r => { typeSettings[r.type_id] = r })
   } catch { /* table may not exist on older instances */ }
 
-  // Mark this daily run as done for today (prevents duplicate runs on restart)
-  try {
-    db.prepare(
-      "INSERT OR IGNORE INTO notification_log (type_id, date_key) VALUES ('__daily_run__', ?)"
-    ).run(today)
-  } catch (_) { /* already recorded */ }
-
   if (!licensePayload) {
     console.log('🔒 No active license — notification emails require a premium license')
     return
@@ -701,6 +678,16 @@ async function runNotifications (db, trigger = 'scheduled') {
     console.log('🔕 Notifications disabled — skipping run')
     return
   }
+
+  // Mark this daily run as done for today (prevents duplicate runs on restart).
+  // Written only after the license and enabled guards so a license-less or disabled
+  // boot does not consume the daily catch-up slot (#174); adding a license or enabling
+  // notifications mid-day and restarting will then still fire via the startup catch-up.
+  try {
+    db.prepare(
+      "INSERT OR IGNORE INTO notification_log (type_id, date_key) VALUES ('__daily_run__', ?)"
+    ).run(today)
+  } catch (_) { /* already recorded */ }
 
   console.log(`🔔 Running notification checks for ${today}`)
 
@@ -856,7 +843,7 @@ async function sendTestEmail (db) {
   const subject = '📬 Test notification from Grovely'
   const html = wrap(`
     <h2 style="color:#c06;">Hey ${greeting} 💕</h2>
-    <p>This is a test notification from your household app — if you're reading this, your email delivery is working perfectly!</p>
+    <p>This is a test notification from your household app - if you're reading this, your email delivery is working perfectly!</p>
     <p>You're all set. 🌸</p>`)
 
   await sendEmail(subject, html, process.env.ACCOUNT1_EMAIL)

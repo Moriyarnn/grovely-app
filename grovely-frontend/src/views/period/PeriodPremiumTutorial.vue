@@ -73,7 +73,7 @@
 
         <p class="slide-title">Adjust any cycle</p>
         <p class="slide-body">
-          Hold any period group day to enter adjust mode. Drag either handle to extend or shrink the cycle — useful when you log early and need to refine the dates.
+          Hold any period group day to enter adjust mode. Drag either handle to extend or shrink the cycle - useful when you log early and need to refine the dates.
         </p>
       </template>
 
