@@ -33,6 +33,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { API, apiFetch } from '../api'
+import { isNewerVersion } from '../utils/version'
 
 type UpdateStatus = {
   current_version?: string
@@ -46,21 +47,8 @@ const status = ref<UpdateStatus>({})
 const loading = ref(false)
 let pollTimer: ReturnType<typeof setInterval> | null = null
 
-function comparable(version?: string): number[] {
-  return (version || '').replace(/^v/, '').split('.').map(part => Number(part) || 0)
-}
-
-function isNewer(latest?: string, current?: string): boolean {
-  const a = comparable(latest)
-  const b = comparable(current)
-  for (let i = 0; i < Math.max(a.length, b.length); i++) {
-    if ((a[i] || 0) !== (b[i] || 0)) return (a[i] || 0) > (b[i] || 0)
-  }
-  return false
-}
-
 const latestVersion = computed(() => status.value.latest?.version || '')
-const available = computed(() => isNewer(latestVersion.value, status.value.current_version))
+const available = computed(() => isNewerVersion(latestVersion.value, status.value.current_version))
 const latestNotes = computed(() => status.value.latest?.summary || status.value.latest?.notes || 'A newer release is ready for this household.')
 const lastCheckedLabel = computed(() => {
   const date = new Date(status.value.last_checked_at || '')

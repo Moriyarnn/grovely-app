@@ -5,6 +5,7 @@ const fs = require('node:fs/promises')
 const http = require('node:http')
 const os = require('node:os')
 const path = require('node:path')
+const { composeArgs } = require('../compose')
 
 let feedPayload = { version: 'v0.14.1', summary: 'Test release' }
 let feedServer
@@ -78,11 +79,23 @@ test('accepts only valid public release metadata', async () => {
   assert.equal(valid.status, 200)
   assert.equal(valid.body.latest.version, 'v0.14.1')
 
+  feedPayload = { version: 'v0.14.1-rc.1', summary: 'Prerelease test' }
+  const prerelease = await request(`http://127.0.0.1:${updaterPort}/check`, options)
+  assert.equal(prerelease.status, 200)
+  assert.equal(prerelease.body.latest.version, 'v0.14.1-rc.1')
+
   feedPayload = { version: 'not-a-version' }
   const invalid = await request(`http://127.0.0.1:${updaterPort}/check`, options)
   assert.equal(invalid.status, 200)
   assert.match(invalid.body.error, /invalid version/i)
   feedPayload = { version: 'v0.14.1', summary: 'Test release' }
+})
+
+test('uses the configured environment file for Compose commands', () => {
+  assert.deepEqual(
+    composeArgs('.env.uat', ['docker-compose.yml', 'docker-compose.uat.yml'], ['pull', 'frontend', 'backend']),
+    ['compose', '--env-file', '.env.uat', '-f', 'docker-compose.yml', '-f', 'docker-compose.uat.yml', 'pull', 'frontend', 'backend'],
+  )
 })
 
 test('creates a persistent local credential when no environment token exists', async () => {

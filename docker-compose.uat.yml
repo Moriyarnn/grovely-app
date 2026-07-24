@@ -59,8 +59,9 @@ services:
     environment:
       - PORT=3003
       - GROVELY_APP_DIR=/grovely
-      - GROVELY_COMPOSE_FILES=docker-compose.uat.yml
+      - GROVELY_COMPOSE_FILES=docker-compose.yml,docker-compose.uat.yml
       - GROVELY_ENV_FILE=.env.uat
+      - GROVELY_COMPOSE_ENV_FILE=.env.uat
       - BACKEND_INTERNAL_URL=http://backend:3000
       - UPDATER_TOKEN_FILE=/state/updater-token
       - UPDATE_PULL_ENABLED=true

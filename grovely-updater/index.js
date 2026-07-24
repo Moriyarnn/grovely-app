@@ -3,6 +3,7 @@ const fs = require('node:fs')
 const path = require('node:path')
 const crypto = require('node:crypto')
 const { spawn } = require('node:child_process')
+const { composeArgs } = require('./compose')
 
 const port = Number(process.env.PORT || 3003)
 const feedUrl = process.env.UPDATE_FEED_URL || 'https://grovely.org/releases/stable.json'
@@ -10,6 +11,7 @@ const appDir = process.env.GROVELY_APP_DIR || '/grovely'
 const stateFile = process.env.UPDATE_STATE_FILE || '/state/update-state.json'
 const tokenFile = process.env.UPDATER_TOKEN_FILE || '/state/updater-token'
 const envFile = process.env.GROVELY_ENV_FILE || '.env'
+const composeEnvFile = process.env.GROVELY_COMPOSE_ENV_FILE || envFile
 const backendUrl = process.env.BACKEND_INTERNAL_URL || 'http://backend:3000'
 const intervalHours = Math.max(1, Number(process.env.UPDATE_CHECK_INTERVAL_HOURS || 24))
 const checksEnabled = process.env.UPDATE_CHECK_ENABLED !== 'false'
@@ -73,7 +75,7 @@ async function releaseCheck (force = false) {
     const response = await fetch(feedUrl, { signal: AbortSignal.timeout(8000), headers: { Accept: 'application/json' } })
     if (!response.ok) throw new Error(`Release feed returned ${response.status}`)
     const release = await response.json()
-    if (!release || typeof release.version !== 'string' || !/^v?\d+\.\d+\.\d+$/.test(release.version)) {
+    if (!release || typeof release.version !== 'string' || !/^v?\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(release.version)) {
       throw new Error('Release feed returned an invalid version.')
     }
     state.latest = release
@@ -95,10 +97,6 @@ function run (command, args) {
     child.on('error', reject)
     child.on('close', code => code === 0 ? resolve() : reject(new Error(stderr.trim() || `${command} exited ${code}`)))
   })
-}
-
-function composeArgs (commandArgs) {
-  return ['compose', ...composeFiles.flatMap(file => ['-f', file]), ...commandArgs]
 }
 
 function updateVersionFile (version) {
@@ -132,10 +130,10 @@ async function install () {
   try {
     await snapshot()
     updateVersionFile(state.latest.compose_version || state.latest.version)
-    if (pullEnabled) await run('docker', composeArgs(['pull', ...managedServices]))
+    if (pullEnabled) await run('docker', composeArgs(composeEnvFile, composeFiles, ['pull', ...managedServices]))
     const upArgs = ['up', '-d', '--wait', '--wait-timeout', '90']
     if (buildOnInstall) upArgs.push('--build')
-    await run('docker', composeArgs([...upArgs, ...managedServices]))
+    await run('docker', composeArgs(composeEnvFile, composeFiles, [...upArgs, ...managedServices]))
   } catch (err) {
     state.error = `Update stopped safely: ${err.message}`
     throw err

@@ -5,6 +5,14 @@ record; the in-app "What's New" panel shows a short summary of major releases on
 
 ---
 
+## v0.14.1-rc.2 - UAT update correction
+*July 24, 2026*
+
+- UAT updates now pass `.env.uat` to Compose and combine the base and UAT Compose files before pulling images
+- Release candidate versions are accepted and ordered correctly, so UAT can offer a newer candidate
+
+---
+
 ## v0.14.1-rc.1 - system updates release candidate
 *July 24, 2026*
 
