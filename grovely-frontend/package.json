@@ -1,6 +1,6 @@
 {
   "name": "grovely-frontend",
-  "version": "0.14.1-rc.3",
+  "version": "0.14.1-rc.4",
   "private": true,
   "type": "module",
   "scripts": {

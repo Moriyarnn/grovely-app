@@ -5,6 +5,13 @@ record; the in-app "What's New" panel shows a short summary of major releases on
 
 ---
 
+## v0.14.1-rc.4 - update workflow validation
+*July 24, 2026*
+
+- Release candidate used to validate the completed self-update workflow against the RC3 baseline
+
+---
+
 ## v0.14.1-rc.3 - updater completion fixes
 *July 24, 2026*
 

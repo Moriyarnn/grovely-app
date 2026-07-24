@@ -1,6 +1,6 @@
 {
   "name": "grovely-backend",
-  "version": "0.14.1-rc.3",
+  "version": "0.14.1-rc.4",
   "description": "",
   "main": "index.js",
   "scripts": {
