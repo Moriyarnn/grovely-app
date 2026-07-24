@@ -41,6 +41,12 @@ jobs:
               BUILD_MODE=prod
               VITE_BACKEND_PORT=
             tag_suffix: '-proxy'
+          - name: updater
+            context: ./grovely-updater
+            image: ghcr.io/${{ github.repository_owner }}/grovely-updater
+            target: ''
+            build_args: ''
+            tag_suffix: ''
 
     steps:
       - name: Checkout
@@ -72,6 +78,7 @@ jobs:
             suffix=${{ matrix.tag_suffix }},onlatest=true
           tags: |
             type=ref,event=branch
+            type=ref,event=tag
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest,enable={{is_default_branch}}
@@ -109,12 +116,17 @@ jobs:
           cp docker-compose.yml release/docker-compose.yml
           cp docker-compose.proxy-host.yml release/docker-compose.proxy-host.yml
           cp docker-compose.proxy-docker.yml release/docker-compose.proxy-docker.yml
+          cp Caddyfile.example release/Caddyfile.example
+          cp validate-env.sh release/validate-env.sh
 
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
         with:
+          prerelease: ${{ contains(github.ref_name, '-') }}
           files: |
             release/docker-compose.yml
             release/docker-compose.proxy-host.yml
             release/docker-compose.proxy-docker.yml
+            release/Caddyfile.example
             release/example.env
+            release/validate-env.sh

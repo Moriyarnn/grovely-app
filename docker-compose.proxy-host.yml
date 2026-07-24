@@ -45,7 +45,7 @@
 
 services:
   frontend:
-    image: ghcr.io/moriyarnn/grovely-frontend:latest-proxy
+    image: ghcr.io/moriyarnn/grovely-frontend:${GROVELY_VERSION:-latest}-proxy
     # If you'd rather build locally, comment the `image:` line above and use
     # `docker compose ... up -d --build` — the main compose file provides the
     # build context; this overlay overrides the build arg below.
@@ -58,3 +58,7 @@ services:
   backend:
     ports: !override
       - "127.0.0.1:3000:3000"
+
+  updater:
+    environment:
+      - GROVELY_COMPOSE_FILES=docker-compose.yml,docker-compose.proxy-host.yml

@@ -5,6 +5,15 @@ record; the in-app "What's New" panel shows a short summary of major releases on
 
 ---
 
+## v0.14.1-rc.1 - system updates release candidate
+*July 24, 2026*
+
+- Version-aware home status lets either household member see when a Grovely release is available
+- Optional, anonymous release checks use public cached metadata only and can be disabled by the server administrator
+- Confirmed in-app updates create a local pre-update snapshot, pull the published frontend and backend images, and preserve local Compose and proxy configuration
+
+---
+
 ## v0.14.0 - live in-browser demo
 *June 30, 2026*
 

@@ -76,7 +76,7 @@
           </div>
 
           <div class="branding-footer">
-            <span class="branding-version">v0.12.6</span>
+            <span class="branding-version">v{{ APP_VERSION }}</span>
           </div>
         </div>
       </div>
@@ -148,8 +148,7 @@
 
           <div class="form-footer">
             <div class="form-privacy">
-              <v-icon size="13" color="#4ADE80">mdi-shield-check-outline</v-icon>
-              <span>No telemetry. No cloud. Your data, your server.</span>
+              <span>No telemetry. Your household data<br>stays on your server.</span>
             </div>
           </div>
         </div>
@@ -172,6 +171,7 @@ import logoStacked from '../assets/Logo Stacked Mobile.png'
 import { apps } from '../composables/useApps'
 
 const router = useRouter()
+const APP_VERSION = __APP_VERSION__
 const { fetchPreferences } = usePreferences()
 const username = ref('')
 const password = ref('')

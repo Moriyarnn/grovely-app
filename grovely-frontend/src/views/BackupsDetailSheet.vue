@@ -6,7 +6,7 @@
     title="Scheduled backups"
     subtitle="Automatic snapshots - local and remote"
     subtitle-style="plain"
-    @update:open="v => { if (!v) close() }"
+    @update:open="onOpenChange"
   >
     <div class="bk-body" :class="{ 'bk-body--no-warnings': !hasWarnings }">
 
@@ -481,6 +481,10 @@ function close() {
   emit('update:modelValue', false)
 }
 
+function onOpenChange(open: boolean) {
+  if (!open) close()
+}
+
 const { settings, fetchSettings, updateSetting } = useSettings()
 
 // Build-time demo flag (literal false in the normal build, so demo-only
@@ -619,9 +623,10 @@ const slideDirection = ref<'left' | 'right'>('left')
 // into a single pill + toggle row.
 
 type PillTone = 'live' | 'err' | 'paused' | 'partial'
+type StorageDestinationId = 'local' | 's3' | 'webdav'
 
 interface DestEntry {
-  id: 'local' | 's3' | 'webdav' | 'history'
+  id: StorageDestinationId
   label: string
   icon: string
   color: string
@@ -726,7 +731,7 @@ const storageDestinations = computed(() => destinationsList.value)
 
 // ── Destination toggle + Enable all ─────────────────────────────────────────
 
-async function toggleDestination(id: 'local' | 's3' | 'webdav') {
+async function toggleDestination(id: StorageDestinationId) {
   if (demoGate()) return
   if (id === 'local') return
   const key = id === 's3' ? 'backup_dest_s3_enabled' : 'backup_dest_webdav_enabled'

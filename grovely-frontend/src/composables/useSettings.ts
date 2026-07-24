@@ -2,16 +2,16 @@ import { ref } from 'vue'
 import { API, apiFetch } from '../api'
 
 interface Settings {
-  partner_can_read_notes: string
-  notifications_enabled: string
-  notification_greeting: string
-  notification_signoff: string
-  notification_sender_name: string
-  reminder_days: string
-  pantry_currency: string
-  pantry_currency_custom_symbol: string
-  pantry_currency_custom_label: string
-  [key: string]: string
+  partner_can_read_notes?: string
+  notifications_enabled?: string
+  notification_greeting?: string
+  notification_signoff?: string
+  notification_sender_name?: string
+  reminder_days?: string
+  pantry_currency?: string
+  pantry_currency_custom_symbol?: string
+  pantry_currency_custom_label?: string
+  [key: string]: string | undefined
 }
 
 const settings = ref<Settings>({ partner_can_read_notes: '0' })

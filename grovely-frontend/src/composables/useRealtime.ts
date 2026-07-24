@@ -55,6 +55,8 @@ function describe(ev: any): { key: string; icon: string; render: (c: number) => 
       }
     case 'pantry.inv.modify':
       return { key: 'inv.modify', icon: 'mdi-fridge-outline', render: () => `${name} updated the pantry inventory` }
+    case 'system.update':
+      return { key: 'system.update', icon: 'mdi-package-up', render: () => `${name} started a Grovely update` }
     default:
       return { key: 'other', icon: 'mdi-bell-outline', render: () => `${name} made a change` }
   }

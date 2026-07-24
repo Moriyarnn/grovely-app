@@ -71,7 +71,7 @@ function goToWarning(w: any) {
       const cur = new Date(cycle.start_date + 'T00:00:00')
       const endD = new Date(end + 'T00:00:00')
       while (cur <= endD) {
-        dates.add(cur.toISOString().split('T')[0])
+        dates.add(cur.toISOString().slice(0, 10))
         cur.setDate(cur.getDate() + 1)
       }
     } else {

@@ -1,11 +1,13 @@
 {
   "name": "grovely-backend",
-  "version": "0.14.0",
+  "version": "0.14.1-rc.1",
   "description": "",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "dev": "nodemon --legacy-watch --ignore data/ index.js"
+    "dev": "nodemon --legacy-watch --ignore data/ index.js",
+    "test": "node --test",
+    "test:coverage": "node --test --experimental-test-coverage"
   },
   "keywords": [],
   "author": "",

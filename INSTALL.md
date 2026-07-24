@@ -32,8 +32,8 @@ mkdir grovely && cd grovely
 ### Step 2: download the compose file and the env template
 
 ```bash
-curl -O https://raw.githubusercontent.com/Moriyarnn/grovely-app/main/docker-compose.yml
-curl -o .env https://raw.githubusercontent.com/Moriyarnn/grovely-app/main/example.env
+curl -LO https://github.com/Moriyarnn/grovely-app/releases/latest/download/docker-compose.yml
+curl -L -o .env https://github.com/Moriyarnn/grovely-app/releases/latest/download/example.env
 ```
 
 The `example.env` file is the canonical reference for every supported variable, with inline notes explaining what each one does (accounts, license, SMTP, backups, timezone, etc.). Open it, fill in `OWNER1_*` and `OWNER2_*`, leave the rest commented until you need it.
@@ -55,7 +55,7 @@ Drop that into a file called `.env` next to `docker-compose.yml` and you're read
 Catches typos, leftover placeholders, missing required values, and common gotchas before you start the stack:
 
 ```bash
-curl -O https://raw.githubusercontent.com/Moriyarnn/grovely-app/main/validate-env.sh
+curl -LO https://github.com/Moriyarnn/grovely-app/releases/latest/download/validate-env.sh
 chmod +x validate-env.sh
 ./validate-env.sh
 ```
@@ -80,9 +80,9 @@ Use this when your reverse proxy runs directly on the host OS, not in Docker. Gr
 
 ```bash
 mkdir grovely && cd grovely
-curl -O https://raw.githubusercontent.com/Moriyarnn/grovely-app/main/docker-compose.yml
-curl -O https://raw.githubusercontent.com/Moriyarnn/grovely-app/main/docker-compose.proxy-host.yml
-curl -o .env https://raw.githubusercontent.com/Moriyarnn/grovely-app/main/example.env
+curl -LO https://github.com/Moriyarnn/grovely-app/releases/latest/download/docker-compose.yml
+curl -LO https://github.com/Moriyarnn/grovely-app/releases/latest/download/docker-compose.proxy-host.yml
+curl -L -o .env https://github.com/Moriyarnn/grovely-app/releases/latest/download/example.env
 ```
 
 Fill in your `.env` (see Step 2 of section 1).
@@ -103,7 +103,7 @@ docker compose -f docker-compose.yml -f docker-compose.proxy-host.yml up -d
 For a full Caddyfile with security headers, gzip, and health-check routing, grab the example from the repo and replace the domain and email:
 
 ```bash
-curl -O https://raw.githubusercontent.com/Moriyarnn/grovely-app/main/Caddyfile.example
+curl -LO https://github.com/Moriyarnn/grovely-app/releases/latest/download/Caddyfile.example
 ```
 
 The minimal version:
@@ -158,9 +158,9 @@ If you already have a shared network with a different name (e.g. `web`, `traefik
 
 ```bash
 mkdir grovely && cd grovely
-curl -O https://raw.githubusercontent.com/Moriyarnn/grovely-app/main/docker-compose.yml
-curl -O https://raw.githubusercontent.com/Moriyarnn/grovely-app/main/docker-compose.proxy-docker.yml
-curl -o .env https://raw.githubusercontent.com/Moriyarnn/grovely-app/main/example.env
+curl -LO https://github.com/Moriyarnn/grovely-app/releases/latest/download/docker-compose.yml
+curl -LO https://github.com/Moriyarnn/grovely-app/releases/latest/download/docker-compose.proxy-docker.yml
+curl -L -o .env https://github.com/Moriyarnn/grovely-app/releases/latest/download/example.env
 ```
 
 Fill in your `.env` (see Step 2 of section 1).
@@ -206,6 +206,12 @@ Everything Grovely accepts is documented inline in [`example.env`](https://githu
 `OWNER1_*` / `OWNER2_*` are only used on first run to seed the accounts. To change a username or password later, do it in-app under Settings.
 
 ## Updating
+
+Grovely System checks `https://grovely.org/releases/stable.json` once every 24 hours to show both household accounts when a tagged release is available. The request contains no account, license, installed-version, usage, or household data. Normal network metadata such as your server's public IP is visible to the release service. Set `UPDATE_CHECK_ENABLED=false` in `.env` and restart if you prefer not to make release checks.
+
+When Grovely System is available, either partner can start an update from Home. It creates a local pre-update recovery snapshot before pulling matched images and waiting for the stack health check. If the system is unavailable, use the commands below.
+
+Normal releases update the images while keeping your local Compose files and proxy configuration intact. If a future release requires a Compose-structure migration, its release notes will call that out and provide the exact one-time command. Grovely never silently overwrites local Compose files.
 
 ```bash
 docker compose pull
@@ -259,6 +265,10 @@ The images are public, but some Docker setups try to authenticate. Log out of GH
 docker logout ghcr.io
 docker compose pull
 ```
+
+### Update checks are unavailable
+
+Your reverse proxy only handles incoming browser traffic and does not affect update checks. Grovely System and Docker need outgoing access to `grovely.org` and `ghcr.io`. Check DNS, firewall rules, or your Docker daemon proxy settings. On an air-gapped server, disable release checks and update manually from a trusted image source.
 
 ### Frontend loads but login fails
 

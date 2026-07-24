@@ -30,6 +30,7 @@ import makeCatalogRouter from '../../../grovely-backend/routes/pantry/catalog.js
 import makePantryRouter from '../../../grovely-backend/routes/pantry/pantry.js'
 import makeSettingsRouter from '../../../grovely-backend/routes/settings.js'
 import makePreferencesRouter from '../../../grovely-backend/routes/preferences.js'
+import calcHelpers from '../../../grovely-backend/routes/period/_calcHelpers.js'
 // premium/index.js exports a ready router (not a factory); handlers use req.db.
 import premiumRouter from '../../../grovely-backend/routes/premium/index.js'
 // The premium backups sub-router. premium/index mounts it with router.use(),
@@ -56,6 +57,10 @@ export async function initDemoBackend(): Promise<void> {
 
   runMigrations(db)
   seed(db)
+  // The normal backend performs this on startup. Demo cycles are inserted
+  // directly, so they need the same stored predictions before the first
+  // calendar request.
+  calcHelpers.recomputeAllPredictions(db)
 
   configureServer(db)
 

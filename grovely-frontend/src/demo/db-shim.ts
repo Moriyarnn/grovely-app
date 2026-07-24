@@ -58,7 +58,7 @@ class PreparedStatement {
     this.db.run(this.sql, normalizeParams(params) as never)
     const changes = this.db.getRowsModified()
     const res = this.db.exec('SELECT last_insert_rowid() AS id')
-    const lastInsertRowid = res.length ? Number(res[0].values[0][0]) : 0
+    const lastInsertRowid = Number(res[0]?.values[0]?.[0] ?? 0)
     return { changes, lastInsertRowid }
   }
 }

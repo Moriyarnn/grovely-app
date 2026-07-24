@@ -167,6 +167,12 @@ app.use('/api/backup', requireAuth, backupRouter)
 const settingsRouter = require('./routes/settings')(db)
 app.use('/api/settings', requireAuth, settingsRouter)
 
+// Release availability and the constrained local Update Service. Both
+// household accounts have equal access; Docker control stays outside this web
+// process in the dedicated updater service.
+const systemUpdateRouter = require('./routes/system-update')(db)
+app.use('/api/system/update', requireAuth, systemUpdateRouter)
+
 // User preferences
 const preferencesRouter = require('./routes/preferences')(db)
 app.use('/api/preferences', requireAuth, preferencesRouter)
@@ -209,12 +215,12 @@ app.get('/api/instance', requireAuth, (_req, res) => {
     const now = new Date(); now.setHours(0, 0, 0, 0)
     daysRunning = Math.floor((now - d0) / 86400000)
   }
-  res.json({ daysRunning, dbSizeMB })
+  res.json({ daysRunning, dbSizeMB, backendVersion: require('./package.json').version })
 })
 
 // Health check
 app.get('/health', (req, res) => {
-  res.json({ status: 'grovely backend is running!' })
+  res.json({ status: 'grovely backend is running!', version: require('./package.json').version })
 })
 
 app.listen(PORT, () => {

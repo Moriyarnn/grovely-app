@@ -24,6 +24,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import type { CSSProperties } from 'vue'
 import { activeSwipeId } from '@/composables/useSwipeGroup'
 
 const props = defineProps<{
@@ -52,16 +53,20 @@ function close() {
 }
 
 function onTouchStart(e: TouchEvent) {
-  startX = e.touches[0].clientX
-  startY = e.touches[0].clientY
+  const touch = e.touches.item(0)
+  if (!touch) return
+  startX = touch.clientX
+  startY = touch.clientY
   startOffset = offset.value
   direction = null
   isDragging.value = true
 }
 
 function onTouchMove(e: TouchEvent) {
-  const dx = e.touches[0].clientX - startX
-  const dy = e.touches[0].clientY - startY
+  const touch = e.touches.item(0)
+  if (!touch) return
+  const dx = touch.clientX - startX
+  const dy = touch.clientY - startY
 
   if (!direction) {
     if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return
@@ -110,12 +115,12 @@ function handleAction(action: { handler: () => void }) {
   action.handler()
 }
 
-const contentStyle = computed(() => ({
+const contentStyle = computed<CSSProperties>(() => ({
   transform: `translateX(-${offset.value}px)`,
   transition: isDragging.value ? 'none' : 'transform 0.22s cubic-bezier(.4,0,.2,1)',
 }))
 
-const actionsStyle = computed(() => ({
+const actionsStyle = computed<CSSProperties>(() => ({
   width: width.value + 'px',
   visibility: offset.value > 0 ? 'visible' : 'hidden',
 }))

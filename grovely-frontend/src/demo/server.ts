@@ -105,7 +105,10 @@ export async function handleRequest(url: string, options: RequestInit = {}): Pro
     const m = route.regex.exec(sub)
     if (!m) continue
     const params: Record<string, string> = {}
-    route.keys.forEach((k, idx) => { params[k] = decodeURIComponent(m[idx + 1]) })
+    route.keys.forEach((k, idx) => {
+      const value = m[idx + 1]
+      if (value !== undefined) params[k] = decodeURIComponent(value)
+    })
     return runChain(route.handlers, buildRequest(u, options, params))
   }
   return jsonResponse(404, { error: `No demo handler for ${method} ${pathname}` })

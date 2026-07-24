@@ -54,6 +54,15 @@ export default defineConfig(({ mode }) => {
         transformMixedEsModules: true,
       },
     },
+    test: {
+      environment: 'jsdom',
+      coverage: {
+        provider: 'v8',
+        include: ['src/**/*.{ts,vue}'],
+        exclude: ['src/**/__tests__/**'],
+        reporter: ['text', 'html', 'lcov'],
+      },
+    },
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url))

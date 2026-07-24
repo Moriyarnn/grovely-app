@@ -12,9 +12,8 @@ const migrationModules = import.meta.glob('../../../grovely-backend/migrations/*
 }) as Record<string, string>
 
 export function runMigrations(db: DemoDatabase): void {
-  const files = Object.keys(migrationModules).sort()
-  for (const file of files) {
-    const sql = migrationModules[file]
+  const migrations = Object.entries(migrationModules).sort(([a], [b]) => a.localeCompare(b))
+  for (const [file, sql] of migrations) {
     try {
       db.exec(sql)
     } catch (err) {

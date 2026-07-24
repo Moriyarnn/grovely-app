@@ -317,6 +317,13 @@ const restoreInput = ref<HTMLInputElement | null>(null)
 const backupMsg = ref('')
 const backupMsgError = ref(false)
 
+type FilePickerWindow = Window & {
+  showOpenFilePicker(options: {
+    types: Array<{ description: string; accept: Record<string, string[]> }>
+    multiple: boolean
+  }): Promise<FileSystemFileHandle[]>
+}
+
 function showMsg(msg: string, isError = false) {
   backupMsg.value = msg
   backupMsgError.value = isError
@@ -340,10 +347,11 @@ async function triggerRestore() {
   let file: File | undefined
   if ('showOpenFilePicker' in window) {
     try {
-      const [handle] = await (window as any).showOpenFilePicker({
+      const [handle] = await (window as FilePickerWindow).showOpenFilePicker({
         types: [{ description: 'Grovely backup', accept: { 'application/json': ['.json'] } }],
         multiple: false,
       })
+      if (!handle) return
       file = await handle.getFile()
     } catch {
       return
@@ -352,6 +360,7 @@ async function triggerRestore() {
     restoreInput.value?.click()
     return
   }
+  if (!file) return
   await processRestoreFile(file)
 }
 

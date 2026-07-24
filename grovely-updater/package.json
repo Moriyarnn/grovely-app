@@ -1,0 +1,7 @@
+{
+  "name": "grovely-updater",
+  "private": true,
+  "version": "0.14.1-rc.1",
+  "type": "commonjs",
+  "scripts": { "start": "node index.js", "test": "node --test" }
+}

@@ -125,6 +125,48 @@ function writeSnapshotToDisk (db) {
   return { file_path, size_bytes, table_count, row_count }
 }
 
+// A pre-update snapshot is intentionally separate from scheduled backups: it
+// must remain available while an update is being assessed, and it must not use
+// premium remote destinations. The JSON shape remains identical to every other
+// Grovely backup, so the existing restore flow can import it if recovery is
+// needed.
+function getPreUpdateBackupDir () {
+  return path.join(__dirname, '..', 'data', 'pre-update-snapshots')
+}
+
+function writePreUpdateSnapshotToDisk (db) {
+  const dir = getPreUpdateBackupDir()
+  fs.mkdirSync(dir, { recursive: true })
+
+  const { snapshot, table_count, row_count } = buildSnapshot(db)
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+  const file_path = path.join(dir, `pre-update-${stamp}.json`)
+  const json = JSON.stringify(snapshot)
+  fs.writeFileSync(file_path, json)
+  return { file_path, size_bytes: Buffer.byteLength(json, 'utf8'), table_count, row_count }
+}
+
+function runPreUpdateBackup (db) {
+  const start = Date.now()
+  try {
+    const written = writePreUpdateSnapshotToDisk(db)
+    const duration_ms = Date.now() - start
+    db.prepare(`
+      INSERT INTO log_system_backups
+        (trigger, status, file_path, size_bytes, duration_ms, table_count, row_count)
+      VALUES ('pre_update', 'ok', ?, ?, ?, ?, ?)
+    `).run(written.file_path, written.size_bytes, duration_ms, written.table_count, written.row_count)
+    return { status: 'ok', ...written, duration_ms }
+  } catch (err) {
+    const error = err?.message || String(err)
+    db.prepare(`
+      INSERT INTO log_system_backups (trigger, status, duration_ms, error_message)
+      VALUES ('pre_update', 'error', ?, ?)
+    `).run(Date.now() - start, error)
+    return { status: 'error', error }
+  }
+}
+
 /**
  * Keep only the most recent N snapshots in the backup directory. Older files are removed.
  * Filenames sort lexicographically thanks to the ISO timestamp.
@@ -426,6 +468,7 @@ module.exports = {
   startBackups,
   rescheduleBackups,
   runBackup,
+  runPreUpdateBackup,
   // Snapshot helpers (shared with routes/backup.js)
   MIN_COMPATIBLE_SCHEMA,
   EXCLUDED_TABLES,
@@ -436,6 +479,8 @@ module.exports = {
   // Disk helpers (for Phase C admin endpoints)
   getBackupDir,
   writeSnapshotToDisk,
+  getPreUpdateBackupDir,
+  writePreUpdateSnapshotToDisk,
   pruneOldSnapshots,
   // Remote target introspection (for Phase C status panel)
   getConfiguredTargets,

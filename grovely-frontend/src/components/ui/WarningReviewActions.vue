@@ -39,7 +39,7 @@
     confirmColor="#b45309"
     theme="amber"
     :loading="loading === 'excluded'"
-    @update:open="v => { if (!v) pendingAction = null }"
+    @update:open="onDialogOpenChange"
     @confirm="submitReview('excluded')"
   >
     {{ itemLabel }} will be kept in your history but ignored when calculating averages and predictions.
@@ -55,7 +55,7 @@
     confirmColor="#b45309"
     theme="amber"
     :loading="loading === 'confirmed'"
-    @update:open="v => { if (!v) pendingAction = null }"
+    @update:open="onDialogOpenChange"
     @confirm="submitReview('confirmed')"
   >
     {{ itemLabel }} will be included in your predictions, even though it looks unusual.
@@ -79,6 +79,10 @@ const emit = defineEmits<{ reviewed: [] }>()
 
 const pendingAction = ref<string | null>(null)
 const loading = ref<string | null>(null)
+
+function onDialogOpenChange(open: boolean) {
+  if (!open) pendingAction.value = null
+}
 
 async function submitReview(state: string) {
   loading.value = state

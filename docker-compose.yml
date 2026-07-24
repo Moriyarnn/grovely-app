@@ -36,11 +36,13 @@ services:
       - "3000:3000"
     volumes:
       - sqlite_data_prod:/app/data
+      - updater_state_prod:/updater-state:ro
     environment:
       - NODE_ENV=production
       - TZ=${TZ:-UTC}
       - PUID=${PUID:-1000}
       - PGID=${PGID:-1000}
+      - UPDATER_TOKEN_FILE=/updater-state/updater-token
     env_file:
       - .env
     networks:
@@ -52,9 +54,35 @@ services:
           cpus: '0.5'
     restart: always
 
+  # Official local maintenance component. It is intentionally separate from
+  # the web backend because Docker socket access controls the host.
+  updater:
+    container_name: grovely-prod-updater
+    image: ghcr.io/moriyarnn/grovely-updater:${GROVELY_VERSION:-latest}
+    build: ./grovely-updater
+    volumes:
+      - ./:/grovely
+      - /var/run/docker.sock:/var/run/docker.sock
+      - updater_state_prod:/state
+    environment:
+      - PORT=3003
+      - GROVELY_APP_DIR=/grovely
+      - BACKEND_INTERNAL_URL=http://backend:3000
+      - UPDATER_TOKEN_FILE=/state/updater-token
+      - UPDATE_FEED_URL=${UPDATE_FEED_URL:-https://grovely.org/releases/stable.json}
+      - UPDATE_CHECK_INTERVAL_HOURS=${UPDATE_CHECK_INTERVAL_HOURS:-24}
+    env_file:
+      - .env
+    depends_on:
+      - backend
+    networks:
+      - app_net
+    restart: always
+
 networks:
   app_net:
     driver: bridge
 
 volumes:
   sqlite_data_prod:
+  updater_state_prod:

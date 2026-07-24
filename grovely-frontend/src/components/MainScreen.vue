@@ -30,6 +30,8 @@
       <span>No telemetry. Your data stays on your server.</span>
     </div>
 
+    <UpdateStatusCard v-if="!__DEMO__" />
+
     <div class="ms-divider" />
 
     <!-- App stats -->
@@ -106,6 +108,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import AppScroller from '@/components/ui/AppScroller.vue'
+import UpdateStatusCard from '@/components/UpdateStatusCard.vue'
 import { useRouter } from 'vue-router'
 import { API, apiFetch } from '../api'
 

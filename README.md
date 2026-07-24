@@ -79,6 +79,7 @@
 - Installable as a PWA - add to home screen on iOS and Android for a native app feel
 - Reverse proxy ready - ships overlay files for Caddy, Nginx, Traefik, and dockerized proxy setups
 - SQLite database - no external DB server, everything in one file you own
+- Built-in release awareness - Grovely checks its public release feed so both partners can see available fixes and update safely
 
 ## Screenshots
 
@@ -156,8 +157,8 @@ Open **http://localhost:5173** and log in.
 
 ```bash
 mkdir grovely && cd grovely
-curl -O https://raw.githubusercontent.com/Moriyarnn/grovely-app/main/docker-compose.yml
-curl -o .env https://raw.githubusercontent.com/Moriyarnn/grovely-app/main/example.env
+curl -LO https://github.com/Moriyarnn/grovely-app/releases/latest/download/docker-compose.yml
+curl -L -o .env https://github.com/Moriyarnn/grovely-app/releases/latest/download/example.env
 ```
 
 Edit `.env` and set the usernames and passwords for both accounts, then:
@@ -176,7 +177,7 @@ See [INSTALL.md](./INSTALL.md) for full instructions including reverse proxy set
 
 ## Privacy
 
-No telemetry. No phone-home. No external calls unless you configure SMTP, and that's opt-in. Your data never leaves your server.
+No telemetry or household-data collection. Your household data stays on your server. Grovely checks its public release feed once per day so it can show available fixes. That request sends no account, license, installed-version, usage, or household data, and can be disabled with `UPDATE_CHECK_ENABLED=false`. SMTP and remote backups remain opt-in.
 
 ## Pricing
 
@@ -194,7 +195,7 @@ Grovely is **open core** - the core is free forever, and the premium tier funds 
 - Smart Autofill on the shopping list - purchase history autocomplete with price delta
 - Adjust Cycle and the Current Phase card on the period tracker
 
-More premium features are on the [roadmap](#roadmap), and the price stays $20/year regardless of what's added. The license check is readable offline JWT verification against a public key baked into the image - no license server, no phone-home, validates with no network call ever.
+More premium features are on the [roadmap](#roadmap), and the price stays $20/year regardless of what's added. License verification is readable offline JWT verification against a public key baked into the image - it contacts no license server and makes no network call.
 
 **Get a license → https://grovely.lemonsqueezy.com/**
 
@@ -202,4 +203,4 @@ Prefer to support without premium? You can sponsor development on [Ko-fi](https:
 
 ## License
 
-AGPL-3.0 open core. Email notifications, automatic backups, and advanced features require a $20/year offline license key - offline validation, no server calls.
+AGPL-3.0 open core. Email notifications, automatic backups, and advanced features require a $20/year offline license key - offline validation with no license-server calls.

@@ -6,7 +6,7 @@
     title="Notifications"
     subtitle="Email notifications for your household"
     subtitle-style="plain"
-    @update:open="v => { if (!v) close() }"
+    @update:open="onOpenChange"
   >
     <div class="nm-body">
 
@@ -273,6 +273,10 @@ function close() {
   emit('update:modelValue', false)
 }
 
+function onOpenChange(open: boolean) {
+  if (!open) close()
+}
+
 const { settings, fetchSettings, updateSetting } = useSettings()
 const serverTimezone = computed(() => settings.value.server_timezone ?? 'UTC')
 
@@ -447,17 +451,6 @@ const drilledAppLive = computed(() => {
   return false
 })
 
-const drilledAppEnabled = computed(() => {
-  if (drilledApp.value === 'period') return periodEnabled.value
-  if (drilledApp.value === 'pantry') return pantryEnabled.value
-  return false
-})
-
-function toggleDrilledApp() {
-  if (drilledApp.value === 'period') togglePeriod()
-  else if (drilledApp.value === 'pantry') togglePantry()
-}
-
 const drilledTypes = computed(() => {
   if (drilledApp.value === 'period') return PERIOD_TYPES
   if (drilledApp.value === 'pantry') return PANTRY_TYPES
@@ -586,9 +579,6 @@ const EMAIL_FIELDS = [
 const editingKey   = ref<string | null>(null)
 const editingValue = ref('')
 
-function currentValue(key: string, placeholder: string): string {
-  return settings.value[key] || placeholder
-}
 function startEdit(key: string) {
   if (editingKey.value === key) { editingKey.value = null; return }
   editingKey.value = key
