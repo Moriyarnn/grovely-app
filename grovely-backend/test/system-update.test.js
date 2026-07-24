@@ -15,7 +15,11 @@ function tokenFor (id, username, role) {
 async function startApp () {
   const app = express()
   app.use(express.json())
-  app.use('/api/system/update', requireAuth, systemUpdateRouter({}))
+  const router = systemUpdateRouter({})
+  app.use('/api/system/update', (req, res, next) => {
+    if (req.method === 'POST' && req.path === '/internal/pre-update-snapshot') return router(req, res, next)
+    next()
+  }, requireAuth, router)
   const server = await new Promise(resolve => {
     const listener = app.listen(0, '127.0.0.1', () => resolve(listener))
   })
@@ -46,19 +50,24 @@ test('both household roles can read update status', async () => {
   }
 })
 
-test('pre-update snapshots require the internal updater credential', async () => {
-  const owner = { Authorization: `Bearer ${tokenFor(1, 'owner', 'owner1')}` }
+test('pre-update snapshots accept only the internal updater credential', async () => {
   const previousToken = process.env.UPDATER_TOKEN
   process.env.UPDATER_TOKEN = 'local-test-token'
 
-  const absent = await request(app.baseUrl, '/api/system/update/internal/pre-update-snapshot', { method: 'POST', headers: owner })
+  const absent = await request(app.baseUrl, '/api/system/update/internal/pre-update-snapshot', { method: 'POST' })
   assert.equal(absent.response.status, 401)
 
   const incorrect = await request(app.baseUrl, '/api/system/update/internal/pre-update-snapshot', {
     method: 'POST',
-    headers: { ...owner, 'X-Grovely-Updater-Token': 'incorrect' },
+    headers: { 'X-Grovely-Updater-Token': 'incorrect' },
   })
   assert.equal(incorrect.response.status, 401)
+
+  const accepted = await request(app.baseUrl, '/api/system/update/internal/pre-update-snapshot', {
+    method: 'POST',
+    headers: { 'X-Grovely-Updater-Token': 'local-test-token' },
+  })
+  assert.equal(accepted.response.status, 500)
   if (previousToken === undefined) delete process.env.UPDATER_TOKEN
   else process.env.UPDATER_TOKEN = previousToken
 })

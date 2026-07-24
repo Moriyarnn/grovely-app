@@ -5,6 +5,15 @@ record; the in-app "What's New" panel shows a short summary of major releases on
 
 ---
 
+## v0.14.1-rc.3 - updater completion fixes
+*July 24, 2026*
+
+- Pre-update snapshots now authenticate with the private updater token before the normal household API authentication layer
+- The updater image includes its Compose command helper, and UAT port overrides replace base port bindings cleanly
+- Only stable version tags now publish the `latest` image tag; prerelease tags remain opt-in
+
+---
+
 ## v0.14.1-rc.2 - UAT update correction
 *July 24, 2026*
 

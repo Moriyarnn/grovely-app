@@ -171,7 +171,10 @@ app.use('/api/settings', requireAuth, settingsRouter)
 // household accounts have equal access; Docker control stays outside this web
 // process in the dedicated updater service.
 const systemUpdateRouter = require('./routes/system-update')(db)
-app.use('/api/system/update', requireAuth, systemUpdateRouter)
+app.use('/api/system/update', (req, res, next) => {
+  if (req.method === 'POST' && req.path === '/internal/pre-update-snapshot') return systemUpdateRouter(req, res, next)
+  next()
+}, requireAuth, systemUpdateRouter)
 
 // User preferences
 const preferencesRouter = require('./routes/preferences')(db)

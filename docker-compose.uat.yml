@@ -9,7 +9,7 @@ services:
       args:
         BUILD_MODE: uat
         VITE_BACKEND_PORT: "3002"
-    ports:
+    ports: !override
       - "5175:5173"
     depends_on:
       - backend
@@ -25,7 +25,7 @@ services:
   backend:
     container_name: grovely-uat-backend
     build: ./grovely-backend
-    ports:
+    ports: !override
       - "3002:3000"
     volumes:
       - sqlite_data_uat:/app/data
