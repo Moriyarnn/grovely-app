@@ -2,7 +2,7 @@
   <div class="hub-root">
 
         <!-- Desktop home panel -->
-        <div class="hub-desktop-panel">
+        <div v-if="isDesktop" class="hub-desktop-panel">
           <MainScreen />
         </div>
 
@@ -56,7 +56,6 @@
           <div class="strip-slot mobile-only">
             <SummaryStrip />
           </div>
-          <UpdateStatusCard v-if="!__DEMO__" class="mobile-only" />
 
           <!-- Desktop-only mini-header -->
           <div class="hub-desktop-header desktop-only">
@@ -171,7 +170,6 @@ import logoSide from '../assets/Logo Side Hub.png'
 import { useRouter } from 'vue-router'
 import SummaryStrip from '../components/SummaryStrip.vue'
 import MainScreen from '../components/MainScreen.vue'
-import UpdateStatusCard from '../components/UpdateStatusCard.vue'
 import { API, apiFetch, getUser, clearToken, clearUser, setToken, setUser } from '../api'
 import { usePreferences } from '../composables/usePreferences'
 import { apps } from '../composables/useApps'
@@ -186,6 +184,18 @@ const { licenseActive, fetchLicenseStatus } = useLicense()
 const currentUser = ref(getUser())
 const isDev = import.meta.env.DEV
 const showSwitcher = ref(false)
+const isDesktop = ref(typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches)
+let desktopMediaQuery
+
+function updateDesktopMode() {
+  isDesktop.value = desktopMediaQuery.matches
+}
+
+onMounted(() => {
+  desktopMediaQuery = window.matchMedia('(min-width: 1024px)')
+  desktopMediaQuery.addEventListener('change', updateDesktopMode)
+})
+onUnmounted(() => desktopMediaQuery?.removeEventListener('change', updateDesktopMode))
 
 onMounted(() => { fetchAppStats(); fetchLicenseStatus() })
 

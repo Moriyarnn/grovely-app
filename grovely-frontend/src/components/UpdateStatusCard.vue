@@ -22,7 +22,7 @@
         <button class="update-card__button update-card__button--quiet" :disabled="loading || status.updating" @click="checkNow">
           {{ loading ? 'Checking…' : 'Check now' }}
         </button>
-        <button v-if="available" class="update-card__button" :disabled="loading || status.updating" @click="installNow">
+        <button v-if="available" class="update-card__button update-card__button--update" :disabled="loading || status.updating" @click="installNow">
           {{ status.updating ? 'Updating…' : 'Update now' }}
         </button>
       </div>
@@ -33,7 +33,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { API, apiFetch } from '../api'
-import { isNewerVersion } from '../utils/version'
+import { isNewerVersion, isSameVersion } from '../utils/version'
 
 type UpdateStatus = {
   current_version?: string
@@ -45,6 +45,7 @@ type UpdateStatus = {
 
 const status = ref<UpdateStatus>({})
 const loading = ref(false)
+const reloadAfterUpdate = ref(false)
 let pollTimer: ReturnType<typeof setInterval> | null = null
 
 const latestVersion = computed(() => status.value.latest?.version || '')
@@ -59,6 +60,10 @@ async function load(path = '') {
   const response = await apiFetch(`${API}/system/update${path}`, { method: path ? 'POST' : 'GET' })
   const body = await response.json().catch(() => ({}))
   status.value = { ...status.value, ...body }
+  if (reloadAfterUpdate.value && !status.value.updating && !status.value.error && isSameVersion(latestVersion.value, status.value.current_version)) {
+    reloadAfterUpdate.value = false
+    window.location.reload()
+  }
 }
 
 async function checkNow() {
@@ -70,7 +75,10 @@ async function checkNow() {
 async function installNow() {
   if (!window.confirm(`Update Grovely to ${latestVersion.value}? A local recovery snapshot will be created first.`)) return
   loading.value = true
-  try { await load('/install') } catch { status.value.error = 'Could not start the update.' }
+  try {
+    await load('/install')
+    reloadAfterUpdate.value = Boolean(status.value.updating)
+  } catch { status.value.error = 'Could not start the update.' }
   finally { loading.value = false }
 }
 
@@ -93,7 +101,8 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer) })
 .update-card__text { display: -webkit-box; min-height: 32px; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .update-card__checked { height: 16px; color: #9aa59e; }
 .update-card__actions { display: flex; min-height: 29px; gap: 7px; margin-top: auto; }
-.update-card__button { border: 0; border-radius: 999px; background: #993556; color: #fff; padding: 6px 10px; font: inherit; font-size: 11px; font-weight: 700; cursor: pointer; }
-.update-card__button--quiet { color: #547264; background: #e7f4eb; }
+.update-card__button { box-sizing: border-box; border: 0; border-radius: 999px; background: #993556; color: #fff; padding: 6px 10px; font: inherit; font-size: 11px; font-weight: 700; line-height: 17px; white-space: nowrap; cursor: pointer; }
+.update-card__button--quiet { flex: 0 0 86px; width: 86px; color: #547264; background: #e7f4eb; }
+.update-card__button--update { flex: 0 0 88px; width: 88px; }
 .update-card__button:disabled { opacity: .55; cursor: default; }
 </style>

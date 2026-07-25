@@ -38,3 +38,8 @@ export function isNewerVersion (latest?: string, current?: string): boolean {
   }
   return false
 }
+
+export function isSameVersion (left?: string, right?: string): boolean {
+  if (!left || !right) return false
+  return left.replace(/^v/, '') === right.replace(/^v/, '')
+}

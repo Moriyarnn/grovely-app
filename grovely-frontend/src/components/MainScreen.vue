@@ -57,11 +57,20 @@
 
     <!-- Changelog -->
     <div class="ms-section">
-      <p class="ms-section-label">
-        What's new
-        <span v-if="hasUnread" class="ms-unread-dot" />
-      </p>
-      <AppScroller class="ms-changelog" theme="pink" always-visible>
+      <button v-if="isMobile" class="ms-whats-new-button" type="button" @click="openChangelog">
+        <span class="ms-section-label">
+          What's new
+          <span v-if="hasUnread" class="ms-unread-dot" />
+        </span>
+        <span class="ms-whats-new-action">View updates <v-icon size="15">mdi-chevron-right</v-icon></span>
+      </button>
+
+      <template v-else>
+        <p class="ms-section-label">
+          What's new
+          <span v-if="hasUnread" class="ms-unread-dot" />
+        </p>
+        <AppScroller class="ms-changelog" theme="pink" always-visible>
         <div v-for="entry in CHANGELOG" :key="entry.version" class="ms-cl-entry">
           <div class="ms-cl-head">
             <div class="ms-cl-head-left">
@@ -99,15 +108,57 @@
             >#{{ n }}</a>
           </div>
         </div>
-      </AppScroller>
+        </AppScroller>
+      </template>
     </div>
+
+    <DetailSheet
+      v-if="isMobile"
+      :open="changelogOpen"
+      title="What's new"
+      subtitle="Grovely updates"
+      subtitle-style="plain"
+      theme="pink"
+      size="large"
+      scroll="contained"
+      mobile-height="78vh"
+      @update:open="changelogOpen = $event"
+    >
+      <div class="ms-changelog-sheet">
+        <div v-for="entry in CHANGELOG" :key="entry.version" class="ms-cl-entry">
+          <div class="ms-cl-head">
+            <div class="ms-cl-head-left">
+              <span class="ms-cl-version">{{ entry.version }}</span>
+              <span v-if="entry.title" class="ms-cl-title">{{ entry.title }}</span>
+            </div>
+            <span class="ms-cl-date">{{ entry.date }}</span>
+          </div>
+          <div v-for="(item, i) in entry.items" :key="i" class="ms-cl-row">
+            <span class="ms-tag" :class="`ms-tag--${item.plan.toLowerCase()}`">{{ item.plan }}</span>
+            <span class="ms-cl-text">{{ item.text }}</span>
+          </div>
+          <div v-if="entry.fixes?.length" class="ms-cl-fixes">
+            <span class="ms-cl-fixes-label">Closes</span>
+            <a
+              v-for="n in entry.fixes"
+              :key="n"
+              class="ms-issue-chip"
+              :href="`https://github.com/Moriyarnn/grovely-app/issues/${n}`"
+              target="_blank"
+              rel="noopener"
+            >#{{ n }}</a>
+          </div>
+        </div>
+      </div>
+    </DetailSheet>
 
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import AppScroller from '@/components/ui/AppScroller.vue'
+import DetailSheet from '@/components/ui/DetailSheet.vue'
 import UpdateStatusCard from '@/components/UpdateStatusCard.vue'
 import { useRouter } from 'vue-router'
 import { API, apiFetch } from '../api'
@@ -127,10 +178,28 @@ const daysRunning = ref(null)
 const dbSizeLabel = ref('— MB')
 
 const hasUnread = ref(localStorage.getItem(LAST_SEEN_KEY) !== APP_VERSION)
+const changelogOpen = ref(false)
+const isMobile = ref(typeof window !== 'undefined' && window.matchMedia('(max-width: 1023px)').matches)
+let mobileMediaQuery
 
-onMounted(async () => {
+function updateMobileMode() {
+  isMobile.value = mobileMediaQuery.matches
+}
+
+function markChangelogSeen() {
   localStorage.setItem(LAST_SEEN_KEY, APP_VERSION)
   hasUnread.value = false
+}
+
+function openChangelog() {
+  changelogOpen.value = true
+  markChangelogSeen()
+}
+
+onMounted(async () => {
+  mobileMediaQuery = window.matchMedia('(max-width: 1023px)')
+  mobileMediaQuery.addEventListener('change', updateMobileMode)
+  if (!isMobile.value) markChangelogSeen()
 
   try {
     const r = await apiFetch(`${API}/period/cycles`)
@@ -151,6 +220,7 @@ onMounted(async () => {
     }
   } catch {}
 })
+onUnmounted(() => mobileMediaQuery?.removeEventListener('change', updateMobileMode))
 
 const rowScrollTimers = new WeakMap()
 
@@ -567,6 +637,25 @@ const CHANGELOG = [
   background: #D4537E;
   flex-shrink: 0;
 }
+
+.ms-whats-new-button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid #f0e8ec;
+  border-radius: 12px;
+  background: #fff;
+  color: #993556;
+  cursor: pointer;
+  text-align: left;
+}
+
+.ms-whats-new-button .ms-section-label { margin: 0; }
+.ms-whats-new-action { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+.ms-changelog-sheet { display: flex; flex: 1; min-height: 0; flex-direction: column; gap: 8px; overflow-y: auto; padding-right: 4px; }
 
 /* ── Stats grid ───────────────────────────────────────────────── */
 .ms-stats {

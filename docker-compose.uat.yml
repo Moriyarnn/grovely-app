@@ -68,8 +68,6 @@ services:
       - UPDATE_BUILD_ON_INSTALL=false
       - UPDATE_FEED_URL=https://grovely.org/releases/uat.json
       - UPDATE_CHECK_INTERVAL_HOURS=${UPDATE_CHECK_INTERVAL_HOURS:-24}
-    env_file:
-      - .env.uat
     depends_on:
       - backend
     networks:

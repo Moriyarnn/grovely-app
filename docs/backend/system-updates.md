@@ -67,6 +67,8 @@ The Home update card can show:
 - an unavailable updater or release feed;
 - an update failure with preserved recovery information.
 
+After a person confirms an update, the updater first records that work is in progress and the backend returns `202 Accepted`. This acknowledgement is not a success claim: it lets Home show the reconnecting state before the backend is recreated. Home automatically reloads only after it can reach the restarted backend and that backend reports the exact offered version. The refreshed frontend bundle then shows the matching application version. A snapshot, pull, container, health-check, or version-confirmation failure remains an error rather than a successful update.
+
 The card does not expose Docker output, host paths, Compose arguments, credentials, or snapshot file paths. A failed check stays visible until Home is reloaded or the person chooses `Check now` again. This makes an outage visible without continuous browser polling.
 
 Both accounts have equal update access. The update action emits a silent realtime activity event so connected clients can refresh without showing private system details.
@@ -118,12 +120,13 @@ That internal route rejects absent or incorrect updater credentials. The backend
 
 When a person confirms an available update:
 
-1. Grovely System performs a fresh release check.
-2. It asks the backend to create a local pre-update snapshot.
-3. It updates `GROVELY_VERSION` in the installation's local environment file.
-4. Production pulls the fixed frontend and backend release images.
-5. Docker Compose recreates only frontend and backend and waits for health.
-6. Grovely System persists success or failure state for Home to display.
+1. Grovely System records that the requested update is in progress and Home receives an acknowledgement.
+2. It performs a fresh release check.
+3. It asks the backend to create a local pre-update snapshot.
+4. It updates `GROVELY_VERSION` in the installation's local environment file.
+5. Production pulls the fixed frontend and backend release images.
+6. Docker Compose recreates only frontend and backend and waits for health.
+7. Grovely System persists success or failure state. Home confirms the restarted backend's version before reloading the frontend bundle.
 
 The updater deliberately does not recreate itself during its own request. A newer updater image is obtained on a later full manual Compose pull and recreate. This prevents the updater from terminating the request that is coordinating the application update.
 
@@ -154,9 +157,9 @@ Normal updates change images while preserving the local Compose and proxy config
 
 ## UAT behavior
 
-UAT runs Grovely System with its own Docker state volume, isolated UAT backend, UAT frontend, UAT environment file, and UAT Compose file. It has Docker control only because this is where the real snapshot, rebuild, recreate, and health-check behavior is tested.
+UAT runs Grovely System with its own Docker state volume, isolated UAT backend, UAT frontend, UAT environment file, and UAT Compose file. It has Docker control only because this is where the real snapshot, pull, recreate, and health-check behavior is tested.
 
-Unlike production, UAT rebuilds local UAT frontend and backend source on an update instead of pulling a production release image. This exercises the update protocol without replacing UAT with a production image.
+UAT uses the prerelease feed. A release test deliberately starts the isolated frontend and backend on an earlier published release candidate, then lets Grovely System pull the next published candidate. This mirrors the production image-update path without touching production data or containers.
 
 ## Operational troubleshooting
 
@@ -168,6 +171,18 @@ Unlike production, UAT rebuilds local UAT frontend and backend source on an upda
 | `Update stopped safely` | Snapshot, pull, recreate, or health check failed. | Review local container logs and keep the preserved pre-update snapshot available for recovery. |
 
 For air-gapped systems, disable scheduled checks and update from an explicitly trusted local image source using the normal Docker Compose process.
+
+### Local diagnostics
+
+Grovely System writes phase-specific diagnostics only to the installation's local container logs. They cover release-feed checks, snapshot creation, version-file changes, image pulls, Compose recreation, health waits, and internal backend-to-updater requests. They never include updater credentials, environment values, household data, request bodies, or snapshot paths.
+
+For a failed update, inspect the local logs:
+
+```text
+docker compose logs --tail 200 updater backend
+```
+
+Events are prefixed with `[updater]` or `[system-update]` and identify the failed phase without sending diagnostics anywhere.
 
 ## Validation expectations
 

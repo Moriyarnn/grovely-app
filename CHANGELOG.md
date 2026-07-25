@@ -5,6 +5,16 @@ record; the in-app "What's New" panel shows a short summary of major releases on
 
 ---
 
+## v0.14.1 - update system
+*July 24, 2026*
+
+- Grovely System provides privacy-respecting release awareness and user-confirmed frontend and backend updates with a local recovery snapshot
+- Update requests now acknowledge the reconnecting state before the backend restarts, then confirm the exact running version before refreshing the frontend
+- Local diagnostics identify release-check, snapshot, image-pull, Compose, and health-check phases without logging household data or credentials
+- Mobile Hub no longer mounts desktop-only update content, and mobile What’s new updates open in a scrollable sheet
+
+---
+
 ## v0.14.1-rc.4 - update workflow validation
 *July 24, 2026*
 

@@ -71,8 +71,6 @@ services:
       - UPDATER_TOKEN_FILE=/state/updater-token
       - UPDATE_FEED_URL=${UPDATE_FEED_URL:-https://grovely.org/releases/stable.json}
       - UPDATE_CHECK_INTERVAL_HOURS=${UPDATE_CHECK_INTERVAL_HOURS:-24}
-    env_file:
-      - .env
     depends_on:
       - backend
     networks:

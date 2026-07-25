@@ -13,6 +13,7 @@ let updater
 let updaterPort
 let tempDir
 const token = 'test-updater-token'
+let updaterLogs = ''
 
 function listen (server) {
   return new Promise(resolve => server.listen(0, '127.0.0.1', () => resolve(server.address().port)))
@@ -23,10 +24,10 @@ async function request (url, options) {
   return { status: response.status, body: await response.json() }
 }
 
-async function waitForUpdater () {
+async function waitForUpdater (port = updaterPort, credential = token) {
   for (let attempt = 0; attempt < 40; attempt++) {
     try {
-      const result = await request(`http://127.0.0.1:${updaterPort}/status`, { headers: { 'X-Grovely-Updater-Token': token } })
+      const result = await request(`http://127.0.0.1:${port}/status`, { headers: { 'X-Grovely-Updater-Token': credential } })
       if (result.status === 200) return
     } catch {}
     await new Promise(resolve => setTimeout(resolve, 25))
@@ -55,9 +56,12 @@ before(async () => {
       UPDATE_CHECK_ENABLED: 'false',
       UPDATE_FEED_URL: `http://127.0.0.1:${feedPort}/stable.json`,
       UPDATE_STATE_FILE: path.join(tempDir, 'state.json'),
+      BACKEND_INTERNAL_URL: 'http://127.0.0.1:1',
     },
-    stdio: 'ignore',
+    stdio: ['ignore', 'pipe', 'pipe'],
   })
+  updater.stdout.on('data', data => { updaterLogs += data.toString() })
+  updater.stderr.on('data', data => { updaterLogs += data.toString() })
   await waitForUpdater()
 })
 
@@ -71,6 +75,11 @@ test('rejects requests without the local updater token', async () => {
   const result = await request(`http://127.0.0.1:${updaterPort}/status`)
   assert.equal(result.status, 401)
   assert.equal(result.body.error, 'Unauthorized updater request.')
+})
+
+test('writes lifecycle diagnostics without exposing the updater credential', () => {
+  assert.match(updaterLogs, /\[updater\].*service_started/)
+  assert.doesNotMatch(updaterLogs, new RegExp(token))
 })
 
 test('accepts only valid public release metadata', async () => {
@@ -89,6 +98,16 @@ test('accepts only valid public release metadata', async () => {
   assert.equal(invalid.status, 200)
   assert.match(invalid.body.error, /invalid version/i)
   feedPayload = { version: 'v0.14.1', summary: 'Test release' }
+})
+
+test('accepts an update before the backend restart begins', async () => {
+  const result = await request(`http://127.0.0.1:${updaterPort}/install`, {
+    method: 'POST',
+    headers: { 'X-Grovely-Updater-Token': token },
+  })
+  assert.equal(result.status, 202)
+  assert.equal(result.body.accepted, true)
+  assert.equal(result.body.updating, true)
 })
 
 test('uses the configured environment file for Compose commands', () => {
@@ -123,6 +142,7 @@ test('creates a persistent local credential when no environment token exists', a
       await new Promise(resolve => setTimeout(resolve, 25))
     }
     assert.match(generated, /^[a-f0-9]{64}$/)
+    await waitForUpdater(port, generated)
     const result = await request(`http://127.0.0.1:${port}/status`, { headers: { 'X-Grovely-Updater-Token': generated } })
     assert.equal(result.status, 200)
   } finally {
