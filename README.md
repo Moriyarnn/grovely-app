@@ -6,25 +6,66 @@
   </picture>
 </p>
 
-<p align="center">
-  <a href="https://www.gnu.org/licenses/agpl-3.0"><img src="https://img.shields.io/badge/License-AGPL_v3-blue.svg" alt="License: AGPL v3" /></a>
-  <a href="https://github.com/Moriyarnn/grovely-app/actions/workflows/docker-publish.yml"><img src="https://github.com/Moriyarnn/grovely-app/actions/workflows/docker-publish.yml/badge.svg" alt="Docker Build" /></a>
-  <img src="https://img.shields.io/badge/arch-amd64%20%7C%20arm64-lightgrey" alt="amd64 + arm64" />
-  <img src="https://img.shields.io/badge/privacy-first-blueviolet" alt="Privacy First" />
-  <img src="https://img.shields.io/badge/telemetry-none-green" alt="No Telemetry" />
-  <img src="https://img.shields.io/badge/license%20check-offline-green" alt="Offline License" />
-</p>
+<table align="center">
+  <tbody>
+    <tr>
+      <td><a href="https://www.gnu.org/licenses/agpl-3.0"><img src="https://img.shields.io/badge/License-AGPL_v3-blue.svg" alt="License: AGPL v3" /></a></td>
+      <td><a href="https://github.com/Moriyarnn/grovely-app/actions/workflows/docker-publish.yml"><img src="https://github.com/Moriyarnn/grovely-app/actions/workflows/docker-publish.yml/badge.svg" alt="Docker Build" /></a></td>
+      <td><img src="https://img.shields.io/badge/arch-amd64%20%7C%20arm64-lightgrey" alt="amd64 + arm64" /></td>
+      <td><img src="https://img.shields.io/badge/privacy-first-blueviolet" alt="Privacy First" /></td>
+      <td><img src="https://img.shields.io/badge/telemetry-none-green" alt="No Telemetry" /></td>
+      <td><img src="https://img.shields.io/badge/license%20check-offline-green" alt="Offline License" /></td>
+    </tr>
+  </tbody>
+</table>
 
 <p align="center">Self-hosted household hub with couples support - period tracking, shared pantry, and more on the way.</p>
 
 <p align="center">When my wife and I moved in together, we realized every period tracker charged $40/year and sold the data, and nothing handled the rest of the household either. So I built Grovely. Every problem we ran into became a feature that tied everything together, and there's so much more we want to build.</p>
 
-<p align="center">
-  <img src="grovely-frontend/src/assets/Mobile Period Tracker.jpg" width="30%" />
-  <img src="grovely-frontend/src/assets/Mobile Inventory.jpg" width="30%" />
-  <img src="grovely-frontend/src/assets/Mobile Backups.jpg" width="30%" />
-</p>
+<p align="center"><a href="https://try.grovely.org"><strong>Try the demo</strong></a> - if you have any thoughts or feedback, the application includes an easy way to submit it.</p>
+
+<table align="center">
+  <tbody>
+    <tr>
+      <td width="33.33%"><img src="grovely-frontend/src/assets/Mobile Period Tracker.jpg" width="100%" alt="Period tracker on mobile" /></td>
+      <td width="33.33%"><img src="grovely-frontend/src/assets/Mobile Inventory.jpg" width="100%" alt="Pantry inventory on mobile" /></td>
+      <td width="33.33%"><img src="grovely-frontend/src/assets/Mobile Backups.jpg" width="100%" alt="Scheduled backups on mobile" /></td>
+    </tr>
+  </tbody>
+</table>
 <p align="center"><em>Period tracker · Pantry inventory · Scheduled backups</em></p>
+
+## Quick Start
+
+### Easy install (recommended)
+
+1. Make sure [Docker Desktop](https://docs.docker.com/get-docker/) is installed and running
+2. Download the installer for your system:
+   - **Linux / Mac:** [run-to-install.sh](https://grovely.org/install/run-to-install.sh)
+   - **Windows:** [run-to-install.ps1](https://grovely.org/install/run-to-install.ps1)
+3. Run it:
+   - **Linux / Mac:** open a terminal where you saved the file and run `bash run-to-install.sh`
+   - **Windows:** right-click `run-to-install.ps1` and choose "Run with PowerShell"
+4. Follow the instructions on screen to set up your accounts. Once done, you will be given the option to open Grovely in your browser automatically.
+
+Open **http://localhost:5173** and log in.
+
+### Manual install
+
+```bash
+mkdir grovely && cd grovely
+curl -LO https://github.com/Moriyarnn/grovely-app/releases/latest/download/docker-compose.yml
+curl -L -o .env https://github.com/Moriyarnn/grovely-app/releases/latest/download/example.env
+```
+
+Edit `.env` and set the usernames and passwords for both accounts, then:
+
+```bash
+docker compose up -d
+```
+
+See [INSTALL.md](./INSTALL.md) for full instructions including reverse proxy setups (Caddy, Nginx, Traefik, Nginx Proxy Manager), backups, license keys, and troubleshooting.
 
 ## Features
 
@@ -103,18 +144,20 @@
 ### Mobile
 
 <p align="center">
-  <img src="docs/screenshots/Mobile Inventory.jpg" width="30%" />
-  <img src="docs/screenshots/Mobile Backups.jpg" width="30%" />
-  <img src="docs/screenshots/Mobile Notifications.jpg" width="30%" />
+  <img src="docs/screenshots/Mobile Notifications.jpg" width="30%" alt="Notification settings on mobile" />
 </p>
-<p align="center"><em>Pantry inventory · Scheduled backups · Notification settings</em></p>
+<p align="center"><em>Notification settings</em></p>
 
 ### Demos
 
-<p align="center">
-  <img src="docs/screenshots/Period Tracker Demo.gif" width="30%" />
-  <img src="docs/screenshots/Pantry Shopping List Demo.gif" width="30%" />
-</p>
+<table align="center">
+  <tbody>
+    <tr>
+      <td width="50%"><img src="docs/screenshots/Period Tracker Demo.gif" width="100%" alt="Period tracker demo" /></td>
+      <td width="50%"><img src="docs/screenshots/Pantry Shopping List Demo.gif" width="100%" alt="Pantry shopping list demo" /></td>
+    </tr>
+  </tbody>
+</table>
 <p align="center"><em>Drag to log a period and adjust a cycle · Add an item and move it to the pantry</em></p>
 
 ## Roadmap
@@ -137,37 +180,6 @@
 - Symptom-triggered suggestions across features (recipes, exercise, partner nudges)
 - Android and iOS native apps
 - Themes
-
-## Quick Start
-
-### Easy install (recommended)
-
-1. Make sure [Docker Desktop](https://docs.docker.com/get-docker/) is installed and running
-2. Download the installer for your system:
-   - **Linux / Mac:** [run-to-install.sh](https://grovely.org/install/run-to-install.sh)
-   - **Windows:** [run-to-install.ps1](https://grovely.org/install/run-to-install.ps1)
-3. Run it:
-   - **Linux / Mac:** open a terminal where you saved the file and run `bash run-to-install.sh`
-   - **Windows:** right-click `run-to-install.ps1` and choose "Run with PowerShell"
-4. Follow the instructions on screen to set up your accounts. Once done, you will be given the option to open Grovely in your browser automatically.
-
-Open **http://localhost:5173** and log in.
-
-### Manual install
-
-```bash
-mkdir grovely && cd grovely
-curl -LO https://github.com/Moriyarnn/grovely-app/releases/latest/download/docker-compose.yml
-curl -L -o .env https://github.com/Moriyarnn/grovely-app/releases/latest/download/example.env
-```
-
-Edit `.env` and set the usernames and passwords for both accounts, then:
-
-```bash
-docker compose up -d
-```
-
-See [INSTALL.md](./INSTALL.md) for full instructions including reverse proxy setups (Caddy, Nginx, Traefik, Nginx Proxy Manager), backups, license keys, and troubleshooting.
 
 ## Tech Stack
 

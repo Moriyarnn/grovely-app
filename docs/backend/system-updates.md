@@ -1,12 +1,12 @@
-# Grovely System
+# Grovely updater
 
-Grovely System is Grovely's self-hosted update component. Its technical Docker Compose service and image are named `grovely-updater`; its product-facing name is Grovely System.
+Grovely's updater is the self-hosted update component. Its technical Docker Compose service and image are named `grovely-updater`.
 
 It lets either household account see whether a newer Grovely release exists and, when one does, request a safe update from Home. It is free, included in the production stack, and is not a premium feature, add-on platform, Docker dashboard, or generic command runner.
 
 ## What it does and does not do
 
-Grovely System:
+The updater:
 
 - checks the public release feed once every 24 hours by default;
 - shows update status in Home on desktop and mobile;
@@ -27,7 +27,7 @@ It does not:
 
 ## Release source and privacy
 
-GitHub Releases made from `vX.Y.Z` tags are the canonical release source. Grovely System requests:
+GitHub Releases made from `vX.Y.Z` tags are the canonical release source. The updater requests:
 
 ```text
 https://grovely.org/releases/stable.json
@@ -46,7 +46,7 @@ The Grovely site Worker obtains the existing public GitHub latest-release metada
 
 The Worker route bypasses landing-site analytics, counters, cookies, identifiers, and Pages proxy handling. It does not need a special manifest asset to be attached to each release.
 
-The request contains no account, household, license, installed-version, usage, browser, or other application identifier. As with any outgoing request, the receiving infrastructure can observe normal network metadata such as a server IP address. Grovely System does not send household data.
+The request contains no account, household, license, installed-version, usage, browser, or other application identifier. As with any outgoing request, the receiving infrastructure can observe normal network metadata such as a server IP address. The updater does not send household data.
 
 Automatic checks can be disabled in the installation's local `.env`:
 
@@ -80,19 +80,19 @@ The production Compose stack contains three relevant services:
 ```text
 Browser
   -> authenticated Grovely backend
-    -> internal Grovely System API
+    -> internal updater API
       -> Docker daemon, fixed Grovely frontend and backend services
 ```
 
-The browser only calls authenticated backend routes. The backend has no Docker socket. Grovely System has Docker-socket access because it must perform the controlled Compose operation, but its HTTP API is reachable only on the internal Docker network and requires its internal credential.
+The browser only calls authenticated backend routes. The backend has no Docker socket. The updater has Docker-socket access because it must perform the controlled Compose operation, but its HTTP API is reachable only on the internal Docker network and requires its internal credential.
 
-Grovely System has no published host port. The backend contacts it at `http://updater:3003`. Its port is explicitly fixed to `3003` so a general backend `PORT=3000` environment value cannot change the internal protocol.
+The updater has no published host port. The backend contacts it at `http://updater:3003`. Its port is explicitly fixed to `3003` so a general backend `PORT=3000` environment value cannot change the internal protocol.
 
 Direct, host-proxy, and Docker-proxy installations provide their fixed Compose-file list through local configuration. The updater never accepts that list from a browser request.
 
 ## Internal credential
 
-On first startup, Grovely System generates a random 256-bit credential and stores it in its persistent updater-state volume. On later starts it reuses that credential.
+On first startup, the updater generates a random 256-bit credential and stores it in its persistent updater-state volume. On later starts it reuses that credential.
 
 The updater mounts the volume read-write. The backend mounts the same volume read-only and reads the credential only when it needs to call the updater or verify the internal pre-update-snapshot request. The credential is not stored in `.env`, `example.env`, installer output, GitHub, browser responses, or external requests.
 
@@ -120,17 +120,17 @@ That internal route rejects absent or incorrect updater credentials. The backend
 
 When a person confirms an available update:
 
-1. Grovely System records that the requested update is in progress and Home receives an acknowledgement.
+1. The updater records that the requested update is in progress and Home receives an acknowledgement.
 2. It performs a fresh release check.
 3. It asks the backend to create a local pre-update snapshot.
 4. It updates `GROVELY_VERSION` in the installation's local environment file.
 5. Production pulls the fixed frontend and backend release images.
 6. Docker Compose recreates only frontend and backend and waits for health.
-7. Grovely System persists success or failure state. Home confirms the restarted backend's version before reloading the frontend bundle.
+7. The updater persists success or failure state. Home confirms the restarted backend's version before reloading the frontend bundle.
 
 The updater deliberately does not recreate itself during its own request. A newer updater image is obtained on a later full manual Compose pull and recreate. This prevents the updater from terminating the request that is coordinating the application update.
 
-If a snapshot, image pull, container recreation, or health wait fails, the operation stops safely. Grovely System preserves its recovery state and does not automatically roll back, because a database migration may already have run.
+If a snapshot, image pull, container recreation, or health wait fails, the operation stops safely. The updater preserves its recovery state and does not automatically roll back, because a database migration may already have run.
 
 ### Pre-update snapshots
 
@@ -153,13 +153,13 @@ https://github.com/Moriyarnn/grovely-app/releases/latest/download/
 
 The bundle contains matching Compose files, both proxy overlays, `example.env`, `validate-env.sh`, and `Caddyfile.example`. Manual `curl` commands use `-L` because GitHub Release downloads redirect.
 
-Normal updates change images while preserving the local Compose and proxy configuration. A future release that genuinely needs a Compose-structure change must provide an explicit one-time migration instruction. Grovely System never silently replaces Compose files.
+Normal updates change images while preserving the local Compose and proxy configuration. A future release that genuinely needs a Compose-structure change must provide an explicit one-time migration instruction. The updater never silently replaces Compose files.
 
 ## UAT behavior
 
-UAT runs Grovely System with its own Docker state volume, isolated UAT backend, UAT frontend, UAT environment file, and UAT Compose file. It has Docker control only because this is where the real snapshot, pull, recreate, and health-check behavior is tested.
+UAT runs the updater with its own Docker state volume, isolated UAT backend, UAT frontend, UAT environment file, and UAT Compose file. It has Docker control only because this is where the real snapshot, pull, recreate, and health-check behavior is tested.
 
-UAT uses the prerelease feed. A release test deliberately starts the isolated frontend and backend on an earlier published release candidate, then lets Grovely System pull the next published candidate. This mirrors the production image-update path without touching production data or containers.
+UAT uses the prerelease feed. A release test deliberately starts the isolated frontend and backend on an earlier published release candidate, then lets the updater pull the next published candidate. This mirrors the production image-update path without touching production data or containers.
 
 ## Operational troubleshooting
 
@@ -174,7 +174,7 @@ For air-gapped systems, disable scheduled checks and update from an explicitly t
 
 ### Local diagnostics
 
-Grovely System writes phase-specific diagnostics only to the installation's local container logs. They cover release-feed checks, snapshot creation, version-file changes, image pulls, Compose recreation, health waits, and internal backend-to-updater requests. They never include updater credentials, environment values, household data, request bodies, or snapshot paths.
+The updater writes phase-specific diagnostics only to the installation's local container logs. They cover release-feed checks, snapshot creation, version-file changes, image pulls, Compose recreation, health waits, and internal backend-to-updater requests. They never include updater credentials, environment values, household data, request bodies, or snapshot paths.
 
 For a failed update, inspect the local logs:
 
@@ -186,4 +186,4 @@ Events are prefixed with `[updater]` or `[system-update]` and identify the faile
 
 ## Validation expectations
 
-Changes to Grovely System should cover updater credential rejection and generation, malformed feed metadata, both household roles, internal route protection, snapshot-first ordering, direct and proxy Compose configuration, failure preservation, and UAT behavior. Run the relevant backend and updater tests, frontend checks, Compose validation, and isolated UAT verification before release.
+Changes to the updater should cover updater credential rejection and generation, malformed feed metadata, both household roles, internal route protection, snapshot-first ordering, direct and proxy Compose configuration, failure preservation, and UAT behavior. Run the relevant backend and updater tests, frontend checks, Compose validation, and isolated UAT verification before release.

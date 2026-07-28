@@ -1,0 +1,18 @@
+# Isolated host-proxy UAT overlay. It keeps UAT on loopback-only ports so a
+# temporary host proxy can exercise the same-origin production topology.
+services:
+  frontend:
+    image: ghcr.io/moriyarnn/grovely-frontend:${GROVELY_VERSION:-latest}-proxy
+    build:
+      args:
+        VITE_BACKEND_PORT: ""
+    ports: !override
+      - "127.0.0.1:5175:5173"
+
+  backend:
+    ports: !override
+      - "127.0.0.1:3002:3000"
+
+  updater:
+    environment:
+      - GROVELY_COMPOSE_FILES=docker-compose.yml,docker-compose.uat.yml,docker-compose.uat.proxy-host.yml

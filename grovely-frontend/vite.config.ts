@@ -1,8 +1,8 @@
 import { fileURLToPath, URL } from 'node:url'
-import { readFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv, type Plugin } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import vueDevTools from 'vite-plugin-vue-devtools'
 import { demoBackend } from './vite-plugin-demo-backend'
@@ -14,10 +14,57 @@ const pkg = JSON.parse(
 )
 
 const backendDir = fileURLToPath(new URL('../grovely-backend', import.meta.url))
+const headersPath = fileURLToPath(new URL('./dist/_headers', import.meta.url))
+
+function feedbackOrigin(endpoint: string | undefined): string | null {
+  if (!endpoint) return null
+
+  try {
+    const url = new URL(endpoint)
+    return url.protocol === 'https:' ? url.origin : null
+  } catch {
+    return null
+  }
+}
+
+function feedbackCspPlugin(origin: string) {
+  return {
+    name: 'feedback-csp',
+    closeBundle() {
+      const headers = readFileSync(headersPath, 'utf-8')
+      writeFileSync(headersPath, headers.replace("connect-src 'self';", `connect-src 'self' ${origin};`))
+    },
+  }
+}
+
+async function demoReleaseCurrent(): Promise<boolean | null> {
+  try {
+    const response = await fetch('https://grovely.org/releases/stable.json')
+    const manifest = await response.json() as { version?: string }
+    return manifest.version === `v${pkg.version}`
+  } catch {
+    return null
+  }
+}
+
+function demoReleaseStatusPlugin(isDemo: boolean): Plugin {
+  return {
+    name: 'demo-release-status',
+    async config() {
+      return {
+        define: {
+          __DEMO_RELEASE_CURRENT__: JSON.stringify(isDemo ? await demoReleaseCurrent() : null),
+        },
+      }
+    },
+  }
+}
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const isDemo = mode === 'demo'
+  const feedbackEndpoint = process.env.VITE_FEEDBACK_ENDPOINT ?? loadEnv(mode, process.cwd()).VITE_FEEDBACK_ENDPOINT
+  const configuredFeedbackOrigin = feedbackOrigin(feedbackEndpoint)
   return {
     define: {
       __APP_VERSION__: JSON.stringify(pkg.version),
@@ -27,8 +74,10 @@ export default defineConfig(({ mode }) => {
       __DEMO__: JSON.stringify(isDemo),
     },
     plugins: [
+      demoReleaseStatusPlugin(isDemo),
       vue(),
       ...(isDemo ? [demoBackend()] : []),
+      ...(isDemo && configuredFeedbackOrigin ? [feedbackCspPlugin(configuredFeedbackOrigin)] : []),
     ],
     server: {
       host: true,

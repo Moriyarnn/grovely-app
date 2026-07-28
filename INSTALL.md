@@ -4,7 +4,7 @@ A self-hosted household hub for couples: period tracker, shared grocery list, pa
 
 This guide walks you through three deployment shapes:
 
-- **Direct**: open Grovely on `http://your-server:5173`, no domain or HTTPS
+- **Direct**: open Grovely locally on `http://localhost:5173`, no domain or HTTPS
 - **Behind a host-installed reverse proxy**: Caddy, Nginx, Apache, or HAProxy running directly on the host
 - **Behind a dockerized reverse proxy**: Traefik, Nginx Proxy Manager, dockerized Caddy
 
@@ -70,7 +70,7 @@ docker compose up -d
 docker compose ps
 ```
 
-Open `http://your-server:5173`, log in with `OWNER1_USERNAME` / `OWNER1_PASSWORD`, and you're in.
+Open `http://localhost:5173`, log in with `OWNER1_USERNAME` / `OWNER1_PASSWORD`, and you're in.
 
 ## 2. With a host-installed reverse proxy (Caddy, Nginx, Apache)
 
@@ -207,9 +207,9 @@ Everything Grovely accepts is documented inline in [`example.env`](https://githu
 
 ## Updating
 
-Grovely System checks `https://grovely.org/releases/stable.json` once every 24 hours to show both household accounts when a tagged release is available. The request contains no account, license, installed-version, usage, or household data. Normal network metadata such as your server's public IP is visible to the release service. Set `UPDATE_CHECK_ENABLED=false` in `.env` and restart if you prefer not to make release checks.
+Grovely's updater checks `https://grovely.org/releases/stable.json` once every 24 hours to show both household accounts when a tagged release is available. The request contains no account, license, installed-version, usage, or household data. Normal network metadata such as your server's public IP is visible to the release service. Set `UPDATE_CHECK_ENABLED=false` in `.env` and restart if you prefer not to make release checks.
 
-When Grovely System is available, either partner can start an update from Home. It creates a local pre-update recovery snapshot before pulling matched images and waiting for the stack health check. If the system is unavailable, use the commands below.
+When the updater is available, either partner can start an update from Home. It creates a local pre-update recovery snapshot before pulling matched images and waiting for the stack health check. If the updater is unavailable, use the commands below.
 
 Normal releases update the images while keeping your local Compose files and proxy configuration intact. If a future release requires a Compose-structure migration, its release notes will call that out and provide the exact one-time command. Grovely never silently overwrites local Compose files.
 
@@ -268,7 +268,7 @@ docker compose pull
 
 ### Update checks are unavailable
 
-Your reverse proxy only handles incoming browser traffic and does not affect update checks. Grovely System and Docker need outgoing access to `grovely.org` and `ghcr.io`. Check DNS, firewall rules, or your Docker daemon proxy settings. On an air-gapped server, disable release checks and update manually from a trusted image source.
+Your reverse proxy only handles incoming browser traffic and does not affect update checks. The updater and Docker need outgoing access to `grovely.org` and `ghcr.io`. Check DNS, firewall rules, or your Docker daemon proxy settings. On an air-gapped server, disable release checks and update manually from a trusted image source.
 
 ### Frontend loads but login fails
 

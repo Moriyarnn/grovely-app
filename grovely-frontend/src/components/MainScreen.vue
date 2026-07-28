@@ -30,7 +30,7 @@
       <span>No telemetry. Your data stays on your server.</span>
     </div>
 
-    <UpdateStatusCard v-if="!__DEMO__" />
+    <UpdateStatusCard />
 
     <div class="ms-divider" />
 

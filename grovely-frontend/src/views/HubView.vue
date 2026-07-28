@@ -141,9 +141,20 @@
 
           <!-- Mobile-only sign out -->
           <div class="hub-footer mobile-only">
-            <div v-if="licenseActive" class="hub-premium-thanks">
-              <v-icon size="16" color="#993556">{{ premiumNote.icon }}</v-icon>
-              <span>{{ premiumNote.line1 }}<br><a v-if="premiumNote.href" class="hub-premium-cta" :href="premiumNote.href">{{ premiumNote.line2 }}</a><span v-else>{{ premiumNote.line2 }}</span></span>
+            <div class="hub-footer-card">
+              <Transition name="hub-footer-swap" mode="out-in">
+                <div v-if="showMobileFeedback && feedbackConfigured" key="feedback" class="hub-feedback-card">
+                  <FeedbackPanel compact />
+                </div>
+                <div v-else-if="licenseActive" key="thanks" class="hub-premium-thanks">
+                  <v-icon size="16" color="#993556">{{ premiumNote.icon }}</v-icon>
+                  <span>{{ premiumNote.line1 }}<br><a v-if="premiumNote.href" class="hub-premium-cta" :href="premiumNote.href">{{ premiumNote.line2 }}</a><span v-else>{{ premiumNote.line2 }}</span></span>
+                </div>
+                <button v-else-if="licenseActive === false" key="license" type="button" class="hub-premium-invite" @click="premiumGateOpen = true">
+                  <v-icon size="16" color="#993556">mdi-heart</v-icon>
+                  <span>Would you like to see Grovely's development continue?<br>Consider supporting us by getting a <span class="hub-premium-invite-link">premium license.</span></span>
+                </button>
+              </Transition>
             </div>
             <button class="hub-logout-btn" @click="logout">{{ isDemo ? 'Exit demo' : 'Sign out' }}</button>
           </div>
@@ -158,6 +169,7 @@
             :duration="9000"
             @update:model-value="dismissReorderHint"
           />
+          <PremiumGate :open="premiumGateOpen" theme="pink" @update:open="premiumGateOpen = $event" />
 
         </div>
   </div>
@@ -170,17 +182,24 @@ import logoSide from '../assets/Logo Side Hub.png'
 import { useRouter } from 'vue-router'
 import SummaryStrip from '../components/SummaryStrip.vue'
 import MainScreen from '../components/MainScreen.vue'
+import FeedbackPanel from '../components/FeedbackPanel.vue'
+import PremiumGate from '../components/PremiumGate.vue'
 import { API, apiFetch, getUser, clearToken, clearUser, setToken, setUser } from '../api'
 import { usePreferences } from '../composables/usePreferences'
 import { apps } from '../composables/useApps'
 import { useAppStats } from '../composables/useAppStats'
 import { usePeriodData } from '../composables/usePeriodData'
 import { useLicense } from '../composables/useLicense'
+import { feedbackConfig } from '../services/feedback'
 
 const router = useRouter()
 const { preferences, fetchPreferences, updatePreference, resetCache: resetPreferences } = usePreferences()
 const { dynamicSubs, fetchAppStats } = useAppStats()
 const { licenseActive, fetchLicenseStatus } = useLicense()
+const feedbackConfigured = feedbackConfig() !== null
+const showMobileFeedback = ref(false)
+const premiumGateOpen = ref(false)
+let mobileFooterTimer
 const currentUser = ref(getUser())
 const isDev = import.meta.env.DEV
 const showSwitcher = ref(false)
@@ -191,11 +210,32 @@ function updateDesktopMode() {
   isDesktop.value = desktopMediaQuery.matches
 }
 
+function stopMobileFooterRotation() {
+  if (mobileFooterTimer) clearTimeout(mobileFooterTimer)
+  mobileFooterTimer = undefined
+}
+
+function syncMobileFooterRotation() {
+  stopMobileFooterRotation()
+  showMobileFeedback.value = false
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  if (isDesktop.value || !feedbackConfigured || licenseActive.value === null || reducedMotion) return
+
+  mobileFooterTimer = window.setTimeout(() => {
+    showMobileFeedback.value = true
+  }, 4000)
+}
+
 onMounted(() => {
   desktopMediaQuery = window.matchMedia('(min-width: 1024px)')
   desktopMediaQuery.addEventListener('change', updateDesktopMode)
 })
-onUnmounted(() => desktopMediaQuery?.removeEventListener('change', updateDesktopMode))
+onUnmounted(() => {
+  desktopMediaQuery?.removeEventListener('change', updateDesktopMode)
+  stopMobileFooterRotation()
+})
+
+watch([isDesktop, licenseActive], syncMobileFooterRotation, { immediate: true })
 
 onMounted(() => { fetchAppStats(); fetchLicenseStatus() })
 
@@ -573,6 +613,12 @@ onUnmounted(removeWindowListeners)
   padding-bottom: 0.5rem;
   flex-shrink: 0;
 }
+.hub-footer-card { width: 100%; height: 66px; margin-bottom: 12px; }
+.hub-feedback-card { width: 100%; height: 66px; }
+.hub-feedback-card :deep(.feedback-panel--compact) { height: 66px; }
+.hub-footer-swap-enter-active, .hub-footer-swap-leave-active { transition: opacity 0.22s ease, transform 0.22s ease; }
+.hub-footer-swap-enter-from { opacity: 0; transform: translateX(12px); }
+.hub-footer-swap-leave-to { opacity: 0; transform: translateX(-12px); }
 .hub-premium-thanks {
   display: flex;
   align-items: center;
@@ -580,7 +626,9 @@ onUnmounted(removeWindowListeners)
   font-size: 11px;
   color: #993556;
   line-height: 1.4;
-  margin-bottom: 12px;
+  box-sizing: border-box;
+  height: 66px;
+  margin-bottom: 0;
   padding: 10px 12px;
   border: 1.5px solid #F4C0D1;
   border-radius: 10px;
@@ -589,6 +637,27 @@ onUnmounted(removeWindowListeners)
   width: 100%;
   text-align: left;
 }
+.hub-premium-invite {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+  height: 66px;
+  margin-bottom: 0;
+  padding: 10px 12px;
+  border: 1.5px solid #F4C0D1;
+  border-radius: 10px;
+  color: #993556;
+  background: #FDF6F9;
+  font: inherit;
+  font-size: 11px;
+  line-height: 1.4;
+  text-align: left;
+  cursor: pointer;
+}
+.hub-premium-invite:focus-visible { outline: 2px solid #993556; outline-offset: 2px; }
+.hub-premium-invite-link { font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
 .hub-premium-cta {
   color: #993556;
   font-weight: 700;
@@ -637,7 +706,7 @@ onUnmounted(removeWindowListeners)
   .app-sub { font-size: 10px; }
   .app-badge { font-size: 8px; padding: 1px 5px; }
   .hub-footer { padding-top: 0.25rem; padding-bottom: 0.25rem; }
-  .hub-premium-thanks { padding: 6px 8px; font-size: 10px; }
+  .hub-premium-thanks, .hub-premium-invite { padding: 6px 8px; font-size: 10px; }
 }
 
 /* ── Drag to reorder ──────────────────────────────────────────── */

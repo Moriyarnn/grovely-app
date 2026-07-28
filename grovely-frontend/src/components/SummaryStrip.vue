@@ -162,13 +162,13 @@ onUnmounted(() => clearInterval(timer))
 </script>
 
 <style scoped>
-.strip-wrapper { margin-bottom: 1.25rem; }
+.strip-wrapper { position: relative; margin-bottom: 1.25rem; }
 .strip-track { overflow: hidden; border-radius: 14px; cursor: grab; }
 .strip-inner { display: flex; transition: transform 0.35s cubic-bezier(.4,0,.2,1); }
 .strip-card { min-width: 100%; padding: 12px 14px; box-sizing: border-box; border: 3px solid; border-radius: 12px; }
 .strip-label { font-size: 10px; font-weight: 600; margin: 0 0 3px; letter-spacing: 0.06em; text-transform: uppercase; }
 .strip-message { font-size: 15px; font-weight: 500; margin: 0; }
-.strip-dots { display: flex; justify-content: center; gap: 5px; margin-top: 8px; }
+.strip-dots { position: absolute; top: 100%; left: 0; right: 0; display: flex; justify-content: center; gap: 5px; margin-top: 7px; }
 .dot { width: 6px; height: 6px; border-radius: 50%; background: #ddd; cursor: pointer; display: inline-block; transition: background 0.2s; }
 .dot.active { background: #D4537E; }
 </style>

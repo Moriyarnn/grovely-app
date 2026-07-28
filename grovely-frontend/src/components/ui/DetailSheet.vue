@@ -29,7 +29,7 @@
         <div class="ds-body">
           <slot />
         </div>
-        <div v-if="$slots.footer" class="ds-footer">
+        <div v-if="$slots.footer" class="ds-footer" :class="{ 'ds-footer--compact': compactFooter }">
           <slot name="footer" />
         </div>
       </div>
@@ -76,7 +76,10 @@ const props = defineProps({
   // (height: auto, capped at 88vh, still scrolls past that) instead of the
   // fixed min(640px, 88vh). Use for short sheets where the fixed height
   // would leave an awkward empty band. Default false = original sizing.
-  hugContent: { type: Boolean, default: false }
+  hugContent: { type: Boolean, default: false },
+  // Strictly opt-in. Reduces the gap between the body and footer for short,
+  // action-focused sheets. Default false preserves every existing footer.
+  compactFooter: { type: Boolean, default: false },
 })
 defineEmits(['update:open'])
 
@@ -257,6 +260,7 @@ onBeforeUnmount(() => {
 .ds-sheet--pink    .ds-footer { border-color: #f0e8ec; }
 .ds-sheet--green   .ds-footer { border-color: #B8E6D0; }
 .ds-sheet--neutral .ds-footer { border-color: #ececec; }
+.ds-footer--compact { padding-top: 8px; margin-top: 0; }
 
 /* ── Desktop: centered modal ──────────────────────────────── */
 @media (min-width: 1024px) {

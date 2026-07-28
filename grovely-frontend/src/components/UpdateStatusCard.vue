@@ -1,24 +1,25 @@
 <template>
-  <section class="update-card" :class="{ 'update-card--available': available, 'update-card--error': status.error }">
+  <section class="update-card" :class="{ 'update-card--available': available || (isDemo && demoReleaseCurrent === false), 'update-card--error': status.error || (isDemo && demoReleaseCurrent === null), 'update-card--demo': isDemo }">
     <div class="update-card__icon">
-      <v-icon size="18" :color="status.error ? '#9b6d18' : available ? '#993556' : '#2E7D52'">
-        {{ status.error ? 'mdi-cloud-alert-outline' : available ? 'mdi-package-up' : 'mdi-shield-check-outline' }}
+      <v-icon size="18" :color="isDemo ? '#547264' : status.error ? '#9b6d18' : available ? '#993556' : '#2E7D52'">
+        {{ isDemo ? 'mdi-cloud-off-outline' : status.error ? 'mdi-cloud-alert-outline' : available ? 'mdi-package-up' : 'mdi-shield-check-outline' }}
       </v-icon>
     </div>
     <div class="update-card__body">
       <p class="update-card__title">
-        {{ status.error ? 'Update status unavailable' : available ? `Grovely ${latestVersion} is available` : 'Grovely is up to date' }}
+        {{ isDemo ? demoReleaseCurrent === true ? 'Grovely is up to date' : demoReleaseCurrent === false ? 'A newer Grovely version is available' : 'Update status unavailable' : status.error ? 'Update status unavailable' : available ? `Grovely ${latestVersion} is available` : 'Grovely is up to date' }}
       </p>
       <p class="update-card__text">
-        <template v-if="status.error">{{ status.error }}</template>
+        <template v-if="isDemo">Updates are disabled for this demo.</template>
+        <template v-else-if="status.error">{{ status.error }}</template>
         <template v-else-if="status.updating">Updating safely. Grovely will reconnect when it is ready.</template>
         <template v-else-if="available">{{ latestNotes }}</template>
         <template v-else>Checks daily for new releases. No household data is sent.</template>
       </p>
       <p class="update-card__checked">
-        {{ status.last_checked_at ? `Last checked ${lastCheckedLabel}` : '\u00a0' }}
+        {{ isDemo ? 'Run Grovely on your own device for one-click updates with a recovery backup.' : status.last_checked_at ? `Last checked ${lastCheckedLabel}` : '\u00a0' }}
       </p>
-      <div class="update-card__actions">
+      <div v-if="!isDemo" class="update-card__actions">
         <button class="update-card__button update-card__button--quiet" :disabled="loading || status.updating" @click="checkNow">
           {{ loading ? 'Checking…' : 'Check now' }}
         </button>
@@ -46,6 +47,8 @@ type UpdateStatus = {
 const status = ref<UpdateStatus>({})
 const loading = ref(false)
 const reloadAfterUpdate = ref(false)
+const isDemo = __DEMO__
+const demoReleaseCurrent = __DEMO_RELEASE_CURRENT__
 let pollTimer: ReturnType<typeof setInterval> | null = null
 
 const latestVersion = computed(() => status.value.latest?.version || '')
@@ -83,6 +86,7 @@ async function installNow() {
 }
 
 onMounted(async () => {
+  if (isDemo) return
   await load().catch(() => { status.value.error = 'Could not reach the Update Service.' })
   pollTimer = setInterval(() => { if (status.value.updating) load().catch(() => {}) }, 5000)
 })
@@ -93,6 +97,10 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer) })
 .update-card { display: flex; height: 136px; gap: 10px; padding: 12px; border: 1px solid #d7eadf; border-radius: 14px; background: #f7fcf8; margin: 12px 0 2px; }
 .update-card--available { border-color: #f3cdda; background: #fff8fb; }
 .update-card--error { border-color: #f0dfb6; background: #fffcf4; }
+.update-card--demo.update-card--available { border-color: #efb8b8; background: #fff8f8; }
+.update-card--demo.update-card--available .update-card__title { color: #b42318; }
+.update-card--demo.update-card--error { border-color: #efb8b8; background: #fff8f8; }
+.update-card--demo.update-card--error .update-card__title { color: #b42318; }
 .update-card__icon { padding-top: 2px; }
 .update-card__body { display: flex; min-width: 0; flex: 1; flex-direction: column; }
 .update-card__title { margin: 0; color: #285c40; font-size: 12px; font-weight: 700; }

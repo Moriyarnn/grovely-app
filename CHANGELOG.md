@@ -5,6 +5,14 @@ record; the in-app "What's New" panel shows a short summary of major releases on
 
 ---
 
+## v0.14.2 - feedback availability
+*July 28, 2026*
+
+- Encrypted feedback is available from the app when opened on localhost or over HTTPS
+- Official frontend images, release templates, and guided installers now include the public feedback configuration
+
+---
+
 ## v0.14.1 - update system
 *July 24, 2026*
 

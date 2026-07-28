@@ -5,7 +5,9 @@
 #   visitor opening DevTools sees only this origin.
 # - The CSP is the machine-enforced privacy guarantee: connect-src 'self' means
 #   the browser itself forbids the page from sending data to any other origin.
-#   'wasm-unsafe-eval' is required so the browser will compile the sql.js WASM.
+#   A demo build with a valid public feedback endpoint adds only that endpoint's
+#   HTTPS origin as an explicit feedback exception. 'wasm-unsafe-eval' is
+#   required so the browser will compile the sql.js WASM.
 /*
   Cache-Control: public, no-transform
   Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; worker-src 'self' blob:; manifest-src 'self'; base-uri 'self'; form-action 'self'; object-src 'none'

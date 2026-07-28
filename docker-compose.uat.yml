@@ -9,6 +9,9 @@ services:
       args:
         BUILD_MODE: uat
         VITE_BACKEND_PORT: "3002"
+        VITE_FEEDBACK_ENDPOINT: ${UAT_FEEDBACK_ENDPOINT:-https://feedback-uat.grovely.org/v1/feedback}
+        VITE_FEEDBACK_PUBLIC_KEY: ${UAT_FEEDBACK_PUBLIC_KEY:-BKSat8Zco4TfKTxB1Bk-UPiTCpCjKIu8Dxq5ebFdbX-S-GUOODriVziZb7GX4zvujbephhAcxgCdgAEq3MNzjBA}
+        VITE_FEEDBACK_PUBLIC_KEY_ID: ${UAT_FEEDBACK_PUBLIC_KEY_ID:-v1-uat}
     ports: !override
       - "5175:5173"
     depends_on:

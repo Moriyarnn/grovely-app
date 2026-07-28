@@ -102,10 +102,17 @@
       </Teleport>
 
       <div class="shell-footer">
+        <FeedbackPanel />
+        <div class="shell-footer-divider" />
         <div v-if="licenseActive" class="shell-premium-thanks">
           <v-icon size="16" color="#993556">{{ premiumNote.icon }}</v-icon>
           <span>{{ premiumNote.line1 }}<br><a v-if="premiumNote.href" class="shell-premium-cta" :href="premiumNote.href">{{ premiumNote.line2 }}</a><span v-else>{{ premiumNote.line2 }}</span></span>
         </div>
+        <!-- PREMIUM GATE (frontend) -->
+        <button v-else-if="licenseActive === false" type="button" class="shell-premium-invite" @click="premiumGateOpen = true">
+          <v-icon size="16" color="#993556">mdi-heart</v-icon>
+          <span>Would you like to see Grovely's development continue?<br>Consider supporting us by getting a <span class="shell-premium-invite-link">premium license.</span></span>
+        </button>
         <button class="shell-logout-btn" @click="logout">{{ isDemo ? 'Exit demo' : 'Sign out' }}</button>
       </div>
 
@@ -116,6 +123,9 @@
       <slot />
     </div>
 
+    <!-- PREMIUM GATE (frontend) -->
+    <PremiumGate :open="premiumGateOpen" theme="pink" @update:open="premiumGateOpen = $event" />
+
   </div>
 
 </template>
@@ -125,6 +135,8 @@ import { ref, computed, watch, nextTick, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import logoSide from '../assets/Logo Side Desktop.png'
 import SummaryStrip from './SummaryStrip.vue'
+import FeedbackPanel from './FeedbackPanel.vue'
+import PremiumGate from './PremiumGate.vue'
 import { apps } from '../composables/useApps'
 import { API, getToken, getUser, clearToken, clearUser, setToken, setUser } from '../api'
 import { usePreferences } from '../composables/usePreferences'
@@ -140,6 +152,7 @@ const { licenseActive, fetchLicenseStatus } = useLicense()
 if (getToken()) { fetchPreferences(); fetchAppStats(); fetchLicenseStatus() }
 
 const currentUser = ref(getUser())
+const premiumGateOpen = ref(false)
 
 const greeting = computed(() => {
   const h = new Date().getHours()
@@ -561,7 +574,12 @@ async function switchUser(role) {
 .shell-footer {
   margin-top: auto;
   padding-top: 1rem;
-  border-top: 1px solid #f0e8ec;
+}
+
+.shell-footer-divider {
+  height: 1px;
+  margin: 0 0 12px;
+  background: #f0e8ec;
 }
 
 .shell-icon-btn {
@@ -589,6 +607,25 @@ async function switchUser(role) {
   border-radius: 10px;
   background: #FDF6F9;
 }
+.shell-premium-invite {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1.5px solid #F4C0D1;
+  border-radius: 10px;
+  color: #993556;
+  background: #FDF6F9;
+  font: inherit;
+  font-size: 10px;
+  line-height: 1.4;
+  text-align: left;
+  cursor: pointer;
+}
+.shell-premium-invite:focus-visible { outline: 2px solid #993556; outline-offset: 2px; }
+.shell-premium-invite-link { font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
 .shell-premium-cta {
   color: #993556;
   font-weight: 700;

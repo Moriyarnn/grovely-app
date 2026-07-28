@@ -7,6 +7,7 @@ declare const __APP_VERSION__: string
 // the normal build it is the constant `false`, so demo-only branches are
 // dead-code eliminated.
 declare const __DEMO__: boolean
+declare const __DEMO_RELEASE_CURRENT__: boolean | null
 
 // sql.js WASM, imported as a self-hosted asset URL in the demo build.
 declare module 'sql.js/dist/sql-wasm.wasm?url' {
