@@ -141,13 +141,6 @@ See [INSTALL.md](./INSTALL.md) for full instructions including reverse proxy set
 </p>
 <p align="center"><em>Shared shopping list and pantry inventory with expiry tracking</em></p>
 
-### Mobile
-
-<p align="center">
-  <img src="docs/screenshots/Mobile Notifications.jpg" width="30%" alt="Notification settings on mobile" />
-</p>
-<p align="center"><em>Notification settings</em></p>
-
 ### Demos
 
 <table align="center">

@@ -29,7 +29,7 @@
 
 services:
   frontend:
-    image: ghcr.io/moriyarnn/grovely-frontend:${GROVELY_VERSION:-latest}-proxy
+    image: ghcr.io/grovely-org/grovely-frontend:${GROVELY_VERSION:-latest}-proxy
     # If you'd rather build locally, comment the `image:` line above and use
     # `docker compose ... up -d --build`. The main compose file provides the
     # build context; this overlay overrides the build arg below.

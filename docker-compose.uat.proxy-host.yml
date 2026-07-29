@@ -2,7 +2,7 @@
 # temporary host proxy can exercise the same-origin production topology.
 services:
   frontend:
-    image: ghcr.io/moriyarnn/grovely-frontend:${GROVELY_VERSION:-latest}-proxy
+    image: ghcr.io/grovely-org/grovely-frontend:${GROVELY_VERSION:-latest}-proxy
     build:
       args:
         VITE_BACKEND_PORT: ""

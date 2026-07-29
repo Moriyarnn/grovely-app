@@ -6,6 +6,7 @@ import { defineConfig, loadEnv, type Plugin } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import vueDevTools from 'vite-plugin-vue-devtools'
 import { demoBackend } from './vite-plugin-demo-backend'
+import { isCurrentOrNewerVersion } from './src/utils/version'
 
 // Single source of truth for the app version: package.json. MainScreen reads
 // __APP_VERSION__ so the displayed version can never drift from the package.
@@ -41,7 +42,7 @@ async function demoReleaseCurrent(): Promise<boolean | null> {
   try {
     const response = await fetch('https://grovely.org/releases/stable.json')
     const manifest = await response.json() as { version?: string }
-    return manifest.version === `v${pkg.version}`
+    return isCurrentOrNewerVersion(`v${pkg.version}`, manifest.version)
   } catch {
     return null
   }

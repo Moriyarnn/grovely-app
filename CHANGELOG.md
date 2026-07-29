@@ -5,6 +5,15 @@ record; the in-app "What's New" panel shows a short summary of major releases on
 
 ---
 
+## v0.14.3 - deployment and demo fixes
+*July 28, 2026*
+
+- Official Compose files now pull the public Grovely organization images
+- The demo stays current when it is ahead of the published stable manifest
+- Removed the duplicate mobile notification-settings screenshot from the README
+
+---
+
 ## v0.14.2 - feedback availability
 *July 28, 2026*
 
