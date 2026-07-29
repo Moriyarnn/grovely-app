@@ -32,8 +32,8 @@ mkdir grovely && cd grovely
 ### Step 2: download the compose file and the env template
 
 ```bash
-curl -LO https://github.com/Moriyarnn/grovely-app/releases/latest/download/docker-compose.yml
-curl -L -o .env https://github.com/Moriyarnn/grovely-app/releases/latest/download/example.env
+curl -LO https://github.com/grovely-org/grovely-app/releases/latest/download/docker-compose.yml
+curl -L -o .env https://github.com/grovely-org/grovely-app/releases/latest/download/example.env
 ```
 
 The `example.env` file is the canonical reference for every supported variable, with inline notes explaining what each one does (accounts, license, SMTP, backups, timezone, etc.). Open it, fill in `OWNER1_*` and `OWNER2_*`, leave the rest commented until you need it.
@@ -55,7 +55,7 @@ Drop that into a file called `.env` next to `docker-compose.yml` and you're read
 Catches typos, leftover placeholders, missing required values, and common gotchas before you start the stack:
 
 ```bash
-curl -LO https://github.com/Moriyarnn/grovely-app/releases/latest/download/validate-env.sh
+curl -LO https://github.com/grovely-org/grovely-app/releases/latest/download/validate-env.sh
 chmod +x validate-env.sh
 ./validate-env.sh
 ```
@@ -80,9 +80,9 @@ Use this when your reverse proxy runs directly on the host OS, not in Docker. Gr
 
 ```bash
 mkdir grovely && cd grovely
-curl -LO https://github.com/Moriyarnn/grovely-app/releases/latest/download/docker-compose.yml
-curl -LO https://github.com/Moriyarnn/grovely-app/releases/latest/download/docker-compose.proxy-host.yml
-curl -L -o .env https://github.com/Moriyarnn/grovely-app/releases/latest/download/example.env
+curl -LO https://github.com/grovely-org/grovely-app/releases/latest/download/docker-compose.yml
+curl -LO https://github.com/grovely-org/grovely-app/releases/latest/download/docker-compose.proxy-host.yml
+curl -L -o .env https://github.com/grovely-org/grovely-app/releases/latest/download/example.env
 ```
 
 Fill in your `.env` (see Step 2 of section 1).
@@ -103,7 +103,7 @@ docker compose -f docker-compose.yml -f docker-compose.proxy-host.yml up -d
 For a full Caddyfile with security headers, gzip, and health-check routing, grab the example from the repo and replace the domain and email:
 
 ```bash
-curl -LO https://github.com/Moriyarnn/grovely-app/releases/latest/download/Caddyfile.example
+curl -LO https://github.com/grovely-org/grovely-app/releases/latest/download/Caddyfile.example
 ```
 
 The minimal version:
@@ -158,9 +158,9 @@ If you already have a shared network with a different name (e.g. `web`, `traefik
 
 ```bash
 mkdir grovely && cd grovely
-curl -LO https://github.com/Moriyarnn/grovely-app/releases/latest/download/docker-compose.yml
-curl -LO https://github.com/Moriyarnn/grovely-app/releases/latest/download/docker-compose.proxy-docker.yml
-curl -L -o .env https://github.com/Moriyarnn/grovely-app/releases/latest/download/example.env
+curl -LO https://github.com/grovely-org/grovely-app/releases/latest/download/docker-compose.yml
+curl -LO https://github.com/grovely-org/grovely-app/releases/latest/download/docker-compose.proxy-docker.yml
+curl -L -o .env https://github.com/grovely-org/grovely-app/releases/latest/download/example.env
 ```
 
 Fill in your `.env` (see Step 2 of section 1).
@@ -185,7 +185,7 @@ For Traefik, you'd typically use container labels. For Nginx Proxy Manager, add 
 
 ## Configuration
 
-Everything Grovely accepts is documented inline in [`example.env`](https://github.com/Moriyarnn/grovely-app/blob/main/example.env), with comments explaining each variable. The quick summary:
+Everything Grovely accepts is documented inline in [`example.env`](https://github.com/grovely-org/grovely-app/blob/main/example.env), with comments explaining each variable. The quick summary:
 
 **Required**
 

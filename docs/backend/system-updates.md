@@ -39,7 +39,7 @@ The Grovely site Worker obtains the existing public GitHub latest-release metada
 {
   "version": "v0.14.0",
   "compose_version": "v0.14.0",
-  "release_url": "https://github.com/Moriyarnn/grovely-app/releases/tag/v0.14.0",
+  "release_url": "https://github.com/grovely-org/grovely-app/releases/tag/v0.14.0",
   "published_at": "2026-07-01T01:35:40Z"
 }
 ```
@@ -148,7 +148,7 @@ They are intentionally separate from scheduled backups:
 New installations use the latest GitHub Release bundle, not a moving raw branch. The guided installers, README, INSTALL guide, and landing-page manual commands download release assets from:
 
 ```text
-https://github.com/Moriyarnn/grovely-app/releases/latest/download/
+https://github.com/grovely-org/grovely-app/releases/latest/download/
 ```
 
 The bundle contains matching Compose files, both proxy overlays, `example.env`, `validate-env.sh`, and `Caddyfile.example`. Manual `curl` commands use `-L` because GitHub Release downloads redirect.

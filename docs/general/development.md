@@ -24,7 +24,7 @@ export PATH="$PATH:/c/Program Files/GitHub CLI"
 ```
 Installed at `C:\Program Files\GitHub CLI\gh.exe` — PATH must be set manually in bash.
 
-Bug tracking: GitHub Issues on `Moriyarnn/grovely-app`
+Bug tracking: GitHub Issues on `grovely-org/grovely-app`
 
 ## Docker Notes
 - `.dockerignore` in `grovely-backend/` excludes `node_modules`, `.env`, and `data` from the build context — critical for native modules (`better-sqlite3`) so Windows-compiled binaries don't overwrite Linux ones in the image.

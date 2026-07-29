@@ -10,7 +10,7 @@
   <tbody>
     <tr>
       <td><a href="https://www.gnu.org/licenses/agpl-3.0"><img src="https://img.shields.io/badge/License-AGPL_v3-blue.svg" alt="License: AGPL v3" /></a></td>
-      <td><a href="https://github.com/Moriyarnn/grovely-app/actions/workflows/docker-publish.yml"><img src="https://github.com/Moriyarnn/grovely-app/actions/workflows/docker-publish.yml/badge.svg" alt="Docker Build" /></a></td>
+      <td><a href="https://github.com/grovely-org/grovely-app/actions/workflows/docker-publish.yml"><img src="https://github.com/grovely-org/grovely-app/actions/workflows/docker-publish.yml/badge.svg" alt="Docker Build" /></a></td>
       <td><img src="https://img.shields.io/badge/arch-amd64%20%7C%20arm64-lightgrey" alt="amd64 + arm64" /></td>
       <td><img src="https://img.shields.io/badge/privacy-first-blueviolet" alt="Privacy First" /></td>
       <td><img src="https://img.shields.io/badge/telemetry-none-green" alt="No Telemetry" /></td>
@@ -55,8 +55,8 @@ Open **http://localhost:5173** and log in.
 
 ```bash
 mkdir grovely && cd grovely
-curl -LO https://github.com/Moriyarnn/grovely-app/releases/latest/download/docker-compose.yml
-curl -L -o .env https://github.com/Moriyarnn/grovely-app/releases/latest/download/example.env
+curl -LO https://github.com/grovely-org/grovely-app/releases/latest/download/docker-compose.yml
+curl -L -o .env https://github.com/grovely-org/grovely-app/releases/latest/download/example.env
 ```
 
 Edit `.env` and set the usernames and passwords for both accounts, then:
