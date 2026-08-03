@@ -24,12 +24,12 @@
 <table align="center">
   <tbody>
     <tr>
-      <td width="50%"><img src="grovely-frontend/src/assets/Mobile Period Tracker.jpg" width="100%" alt="Period tracker on mobile" /></td>
-      <td width="50%"><img src="grovely-frontend/src/assets/Mobile Inventory.jpg" width="100%" alt="Pantry inventory on mobile" /></td>
+      <td width="50%"><img src="grovely-frontend/src/assets/Mobile Period Tracker.jpg" width="320" alt="Period tracker on mobile" /></td>
+      <td width="50%"><img src="grovely-frontend/src/assets/Mobile Inventory.jpg" width="320" alt="Pantry inventory on mobile" /></td>
     </tr>
     <tr>
-      <td width="50%"><img src="grovely-frontend/src/assets/Mobile Backups.jpg" width="100%" alt="Scheduled backups on mobile" /></td>
-      <td width="50%"><img src="grovely-frontend/src/assets/Mobile Notifications.jpg" width="100%" alt="Custom notification settings on mobile" /></td>
+      <td width="50%"><img src="grovely-frontend/src/assets/Mobile Backups.jpg" width="320" alt="Scheduled backups on mobile" /></td>
+      <td width="50%"><img src="grovely-frontend/src/assets/Mobile Notifications.jpg" width="320" alt="Custom notification settings on mobile" /></td>
     </tr>
   </tbody>
 </table>
