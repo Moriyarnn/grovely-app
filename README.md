@@ -6,18 +6,14 @@
   </picture>
 </p>
 
-<table align="center">
-  <tbody>
-    <tr>
-      <td><a href="https://www.gnu.org/licenses/agpl-3.0"><img src="https://img.shields.io/badge/License-AGPL_v3-blue.svg" alt="License: AGPL v3" /></a></td>
-      <td><a href="https://github.com/grovely-org/grovely-app/actions/workflows/docker-publish.yml"><img src="https://github.com/grovely-org/grovely-app/actions/workflows/docker-publish.yml/badge.svg" alt="Docker Build" /></a></td>
-      <td><img src="https://img.shields.io/badge/arch-amd64%20%7C%20arm64-lightgrey" alt="amd64 + arm64" /></td>
-      <td><img src="https://img.shields.io/badge/privacy-first-blueviolet" alt="Privacy First" /></td>
-      <td><img src="https://img.shields.io/badge/telemetry-none-green" alt="No Telemetry" /></td>
-      <td><img src="https://img.shields.io/badge/license%20check-offline-green" alt="Offline License" /></td>
-    </tr>
-  </tbody>
-</table>
+<p align="center">
+  <a href="https://www.gnu.org/licenses/agpl-3.0"><img src="https://img.shields.io/badge/License-AGPL_v3-blue.svg" alt="License: AGPL v3" /></a>
+  <a href="https://github.com/grovely-org/grovely-app/actions/workflows/docker-publish.yml"><img src="https://github.com/grovely-org/grovely-app/actions/workflows/docker-publish.yml/badge.svg" alt="Docker Build" /></a>
+  <img src="https://img.shields.io/badge/arch-amd64%20%7C%20arm64-lightgrey" alt="amd64 + arm64" />
+  <img src="https://img.shields.io/badge/privacy-first-blueviolet" alt="Privacy First" />
+  <img src="https://img.shields.io/badge/telemetry-none-green" alt="No Telemetry" />
+  <img src="https://img.shields.io/badge/license%20check-offline-green" alt="Offline License" />
+</p>
 
 <p align="center">Self-hosted household hub with couples support - period tracking, shared pantry, and more on the way.</p>
 
@@ -28,13 +24,16 @@
 <table align="center">
   <tbody>
     <tr>
-      <td width="33.33%"><img src="grovely-frontend/src/assets/Mobile Period Tracker.jpg" width="100%" alt="Period tracker on mobile" /></td>
-      <td width="33.33%"><img src="grovely-frontend/src/assets/Mobile Inventory.jpg" width="100%" alt="Pantry inventory on mobile" /></td>
-      <td width="33.33%"><img src="grovely-frontend/src/assets/Mobile Backups.jpg" width="100%" alt="Scheduled backups on mobile" /></td>
+      <td width="50%"><img src="grovely-frontend/src/assets/Mobile Period Tracker.jpg" width="100%" alt="Period tracker on mobile" /></td>
+      <td width="50%"><img src="grovely-frontend/src/assets/Mobile Inventory.jpg" width="100%" alt="Pantry inventory on mobile" /></td>
+    </tr>
+    <tr>
+      <td width="50%"><img src="grovely-frontend/src/assets/Mobile Backups.jpg" width="100%" alt="Scheduled backups on mobile" /></td>
+      <td width="50%"><img src="grovely-frontend/src/assets/Mobile Notifications.jpg" width="100%" alt="Custom notification settings on mobile" /></td>
     </tr>
   </tbody>
 </table>
-<p align="center"><em>Period tracker · Pantry inventory · Scheduled backups</em></p>
+<p align="center"><em>Period tracker · Pantry inventory<br />Scheduled backups · Custom notifications</em></p>
 
 ## Quick Start
 
