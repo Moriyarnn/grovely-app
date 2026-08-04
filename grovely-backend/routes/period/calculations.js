@@ -1,6 +1,7 @@
 const express = require('express')
 const router = express.Router()
 const { logPeriodCalculation } = require('../../logger')
+const { getUnresolvedShortCyclePairs } = require('./_shortCyclePairs')
 
 module.exports = (db) => {
 
@@ -40,6 +41,7 @@ module.exports = (db) => {
 
     const lengths = []
     const skippedGaps = []
+    const shortPairs = getUnresolvedShortCyclePairs(effective)
     let anchorIdx = 0
 
     for (let i = 1; i < effective.length; i++) {
@@ -61,7 +63,7 @@ module.exports = (db) => {
         })
       }
     }
-    return { lengths, skippedGaps }
+    return { lengths, skippedGaps, shortPairs }
   }
 
   // GET /api/calculations/summary
@@ -87,17 +89,19 @@ module.exports = (db) => {
     })
 
     const completedCycles = getCompletedCycles()
-    const { lengths: cycleLengths, skippedGaps } = getCycleLengths()
+    const { lengths: cycleLengths, skippedGaps, shortPairs } = getCycleLengths()
 
     // Warn about impossibly short gaps
-    skippedGaps.forEach(({ from, to, gap, cycleId, reviewState }) => {
+    shortPairs.forEach(({ earlier, later, gap }) => {
       dataWarnings.push({
         code: 'SHORT_CYCLE_GAP',
-        message: `Cycles on ${from} and ${to} are only ${gap} day(s) apart (minimum expected is 21). This looks like a data entry mistake, so the gap was excluded from predictions.`,
-        targetDate: to,
-        affectedDates: [from, to],
-        cycleId,
-        reviewState: reviewState ?? null
+        message: `Cycles on ${earlier.start_date} and ${later.start_date} are only ${gap} day(s) apart (minimum expected is 21). This looks like a data entry mistake, so the gap was excluded from predictions.`,
+        targetDate: earlier.start_date,
+        affectedDates: [earlier.start_date, later.start_date],
+        cycleId: later.id,
+        cycleIds: [earlier.id, later.id],
+        confirmationCycleId: later.id,
+        reviewState: null
       })
     })
 

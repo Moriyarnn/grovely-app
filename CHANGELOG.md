@@ -5,6 +5,14 @@ record; the in-app "What's New" panel shows a short summary of major releases on
 
 ---
 
+## v0.14.8 - prediction and runtime fixes
+*August 4, 2026*
+
+- Short-cycle prediction warnings now identify both periods, offer clear review actions, and suppress forecasts until resolved
+- Docker, updater, frontend, and CI builds now use the tested Node runtime version
+
+---
+
 ## v0.14.3 - deployment and demo fixes
 *July 28, 2026*
 

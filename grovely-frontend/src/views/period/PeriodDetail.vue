@@ -185,12 +185,12 @@
           >
             <v-icon v-if="w.isOrphaned" size="11" color="#f97316" style="margin-right:4px;vertical-align:middle">mdi-link-off</v-icon>
             {{ w.message }}
-            <span class="warning-item-review">Review →</span>
+            <span class="warning-item-review">{{ warningGuidance(w) }}</span>
           </li>
         </AppScroller>
         <p v-if="warningsOpen && activeWarnings.some(w => w.cycleId)" class="warnings-tap-hint">
           <v-icon size="11" color="#b45309">mdi-gesture-tap</v-icon>
-          Tap the highlighted cycle on the calendar to resolve
+          Tap the highlighted period on the calendar to review it.
         </p>
       </template>
       <template v-else>
@@ -245,6 +245,14 @@ onMounted(() => { fetchLicenseStatus() })
 
 const activeWarnings = computed(() => allWarnings.value.filter(w => !w.reviewState))
 const acknowledgedWarnings = computed(() => allWarnings.value.filter(w => w.reviewState))
+
+function warningGuidance(w) {
+  if (w.code === 'SHORT_CYCLE_GAP') return 'Tap either period. Exclude the mistaken entry, or confirm the pair if both are real.'
+  if (w.code === 'LONG_PERIOD') return 'Tap the period. Exclude it from predictions, or confirm it is correct.'
+  if (w.code === 'FUTURE_CYCLE') return 'Tap the period to correct its date or remove it.'
+  if (w.isOrphaned) return 'Tap the date to update or remove the logged data.'
+  return 'Tap the highlighted date to review it.'
+}
 
 const todayStr = new Date().toISOString().split('T')[0]
 const currentUser = ref(getUser())

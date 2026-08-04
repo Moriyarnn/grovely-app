@@ -1,4 +1,4 @@
-FROM node:24-alpine
+FROM node:24.18.0-alpine
 
 RUN apk add --no-cache docker-cli docker-cli-compose
 WORKDIR /app

@@ -1,4 +1,5 @@
-FROM node:24-alpine
+# Pin the runtime: Node 24.19.0 crashes under Alpine with the native SQLite addon.
+FROM node:24.18.0-alpine
 
 WORKDIR /app
 

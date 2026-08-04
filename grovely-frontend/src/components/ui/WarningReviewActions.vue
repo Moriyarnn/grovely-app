@@ -1,5 +1,8 @@
 <template>
-  <template v-if="reviewState === null">
+  <template v-if="reviewState === 'excluded'">
+    <IconAction icon="mdi-eye-outline" label="Unignore" color="#92400e" bg="#fef3c7" border="#fcd34d" :loading="loading === 'undo' ? 'Saving...' : ''" @click="undoReview" />
+  </template>
+  <template v-else-if="reviewState === null">
     <IconAction
       icon="mdi-eye-off-outline"
       label="Exclude"
@@ -11,7 +14,7 @@
     />
     <IconAction
       icon="mdi-eye-outline"
-      label="Confirm"
+        label="Confirm pair"
       color="#92400e"
       bg="#fef3c7"
       border="#fcd34d"
@@ -25,7 +28,7 @@
         {{ reviewState === 'confirmed' ? 'mdi-eye-outline' : 'mdi-eye-off-outline' }}
       </v-icon>
       <span class="wra-status-label">{{ reviewState === 'confirmed' ? 'Confirmed' : 'Excluded' }}</span>
-      <button class="wra-undo" @click="undoReview">Undo</button>
+      <button class="wra-undo" @click="undoReview">Unconfirm</button>
     </div>
   </template>
 
@@ -58,7 +61,7 @@
     @update:open="onDialogOpenChange"
     @confirm="submitReview('confirmed')"
   >
-    {{ itemLabel }} will be included in your predictions, even though it looks unusual.
+    This pair will be included in your predictions, even though the gap looks unusual.
   </ConfirmDialog>
 </template>
 
@@ -73,6 +76,7 @@ const props = defineProps<{
   reviewState: string | null
   endpoint: string       // e.g. `/period/cycles/5/review`
   itemLabel: string      // e.g. "Aug 8" — used in dialog body
+  pairCycleId?: number | null
 }>()
 
 const emit = defineEmits<{ reviewed: [] }>()
@@ -90,7 +94,7 @@ async function submitReview(state: string) {
     await apiFetch(`${API}/${props.endpoint}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reviewState: state })
+      body: JSON.stringify({ reviewState: state, pairCycleId: state === 'confirmed' ? props.pairCycleId : undefined })
     })
     emit('reviewed')
   } finally {

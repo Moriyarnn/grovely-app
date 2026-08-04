@@ -70,7 +70,10 @@
               <span v-if="cell.day" class="cal-day-num">{{ cell.day }}</span>
               <span v-if="cell.dateStr && justSaved.has(cell.dateStr)" class="cal-saved-check">✓</span>
               <span v-if="cell.day && topBadge(cell)" class="cal-cell-badges">
-                <span v-if="topBadge(cell) === 'warn'" class="cal-cell-badge cal-cell-badge-warn">
+                <span v-if="topBadge(cell) === 'ignored'" class="cal-cell-badge cal-cell-badge-ignored">
+                  <v-icon size="18" color="#64748b">mdi-eye-off-outline</v-icon>
+                </span>
+                <span v-else-if="topBadge(cell) === 'warn'" class="cal-cell-badge cal-cell-badge-warn">
                   <v-icon size="18" color="#f59e0b">mdi-alert</v-icon>
                 </span>
                 <span v-else-if="topBadge(cell) === 'orphan'" class="cal-cell-badge cal-cell-badge-orphan">
@@ -447,11 +450,12 @@
               @click="selectedLoggedDay || tapContext === 'open-cycle-day' ? switchToEdit() : mode = 'log'"
             />
             <WarningReviewActions
-              v-if="mode === 'view' && selectedCycleWarnings.length > 0"
+              v-if="mode === 'view' && (selectedCycleWarnings.length > 0 || selectedCycle.review_state === 'excluded')"
               :itemId="selectedCycle.id"
               :reviewState="selectedCycle.review_state ?? null"
               :endpoint="`period/cycles/${selectedCycle.id}/review`"
               :itemLabel="selectedCycleStartLabel"
+              :pairCycleId="selectedCycleWarnings[0]?.confirmationCycleId ?? null"
               @reviewed="loadData"
             />
           </div>
@@ -524,6 +528,7 @@ import { API, apiFetch, getUser } from '../../api'
 import { useSettings } from '../../composables/useSettings'
 import { usePreferences } from '../../composables/usePreferences'
 import { usePeriodData } from '../../composables/usePeriodData'
+import { getForecastVisibility, isForecastDateVisible } from '../../utils/periodForecastVisibility'
 
 const { allCycleDays, allCycles, summary, gapDayLogs, viewYear, viewMonth, pulseDates, warningDateSet, orphanedDaySet, cycleWarningMap, loadData, resetView } = usePeriodData()
 
@@ -834,24 +839,23 @@ const predictedCurrentEndDates = computed(() => {
   return set
 })
 
+const forecastVisibility = computed(() =>
+  getForecastVisibility(allCycles.value, summary.value?.dataWarnings ?? [])
+)
+
 const fertileDates = computed(() => {
   const set = new Set()
   if (preferences.value.period_show_fertile_window === '0') return set
   const s = summary.value
   if (!s) return set
 
-  // Use targetDate only — affectedDates includes the "from" anchor of SHORT_CYCLE_GAP warnings,
-  // which would incorrectly suppress the good cycle's fertile window
-  const warnedDates = new Set(s.dataWarnings?.map(w => w.targetDate).filter(Boolean) ?? [])
-
   allCycles.value.forEach(cycle => {
-    if (warnedDates.has(cycle.start_date)) return
-    if (cycle.review_state === 'excluded') return
     if (!cycle.predicted_fertile_start || !cycle.predicted_fertile_end) return
     const cur = new Date(cycle.predicted_fertile_start + 'T00:00:00')
     const end = new Date(cycle.predicted_fertile_end   + 'T00:00:00')
     while (cur <= end) {
-      set.add(cur.toISOString().split('T')[0])
+      const date = cur.toISOString().split('T')[0]
+      if (isForecastDateVisible(cycle.id, date, forecastVisibility.value)) set.add(date)
       cur.setDate(cur.getDate() + 1)
     }
   })
@@ -877,14 +881,12 @@ const predictedOvulationDates = computed(() => {
   const s = summary.value
   if (!s) return set
 
-  const warnedDates = new Set(s.dataWarnings?.map(w => w.targetDate).filter(Boolean) ?? [])
-
   allCycles.value.forEach(cycle => {
-    if (warnedDates.has(cycle.start_date)) return
-    if (cycle.review_state === 'excluded') return
     if (cycle.ovulation_date) return // manual mark overrides predicted tint
     if (!cycle.predicted_ovulation_date) return
-    set.add(cycle.predicted_ovulation_date)
+    if (isForecastDateVisible(cycle.id, cycle.predicted_ovulation_date, forecastVisibility.value)) {
+      set.add(cycle.predicted_ovulation_date)
+    }
   })
 
   for (const m of s.missedPredictions ?? []) set.add(m.ovulationDate)
@@ -1013,6 +1015,11 @@ function hasDataWarning(cell) {
   return !!(cell.dateStr && warningDateSet.value.has(cell.dateStr))
 }
 
+function hasExcludedCycle(cell) {
+  const cycleId = cell.dateStr ? dateToCycleId.value.get(cell.dateStr) : null
+  return !!allCycles.value.find(cycle => cycle.id === cycleId && cycle.review_state === 'excluded')
+}
+
 function hasOrphanedData(cell) {
   return !!(cell.dateStr && orphanedDaySet.value.has(cell.dateStr))
 }
@@ -1021,6 +1028,7 @@ function hasOrphanedData(cell) {
 // 13px mobile cell becomes unreadable — show the most actionable one only.
 function topBadge(cell) {
   if (!cell.day) return null
+  if (hasExcludedCycle(cell)) return 'ignored'
   if (hasDataWarning(cell)) return 'warn'
   if (hasOrphanedData(cell)) return 'orphan'
   if (hasInfo(cell) && (!isPartner.value || partnerCanReadNotes.value)) return 'note'
@@ -1432,7 +1440,7 @@ const MIN_CYCLE_LENGTH_DAYS = 21
 function guardShortCycle(newStartDate, fn) {
   // Cycle length from the preceding cycle's start to this new start
   const preceding = allCycles.value
-    .filter(c => c.start_date < newStartDate)
+    .filter(c => c.start_date < newStartDate && c.review_state !== 'excluded')
     .sort((a, b) => b.start_date.localeCompare(a.start_date))[0]
   if (preceding) {
     const cycleLen = Math.round(
@@ -1447,7 +1455,7 @@ function guardShortCycle(newStartDate, fn) {
   }
   // Cycle length from this new start to the following cycle's start
   const following = allCycles.value
-    .filter(c => c.start_date > newStartDate)
+    .filter(c => c.start_date > newStartDate && c.review_state !== 'excluded')
     .sort((a, b) => a.start_date.localeCompare(b.start_date))[0]
   if (following) {
     const cycleLen = Math.round(
@@ -2577,6 +2585,7 @@ onUnmounted(() => {
   height: auto !important;
 }
 .cal-cell-badge-warn { background: rgba(254, 243, 199, 0.9); }
+.cal-cell-badge-ignored { background: rgba(226, 232, 240, 0.92); }
 .cal-cell-badge-note { background: rgba(226, 232, 240, 0.9); }
 
 

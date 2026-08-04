@@ -1,5 +1,6 @@
 import { ref, computed } from 'vue'
 import { API, apiFetch } from '../api'
+import { getWarningPulseDates } from '../utils/periodWarningPulse'
 
 const allCycleDays = ref<any[]>([])
 const allCycles = ref<any[]>([])
@@ -50,8 +51,11 @@ const cycleWarningMap = computed(() => {
   const map = new Map<number, any[]>()
   summary.value?.dataWarnings?.forEach((w: any) => {
     if (w.cycleId && (w.code === 'SHORT_CYCLE_GAP' || w.code === 'LONG_PERIOD')) {
-      if (!map.has(w.cycleId)) map.set(w.cycleId, [])
-      map.get(w.cycleId)!.push(w)
+      const cycleIds = w.cycleIds ?? [w.cycleId]
+      cycleIds.forEach((cycleId: number) => {
+        if (!map.has(cycleId)) map.set(cycleId, [])
+        map.get(cycleId)!.push(w)
+      })
     }
   })
   return map
@@ -63,23 +67,7 @@ function goToWarning(w: any) {
   viewYear.value = d.getFullYear()
   viewMonth.value = d.getMonth()
 
-  const cycle = allCycles.value.find((c: any) => c.start_date === w.targetDate)
-  const dates = new Set<string>()
-  if (cycle) {
-    const end = cycle.end_date || cycle.last_logged_day
-    if (end) {
-      const cur = new Date(cycle.start_date + 'T00:00:00')
-      const endD = new Date(end + 'T00:00:00')
-      while (cur <= endD) {
-        dates.add(cur.toISOString().slice(0, 10))
-        cur.setDate(cur.getDate() + 1)
-      }
-    } else {
-      dates.add(cycle.start_date)
-    }
-  } else {
-    ;(w.affectedDates ?? [w.targetDate]).forEach((dt: string) => dates.add(dt))
-  }
+  const dates = getWarningPulseDates(w, allCycles.value)
   if (pulseTimeout) clearTimeout(pulseTimeout)
   pulseDates.value = new Set()
   requestAnimationFrame(() => {

@@ -3,6 +3,7 @@ const router = express.Router()
 const { logPeriodEvent } = require('../../logger')
 const { requireOwner } = require('../../middleware/auth')
 const { recomputeAllPredictions } = require('./_calcHelpers')
+const { findUnresolvedShortCyclePair } = require('./_shortCyclePairs')
 const { emitActivity } = require('../../realtime')
 
 module.exports = (db) => {
@@ -93,14 +94,24 @@ module.exports = (db) => {
     res.json({ id, start_date: newStart, end_date: newEnd })
   })
 
-  // Set or clear review state for a flagged cycle
+  // Exclude or restore one cycle, or confirm the short-gap pair it belongs to.
   router.patch('/:id/review', requireOwner, (req, res) => {
-    const { reviewState } = req.body
+    const { reviewState, pairCycleId } = req.body
     const valid = [null, 'confirmed', 'excluded']
     if (!valid.includes(reviewState ?? null)) return res.status(400).json({ error: 'reviewState must be confirmed, excluded, or null' })
     const id = Number(req.params.id)
-    if (!db.prepare('SELECT id FROM cycles WHERE id = ?').get(id)) return res.status(404).json({ error: 'Cycle not found' })
-    db.prepare('UPDATE cycles SET review_state = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(reviewState ?? null, id)
+    const cycle = db.prepare('SELECT * FROM cycles WHERE id = ?').get(id)
+    if (!cycle) return res.status(404).json({ error: 'Cycle not found' })
+    if (reviewState === 'confirmed') {
+      const cycles = db.prepare(`SELECT * FROM cycles WHERE start_date IS NOT NULL ORDER BY start_date ASC`).all()
+      const pair = findUnresolvedShortCyclePair(cycles, id, pairCycleId ?? id)
+      if (!pair) {
+        return res.status(400).json({ error: 'No unresolved short-cycle pair found' })
+      }
+      db.prepare('UPDATE cycles SET review_state = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run('confirmed', pair.later.id)
+    } else {
+      db.prepare('UPDATE cycles SET review_state = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(reviewState ?? null, id)
+    }
     recomputeAllPredictions(db)
     emitActivity(req, { type: 'period.change', action: 'cycle', dates: [] })
     res.json({ success: true })
