@@ -2,7 +2,7 @@
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="grovely-frontend/src/assets/Logo README Dark.png">
     <source media="(prefers-color-scheme: light)" srcset="grovely-frontend/src/assets/Logo README Light.png">
-    <img src="grovely-frontend/src/assets/Logo README Light.png" width="220" alt="Grovely" />
+    <img src="grovely-frontend/src/assets/Logo README Light.png" width="280" alt="Grovely" />
   </picture>
 </p>
 

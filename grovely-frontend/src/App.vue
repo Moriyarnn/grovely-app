@@ -16,6 +16,7 @@
     </v-main>
     <ActivityToast v-if="showShell" />
     <component :is="DemoFeatureDialog" v-if="DemoFeatureDialog" />
+    <component :is="DemoExitDialog" v-if="DemoExitDialog" />
     <component :is="DemoBanner" v-if="DemoBanner && showShell" />
     <Teleport to="body">
       <div v-if="envLabel" class="env-badge">{{ envLabel }}</div>
@@ -34,6 +35,11 @@ import { getToken } from './api'
 // so it (and its content) are dead-code eliminated from the normal build.
 const DemoFeatureDialog = __DEMO__
   ? defineAsyncComponent(() => import('./components/DemoFeatureDialog.vue'))
+  : null
+// Demo-only exit prompt. Kept in a separate async chunk so its public links and
+// engagement copy never ship in the normal self-hosted application bundle.
+const DemoExitDialog = __DEMO__
+  ? defineAsyncComponent(() => import('./components/DemoExitDialog.vue'))
   : null
 // Demo-only persistent "runs entirely in your browser" trust strip. Same
 // async + __DEMO__ gating so it is dead-code eliminated from the normal build.

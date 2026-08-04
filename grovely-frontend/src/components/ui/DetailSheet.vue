@@ -12,7 +12,7 @@
     >
       <div class="ds-inner">
         <div class="ds-handle" />
-        <div class="ds-header">
+        <div v-if="title || subtitle || showClose || $slots['header-extra']" class="ds-header">
           <div class="ds-header-text">
             <p class="ds-title">{{ title }}</p>
             <p
@@ -22,7 +22,7 @@
             >{{ subtitle }}</p>
           </div>
           <slot name="header-extra" />
-          <button class="ds-close" @click="$emit('update:open', false)">
+          <button v-if="showClose" class="ds-close" @click="$emit('update:open', false)">
             <v-icon size="18">mdi-close</v-icon>
           </button>
         </div>
@@ -80,6 +80,9 @@ const props = defineProps({
   // Strictly opt-in. Reduces the gap between the body and footer for short,
   // action-focused sheets. Default false preserves every existing footer.
   compactFooter: { type: Boolean, default: false },
+  // Strictly opt-in. Short promotional sheets can rely on the backdrop to
+  // dismiss while keeping their centered content free of a competing X.
+  showClose: { type: Boolean, default: true },
 })
 defineEmits(['update:open'])
 

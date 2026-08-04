@@ -40,6 +40,7 @@ const FEATURES: Record<string, DemoFeature> = {
 
 export const demoDialogOpen = ref(false)
 export const demoFeature = ref<DemoFeature | null>(null)
+export const demoExitDialogOpen = ref(false)
 
 export function openDemoFeature(key: string): void {
   demoFeature.value = FEATURES[key] ?? {
@@ -47,4 +48,8 @@ export function openDemoFeature(key: string): void {
     body: 'This action needs a running Grovely server, which the demo deliberately does not have.',
   }
   demoDialogOpen.value = true
+}
+
+export function openDemoExit(): void {
+  demoExitDialogOpen.value = true
 }

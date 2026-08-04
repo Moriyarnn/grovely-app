@@ -143,6 +143,7 @@ import { usePreferences } from '../composables/usePreferences'
 import { useAppStats } from '../composables/useAppStats'
 import { usePeriodData } from '../composables/usePeriodData'
 import { useLicense } from '../composables/useLicense'
+import { openDemoExit } from '../composables/useDemo'
 
 const route = useRoute()
 const router = useRouter()
@@ -168,9 +169,8 @@ function isActive(app) {
   return route.path === app.route || route.path.startsWith(app.route + '/')
 }
 
-// In the demo there is no real session to end; sign-off becomes an exit link
-// back to the marketing site. Dead-branch on __DEMO__ so the prod build is
-// unaffected and the URL is stripped from the normal bundle.
+// In the demo there is no real session to end; sign-off opens an optional exit
+// prompt. Dead-branch on __DEMO__ so the production logout stays unchanged.
 const isDemo = __DEMO__
 
 // Premium footer copy. Built from a __DEMO__ ternary so the demo variant (and
@@ -192,7 +192,7 @@ const premiumNote = __DEMO__
 
 function logout() {
   if (__DEMO__) {
-    window.location.href = 'https://grovely.org'
+    openDemoExit()
     return
   }
   clearToken()
