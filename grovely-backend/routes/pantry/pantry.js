@@ -38,13 +38,14 @@ function parseDensityFields(body) {
 // Upsert catalog entry for a given item. Returns the catalog row id.
 // Canonical name is always updated to whatever was submitted (last-writer-wins,
 // case-insensitive dedup enforced by the COLLATE NOCASE unique index).
-function upsertCatalog(db, { name, amount, unit, density, density_unit, pieces, price }) {
+function upsertCatalog(db, { name, category, amount, unit, density, density_unit, pieces, price }) {
   db.prepare(`
     INSERT INTO pantry_item_catalog
-      (name, amount, unit, density, density_unit, pieces, price, last_added_at, use_count, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), 1, datetime('now'))
+      (name, category, amount, unit, density, density_unit, pieces, price, last_added_at, use_count, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), 1, datetime('now'))
     ON CONFLICT(name) DO UPDATE SET
       name          = excluded.name,
+      category      = excluded.category,
       amount        = excluded.amount,
       unit          = excluded.unit,
       density       = excluded.density,
@@ -55,6 +56,7 @@ function upsertCatalog(db, { name, amount, unit, density, density_unit, pieces, 
       use_count     = use_count + 1
   `).run(
     name,
+    category     ?? 'other',
     amount       ?? null,
     unit         ?? null,
     density      ?? null,
@@ -251,6 +253,7 @@ module.exports = (db) => {
     // --- Catalog upsert + purchase history ---
     const catalogId = upsertCatalog(db, {
       name:         name.trim(),
+      category:     cat,
       amount:       amountVal,
       unit:         unit || null,
       density:      densityVal,

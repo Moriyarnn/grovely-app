@@ -19,29 +19,57 @@ router.get('/pantry/catalog/search', (req, res) => {
   const db = req.db;
   const q = (req.query.q ?? '').trim();
 
+  const latestStorePrices = `
+    WITH latest_per_store AS (
+      SELECT p.*,
+        ROW_NUMBER() OVER (
+          PARTITION BY lower(p.name), p.amount, p.unit, p.pieces, lower(COALESCE(p.store, ''))
+          ORDER BY p.added_at DESC, p.id DESC
+        ) AS store_rank
+      FROM pantry_purchase_history p
+    ), latest_variants AS (
+      SELECT p.*,
+        MIN(CASE WHEN trim(COALESCE(p.store, '')) <> '' THEN p.price END) OVER (
+          PARTITION BY lower(p.name), p.amount, p.unit, p.pieces
+        ) AS lowest_recent_price,
+        FIRST_VALUE(p.store) OVER (
+          PARTITION BY lower(p.name), p.amount, p.unit, p.pieces
+          ORDER BY CASE WHEN trim(COALESCE(p.store, '')) <> '' AND p.price IS NOT NULL THEN 0 ELSE 1 END,
+                   p.price ASC, p.added_at DESC, p.id DESC
+        ) AS lowest_recent_store,
+        COUNT(CASE WHEN trim(COALESCE(p.store, '')) <> '' AND p.price IS NOT NULL THEN 1 END) OVER (
+          PARTITION BY lower(p.name), p.amount, p.unit, p.pieces
+        ) AS recent_store_count
+      FROM latest_per_store p
+      WHERE p.store_rank = 1
+    )
+  `;
+
   if (!q) {
     const rows = db.prepare(`
-      SELECT
-        name, amount, unit, density, density_unit, pieces, price, store,
-        MAX(added_at) AS last_added_at
-      FROM pantry_purchase_history
-      GROUP BY name, amount, unit, pieces, store
-      ORDER BY last_added_at DESC
+      ${latestStorePrices}
+      SELECT p.name, p.amount, p.unit, p.density, p.density_unit, p.pieces, p.price, p.store,
+        c.category, p.added_at AS last_added_at,
+        p.lowest_recent_price, p.lowest_recent_store, p.recent_store_count
+      FROM latest_variants p
+      LEFT JOIN pantry_item_catalog c ON c.name = p.name COLLATE NOCASE
+      ORDER BY p.added_at DESC
       LIMIT 30
     `).all();
     return res.json(rows);
   }
 
   const rows = db.prepare(`
-    SELECT
-      name, amount, unit, density, density_unit, pieces, price, store,
-      MAX(added_at) AS last_added_at
-    FROM pantry_purchase_history
-    WHERE name LIKE ? ESCAPE '\\'
-    GROUP BY name, amount, unit, pieces, store
+    ${latestStorePrices}
+    SELECT p.name, p.amount, p.unit, p.density, p.density_unit, p.pieces, p.price, p.store,
+      c.category, p.added_at AS last_added_at,
+      p.lowest_recent_price, p.lowest_recent_store, p.recent_store_count
+    FROM latest_variants p
+      LEFT JOIN pantry_item_catalog c ON c.name = p.name COLLATE NOCASE
+      WHERE p.name LIKE ? ESCAPE '\\'
     ORDER BY
-      CASE WHEN name LIKE ? ESCAPE '\\' THEN 0 ELSE 1 END,
-      last_added_at DESC
+        CASE WHEN p.name LIKE ? ESCAPE '\\' THEN 0 ELSE 1 END,
+      p.added_at DESC
     LIMIT 30
   `).all(`%${q}%`, `${q}%`);
 

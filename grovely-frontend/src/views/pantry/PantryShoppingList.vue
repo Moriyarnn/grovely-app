@@ -129,10 +129,6 @@
               </span>
             </div>
           </div>
-          <!-- Premium price delta: shows ±difference vs last recorded price after autofill -->
-          <div v-if="priceDelta !== null" class="price-delta" :class="priceDelta > 0 ? 'price-delta--up' : 'price-delta--down'">
-            {{ priceDelta > 0 ? '+' : '' }}{{ pantrySymbol }}&nbsp;{{ Math.abs(priceDelta).toFixed(pantryDecimals) }}
-          </div>
         </div>
 
         <!-- Store — flex 1 -->
@@ -156,6 +152,26 @@
           </select>
         </div>
       </div>
+      <!-- Premium price delta: compares the edited price with the selected history price. -->
+      <Transition
+        name="price-delta-panel"
+        @before-enter="onPriceDeltaBeforeEnter"
+        @enter="onPriceDeltaEnter"
+        @leave="onPriceDeltaLeave"
+      >
+        <div v-if="priceDelta !== null || crossStorePriceDelta !== null" class="price-delta-row">
+          <Transition :name="priceDelta > 0 ? 'price-delta-less' : 'price-delta-more'" mode="out-in">
+            <p v-if="priceDelta !== null" :key="priceDelta > 0 ? 'less' : 'more'" class="price-delta">
+              You paid <span class="price-delta-amount" :class="priceDelta > 0 ? 'price-delta-amount--less' : 'price-delta-amount--more'">{{ pantrySymbol }}&nbsp;<Transition name="price-delta-number" mode="out-in"><span :key="priceDeltaAmountAnimationKey" class="price-delta-value" :style="{ width: `${priceDeltaDisplayWidth}ch` }">{{ priceDeltaDisplay }}</span></Transition></span> {{ priceDelta > 0 ? 'less' : 'more' }} {{ addFormPiecesCount > 1 ? 'for each item' : 'for this item' }} last time
+            </p>
+          </Transition>
+          <Transition :name="crossStorePriceDelta > 0 ? 'price-delta-less' : 'price-delta-more'" mode="out-in">
+            <p v-if="crossStorePriceDelta !== null" :key="crossStorePriceDelta > 0 ? 'higher' : 'lower'" class="price-delta price-delta--cross">
+              This is <span class="price-delta-amount" :class="crossStorePriceDelta > 0 ? 'price-delta-amount--less' : 'price-delta-amount--more'">{{ pantrySymbol }}&nbsp;<Transition name="price-delta-number" mode="out-in"><span :key="crossStorePriceDeltaAmountAnimationKey" class="price-delta-value" :style="{ width: `${crossStorePriceDeltaDisplayWidth}ch` }">{{ crossStorePriceDeltaDisplay }}</span></Transition></span> {{ crossStorePriceDelta > 0 ? 'higher' : 'lower' }} than the lowest recent price at {{ autofilledLowestRecentStore }}
+            </p>
+          </Transition>
+        </div>
+      </Transition>
     </form>
 
     <div class="items-area">
@@ -600,7 +616,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { API, apiFetch } from '../../api'
 import AppScroller from '@/components/ui/AppScroller.vue'
 import AppCheckbox from '@/components/ui/AppCheckbox.vue'
@@ -619,6 +635,10 @@ import { useLicense } from '../../composables/useLicense'
 import { CURRENCIES } from '../../constants/currencies'
 import { PANTRY_UNITS, DENSITY_UNITS } from '../../constants/units'
 import { clampPrice, clampQty } from '../../constants/format'
+
+// Keep the active shopping trip's store while this frontend session is loaded.
+// This is intentionally not persisted, so a refresh starts with an empty store.
+const retainedAddStore = ref('')
 
 const CATEGORIES = [
   { value: 'produce',   label: 'Produce' },
@@ -660,11 +680,15 @@ const addPriceInput = ref(null)
 const newPieces = ref('')
 const newDensity = ref('')
 const newDensityUnit = ref('g/ml')
-const newStore = ref('')
+const newStore = retainedAddStore
 
 // Price delta — set when premium autocomplete autofills the price field.
 // Cleared when the user types a new name or resets the form.
 const autofilledPrice    = ref(null)
+const autofilledLowestRecentPrice = ref(null)
+const autofilledLowestRecentStore = ref('')
+const autofilledRecentStoreCount = ref(0)
+const preserveAutofilledPriceForSelection = ref(false)
 const premiumGateOpen    = ref(false)
 
 // Tutorial state — mirrors the pattern in PeriodCalendar
@@ -688,15 +712,99 @@ const isPremium = computed(() => licenseActive.value === true)
 // Price delta computed from watching newPrice vs the autofilled baseline
 const priceDelta = computed(() => {
   if (autofilledPrice.value == null) return null
-  const entered = parseFloat(newPrice.value)
+  const enteredPrice = parseFloat(newPrice.value)
+  const entered = enteredPrice / (newPriceIsTotal.value && addFormPiecesCount.value > 1 ? addFormPiecesCount.value : 1)
   if (isNaN(entered)) return null
   const delta = entered - autofilledPrice.value
   if (Math.abs(delta) < 0.001) return null
   return delta
 })
+const priceDeltaDisplay = computed(() =>
+  priceDelta.value === null ? '' : clampPrice(Math.abs(priceDelta.value), 6, pantryDecimals.value)
+)
+const enteredPerItemPrice = computed(() => {
+  const entered = parseFloat(newPrice.value)
+  return entered / (newPriceIsTotal.value && addFormPiecesCount.value > 1 ? addFormPiecesCount.value : 1)
+})
+const crossStorePriceDelta = computed(() => {
+  const currentStore = newStore.value.trim().toLowerCase()
+  const lowestStore = autofilledLowestRecentStore.value.trim().toLowerCase()
+  const lowestPrice = autofilledLowestRecentPrice.value
+  if (!currentStore || !lowestStore || currentStore === lowestStore || autofilledRecentStoreCount.value < 2 || lowestPrice == null) return null
+  if (isNaN(enteredPerItemPrice.value)) return null
+  const delta = enteredPerItemPrice.value - lowestPrice
+  return Math.abs(delta) < 0.001 ? null : delta
+})
+const crossStorePriceDeltaDisplay = computed(() =>
+  crossStorePriceDelta.value === null ? '' : clampPrice(Math.abs(crossStorePriceDelta.value), 6, pantryDecimals.value)
+)
+const crossStorePriceDeltaDisplayWidth = computed(() => Math.max(1, Math.min(6, crossStorePriceDeltaDisplay.value.length)))
+const crossStorePriceDeltaMeaning = computed(() =>
+  crossStorePriceDelta.value === null ? null : (crossStorePriceDelta.value > 0 ? 'higher' : 'lower')
+)
+const crossStorePriceDeltaAmountAnimationKey = ref(0)
+const priceDeltaDisplayWidth = computed(() => Math.max(1, Math.min(6, priceDeltaDisplay.value.length)))
+const priceDeltaMeaning = computed(() =>
+  priceDelta.value === null ? null : (priceDelta.value > 0 ? 'less' : 'more')
+)
+const priceDeltaAmountAnimationKey = ref(0)
 
-// When user manually changes the name, clear the autofill baseline
-watch(newName, () => { autofilledPrice.value = null })
+watch([priceDeltaDisplay, priceDeltaMeaning], ([display, meaning], [previousDisplay, previousMeaning]) => {
+  if (display && previousDisplay && display !== previousDisplay && meaning === previousMeaning) {
+    priceDeltaAmountAnimationKey.value += 1
+  }
+})
+watch([crossStorePriceDeltaDisplay, crossStorePriceDeltaMeaning], ([display, meaning], [previousDisplay, previousMeaning]) => {
+  if (display && previousDisplay && display !== previousDisplay && meaning === previousMeaning) {
+    crossStorePriceDeltaAmountAnimationKey.value += 1
+  }
+})
+
+function onPriceDeltaBeforeEnter(el) {
+  const panel = el
+  panel.style.height = '0'
+}
+
+function onPriceDeltaEnter(el, done) {
+  const panel = el
+  panel.style.height = 'auto'
+  const targetHeight = panel.scrollHeight
+  panel.style.height = '0'
+  void panel.offsetHeight
+  panel.style.height = `${targetHeight}px`
+  panel.addEventListener('transitionend', function onEnd(event) {
+    if (event.propertyName !== 'height') return
+    panel.removeEventListener('transitionend', onEnd)
+    panel.style.height = ''
+    done()
+  })
+}
+
+function onPriceDeltaLeave(el, done) {
+  const panel = el
+  panel.style.height = `${panel.scrollHeight}px`
+  void panel.offsetHeight
+  panel.style.height = '0'
+  panel.addEventListener('transitionend', function onEnd(event) {
+    if (event.propertyName !== 'height') return
+    panel.removeEventListener('transitionend', onEnd)
+    done()
+  })
+}
+
+// Typing a new name invalidates the autofilled baseline. Autocomplete emits its
+// name update before its select event, so let that one update keep the price it
+// is about to set as the new baseline.
+watch(newName, () => {
+  if (preserveAutofilledPriceForSelection.value) {
+    preserveAutofilledPriceForSelection.value = false
+    return
+  }
+  autofilledPrice.value = null
+  autofilledLowestRecentPrice.value = null
+  autofilledLowestRecentStore.value = ''
+  autofilledRecentStoreCount.value = 0
+})
 
 function displayPieces(pieces) {
   if (!pieces || pieces < 2) return null
@@ -851,8 +959,10 @@ async function addItem() {
     newDensity.value = ''
     newDensityUnit.value = 'g/ml'
     newQtyIsPieces.value = false
-    newStore.value = ''
     autofilledPrice.value = null
+    autofilledLowestRecentPrice.value = null
+    autofilledLowestRecentStore.value = ''
+    autofilledRecentStoreCount.value = 0
     stashAddAmount.value       = ''
     stashAddUnit.value         = 'g'
     stashAddPieces.value       = ''
@@ -972,20 +1082,6 @@ const sheetUnitPricePreview = computed(() => {
   return clampPrice(p / n, sheetUnitPriceClampBudget.value, pantryDecimals.value)
 })
 
-// When TOT is on, the price field represents the total. If the user changes
-// pieces, the per-piece price should stay fixed — so scale total by the
-// new/old pieces ratio. Without this, total stays constant while per-piece
-// silently drifts, and flipping TOT off afterwards shows a surprising value.
-watch(() => sheetForm.value.pieces, (newVal, oldVal) => {
-  if (!sheetPriceIsTotal.value) return
-  const oldN = parseInt(oldVal)
-  const newN = parseInt(newVal)
-  if (isNaN(oldN) || isNaN(newN) || oldN < 2 || newN < 2) return
-  const p = parseFloat(sheetForm.value.price)
-  if (isNaN(p) || p <= 0) return
-  sheetForm.value.price = String(roundPrice(p * (newN / oldN), Math.max(pantryDecimals.value, 2)))
-})
-
 function openItemSheet(item) {
   sheetItem.value = item
   sheetForm.value = {
@@ -1016,18 +1112,7 @@ function roundPrice(x, decimals) {
   return Number(x.toFixed(decimals))
 }
 
-// Edit sheet opens with a stored per-piece value, so TOT must convert the
-// displayed number on toggle — otherwise save's ÷pieces would shrink the
-// stored value on every edit→TOT→save cycle. Add-form keeps TOT display-only
-// because its field starts empty and the user types a fresh number.
 function onSheetPriceTotalToggle(val) {
-  const n = sheetFormPiecesCount.value
-  const p = parseFloat(sheetForm.value.price)
-  if (n > 1 && !isNaN(p) && p > 0) {
-    sheetForm.value.price = val
-      ? String(roundPrice(p * n, Math.max(pantryDecimals.value, 2)))
-      : String(roundPrice(p / n, 4))
-  }
   sheetPriceIsTotal.value = val
 }
 
@@ -1335,9 +1420,15 @@ async function deleteSelected() {
 }
 
 // Handle autocomplete suggestion selection.
-// Free: only the name is emitted. Premium: full row autofills all form fields.
+// Both tiers restore the item's saved category. Premium also restores its
+// store- and quantity-specific purchase details.
 function onAutocompleteSelect(row) {
+  preserveAutofilledPriceForSelection.value = true
   newName.value = row.name
+  newCategory.value = row.category ?? 'other'
+  // Catalog prices are persisted per item, so they must never be treated as
+  // a total when an autocomplete selection replaces the add form's price.
+  newPriceIsTotal.value = false
 
   if (!isPremium.value) return
 
@@ -1363,7 +1454,12 @@ function onAutocompleteSelect(row) {
     newPrice.value    = String(row.price)
     autofilledPrice.value = row.price
   }
+  autofilledLowestRecentPrice.value = row.lowest_recent_price ?? null
+  autofilledLowestRecentStore.value = row.lowest_recent_store ?? ''
+  autofilledRecentStoreCount.value = row.recent_store_count ?? 0
   newStore.value = row.store ?? ''
+  // Clear the guard if the selected row had the same name and no watcher ran.
+  nextTick(() => { preserveAutofilledPriceForSelection.value = false })
 }
 
 // Live activity — surgical merge of another account's shopping-list changes into
@@ -1654,15 +1750,51 @@ onBeforeUnmount(() => {
 }
 
 /* Price delta label — premium autocomplete autofill feedback */
-.price-delta {
-  font-size: 11px;
-  font-weight: 600;
-  padding-left: 2px;
-  margin-top: 2px;
-  letter-spacing: 0.01em;
+.price-delta-row {
+  width: 100%;
+  min-height: 15px;
+  padding-top: 2px;
+  box-sizing: border-box;
+  line-height: 13px;
+  overflow: hidden;
 }
-.price-delta--up   { color: #c0392b; }
-.price-delta--down { color: #27ae60; }
+.price-delta {
+  display: inline-block;
+  width: fit-content;
+  max-width: 100%;
+  font-size: 11px;
+  padding-left: 2px;
+  margin: 0;
+  line-height: 13px;
+  letter-spacing: 0.01em;
+  color: #4B6F5A;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.price-delta-amount {
+  font-weight: 600;
+  white-space: nowrap;
+}
+.price-delta-value { display: inline-block; overflow: hidden; vertical-align: bottom; }
+.price-delta-amount--less { color: #c0392b; }
+.price-delta-amount--more { color: #27ae60; }
+.price-delta-panel-enter-active,
+.price-delta-panel-leave-active { transition: height 0.2s ease, opacity 0.2s ease, transform 0.2s ease; }
+.price-delta-panel-enter-from,
+.price-delta-panel-leave-to { opacity: 0; transform: translateY(-5px); }
+.price-delta-less-enter-active,
+.price-delta-less-leave-active,
+.price-delta-more-enter-active,
+.price-delta-more-leave-active,
+.price-delta-number-enter-active,
+.price-delta-number-leave-active { transition: opacity 0.2s ease, transform 0.2s ease; }
+.price-delta-less-enter-from,
+.price-delta-more-leave-to { opacity: 0; transform: translateY(5px); }
+.price-delta-less-leave-to,
+.price-delta-more-enter-from { opacity: 0; transform: translateY(-5px); }
+.price-delta-number-enter-from { opacity: 0; transform: translateY(3px); }
+.price-delta-number-leave-to { opacity: 0; transform: translateY(-3px); }
 
 .add-meta-label-row {
   display: flex;
@@ -2761,9 +2893,7 @@ onBeforeUnmount(() => {
   .price-opt--desktop { display: inline; }
 }
 
-/* Add form: append " tot." to ∑ toggle label on desktop */
 @media (min-width: 768px) {
-  .add-meta-field--price :deep(.app-field-toggle-text)::after { content: ' tot.'; }
   .item-edit-field--price :deep(.app-field-toggle-text)::after { content: ' tot.'; }
 }
 </style>

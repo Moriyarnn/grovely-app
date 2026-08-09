@@ -6,6 +6,18 @@ const VALID_CATEGORIES = ['produce', 'dairy', 'meat', 'bakery', 'frozen', 'dry_g
 const CATEGORY_ORDER = VALID_CATEGORIES.join("','")
 const VALID_DENSITY_UNITS = ['g/ml', 'g/L', 'kg/L']
 
+// Categories are a preference for an existing catalog name, rather than a
+// store- or quantity-specific purchase detail. Catalog entries are created on
+// move-to-pantry, so this deliberately does not turn unfinished list entries
+// into autocomplete suggestions.
+function updateCatalogCategory(db, name, category) {
+  db.prepare(`
+    UPDATE pantry_item_catalog
+    SET category = ?
+    WHERE name = ? COLLATE NOCASE
+  `).run(category, name)
+}
+
 function parseDensityFields(body) {
   const hasDensity = body.density !== undefined
   const hasDensityUnit = body.density_unit !== undefined
@@ -70,6 +82,7 @@ module.exports = (db) => {
     const result = db.prepare(
       'INSERT INTO shopping_list (name, quantity, category, added_by, price, notes, amount, unit, density, density_unit, pieces, store) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     ).run(name.trim(), quantity?.trim() || null, cat, userId, priceVal, notes?.trim() || null, amountVal, unit || null, densityVal, densityUnitVal, piecesVal, store?.trim() || null)
+    updateCatalogCategory(db, name.trim(), cat)
     const item = db.prepare('SELECT * FROM shopping_list WHERE id = ?').get(result.lastInsertRowid)
     emitActivity(req, { type: 'pantry.list.add', item: item.name, row: item })
     res.status(201).json(item)
@@ -110,6 +123,7 @@ module.exports = (db) => {
     if (category !== undefined) {
       const cat = VALID_CATEGORIES.includes(category) ? category : 'other'
       db.prepare('UPDATE shopping_list SET category = ? WHERE id = ?').run(cat, id)
+      updateCatalogCategory(db, item.name, cat)
     }
 
     if (expiry_date !== undefined) {

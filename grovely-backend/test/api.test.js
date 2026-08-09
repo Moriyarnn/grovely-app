@@ -26,6 +26,71 @@ function createTestDatabase() {
       value TEXT NOT NULL,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
+    CREATE TABLE shopping_list (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      quantity TEXT,
+      category TEXT DEFAULT 'other',
+      added_by INTEGER,
+      checked INTEGER DEFAULT 0,
+      checked_at TEXT,
+      price REAL,
+      notes TEXT,
+      amount REAL,
+      unit TEXT,
+      density REAL,
+      density_unit TEXT,
+      pieces INTEGER,
+      store TEXT
+    );
+    CREATE TABLE pantry (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      quantity TEXT,
+      category TEXT DEFAULT 'other',
+      bought_date TEXT,
+      expiry_date TEXT,
+      opened_date TEXT,
+      notes TEXT,
+      price REAL,
+      amount REAL,
+      unit TEXT,
+      density REAL,
+      density_unit TEXT,
+      pieces INTEGER,
+      status TEXT DEFAULT 'active',
+      deleted_at TEXT,
+      updated_at TEXT
+    );
+    CREATE TABLE pantry_item_catalog (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL COLLATE NOCASE UNIQUE,
+      category TEXT NOT NULL DEFAULT 'other',
+      amount REAL,
+      unit TEXT,
+      density REAL,
+      density_unit TEXT,
+      pieces INTEGER,
+      price REAL,
+      store TEXT,
+      use_count INTEGER NOT NULL DEFAULT 1,
+      last_added_at TEXT NOT NULL DEFAULT (datetime('now')),
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE TABLE pantry_purchase_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      catalog_id INTEGER,
+      name TEXT NOT NULL,
+      amount REAL,
+      unit TEXT,
+      density REAL,
+      density_unit TEXT,
+      pieces INTEGER,
+      price REAL,
+      store TEXT,
+      pantry_item_id INTEGER,
+      added_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
   `)
 
   const insertUser = db.prepare(
@@ -43,6 +108,10 @@ async function startTestApp() {
   app.use(express.json())
   app.use('/api/auth', require('../routes/auth')(db))
   app.use('/api/settings', requireAuth, require('../routes/settings')(db))
+  app.use('/api/pantry/list', requireAuth, require('../routes/pantry/list')(db))
+  app.use('/api/pantry/catalog', requireAuth, require('../routes/pantry/catalog')(db))
+  app.use('/api/pantry', requireAuth, require('../routes/pantry/pantry')(db))
+  app.use('/api/test-premium', (req, _res, next) => { req.db = db; next() }, require('../routes/premium'))
   app.get('/api/premium/check', requireAuth, requireLicense, (_req, res) => {
     res.json({ active: true })
   })
@@ -156,4 +225,56 @@ test('premium route returns payment required without a license', async () => {
   })
   assert.equal(response.status, 402)
   assert.equal(body.error, 'license_required')
+})
+
+test('shopping-list categories become the global autocomplete preference for an item name', async () => {
+  const token = tokenFor(1, 'owner', 'owner1')
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    'Content-Type': 'application/json',
+  }
+  app.db.prepare(`
+    INSERT INTO pantry_item_catalog (name, category, last_added_at)
+    VALUES ('Milk', 'other', datetime('now'))
+  `).run()
+  app.db.prepare(`
+    INSERT INTO pantry_purchase_history (name, amount, unit, price, store)
+    VALUES ('Milk', 1000, 'ml', 3.5, 'Local market')
+  `).run()
+
+  const add = await request(app.baseUrl, '/api/pantry/list', {
+    method: 'POST', headers, body: JSON.stringify({ name: 'milk', category: 'dairy' }),
+  })
+  assert.equal(add.response.status, 201)
+  assert.equal(add.body.category, 'dairy')
+
+  const freeSearch = await request(app.baseUrl, '/api/pantry/catalog/search?q=milk', {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  assert.equal(freeSearch.response.status, 200)
+  assert.equal(freeSearch.body[0].category, 'dairy')
+
+  const premiumSearch = await request(app.baseUrl, '/api/test-premium/pantry/catalog/search?q=milk')
+  assert.equal(premiumSearch.response.status, 200)
+  assert.equal(premiumSearch.body[0].category, 'dairy')
+
+  app.db.prepare(`
+    INSERT INTO pantry_purchase_history (name, amount, unit, price, store, added_at)
+    VALUES ('Milk', 1000, 'ml', 3, 'Other market', datetime('now', '+1 second'))
+  `).run()
+  const crossStoreSearch = await request(app.baseUrl, '/api/test-premium/pantry/catalog/search?q=milk')
+  const localMarket = crossStoreSearch.body.find(row => row.store === 'Local market')
+  assert.equal(localMarket.lowest_recent_price, 3)
+  assert.equal(localMarket.lowest_recent_store, 'Other market')
+  assert.equal(localMarket.recent_store_count, 2)
+
+  const update = await request(app.baseUrl, `/api/pantry/list/${add.body.id}`, {
+    method: 'PATCH', headers, body: JSON.stringify({ category: 'produce' }),
+  })
+  assert.equal(update.response.status, 200)
+
+  const afterEdit = await request(app.baseUrl, '/api/pantry/catalog/search?q=milk', {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  assert.equal(afterEdit.body[0].category, 'produce')
 })

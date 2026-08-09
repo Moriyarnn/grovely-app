@@ -3,7 +3,7 @@ const router = express.Router()
 
 module.exports = (db) => {
   // GET /api/pantry/catalog/search?q=
-  // Free tier: returns name + last_added_at only. Limit 30.
+  // Free tier: returns name, category + last_added_at only. Limit 30.
   // Empty q returns top 30 most recently added (for on-focus dropdown).
   // Non-empty q returns prefix + substring matches ordered by recency.
   router.get('/search', (req, res) => {
@@ -11,7 +11,7 @@ module.exports = (db) => {
 
     if (!q) {
       const rows = db.prepare(`
-        SELECT id, name, last_added_at
+        SELECT id, name, category, last_added_at
         FROM pantry_item_catalog
         ORDER BY last_added_at DESC
         LIMIT 30
@@ -21,7 +21,7 @@ module.exports = (db) => {
 
     // Prefix matches first, then broader substring matches, deduped, limit 30
     const rows = db.prepare(`
-      SELECT id, name, last_added_at
+      SELECT id, name, category, last_added_at
       FROM pantry_item_catalog
       WHERE name LIKE ? ESCAPE '\\'
       ORDER BY

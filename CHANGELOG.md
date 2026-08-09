@@ -5,6 +5,16 @@ record; the in-app "What's New" panel shows a short summary of major releases on
 
 ---
 
+## v0.14.9 - Pantry polish
+*August 8, 2026*
+
+- Pantry autocomplete now preserves an item's last selected category across stores and quantities
+- PCS price entry now keeps saved autocomplete prices per piece, with a reliable total-price toggle
+- The active store stays selected while adding shopping-list items until the frontend refreshes
+- Smart Autofill price comparisons now clearly animate per-item and cross-store price changes
+
+---
+
 ## v0.14.8 - prediction and runtime fixes
 *August 4, 2026*
 
