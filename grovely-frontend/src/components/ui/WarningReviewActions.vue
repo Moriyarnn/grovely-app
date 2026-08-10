@@ -1,6 +1,6 @@
 <template>
   <template v-if="reviewState === 'excluded'">
-    <IconAction icon="mdi-eye-outline" label="Unignore" color="#92400e" bg="#fef3c7" border="#fcd34d" :loading="loading === 'undo' ? 'Saving...' : ''" @click="undoReview" />
+    <IconAction icon="mdi-eye-outline" label="Include" color="#92400e" bg="#fef3c7" border="#fcd34d" :loading="loading === 'undo' ? 'Saving...' : ''" @click="undoReview" />
   </template>
   <template v-else-if="reviewState === null">
     <IconAction
@@ -13,8 +13,9 @@
       @click="pendingAction = 'excluded'"
     />
     <IconAction
+      v-if="canConfirm"
       icon="mdi-eye-outline"
-        label="Confirm pair"
+      :label="pairCycleId != null ? 'Confirm pair' : 'Confirm period'"
       color="#92400e"
       bg="#fef3c7"
       border="#fcd34d"
@@ -49,6 +50,7 @@
   </ConfirmDialog>
 
   <ConfirmDialog
+    v-if="canConfirm"
     :open="pendingAction === 'confirmed'"
     icon="mdi-eye-outline"
     iconColor="#92400e"
@@ -61,7 +63,12 @@
     @update:open="onDialogOpenChange"
     @confirm="submitReview('confirmed')"
   >
-    This pair will be included in your predictions, even though the gap looks unusual.
+    <template v-if="pairCycleId != null">
+      This pair will be included in your predictions, even though the gap looks unusual.
+    </template>
+    <template v-else>
+      This period will be included in your averages and predictions, even though its duration looks unusual.
+    </template>
   </ConfirmDialog>
 </template>
 
@@ -77,6 +84,7 @@ const props = defineProps<{
   endpoint: string       // e.g. `/period/cycles/5/review`
   itemLabel: string      // e.g. "Aug 8" — used in dialog body
   pairCycleId?: number | null
+  canConfirm?: boolean
 }>()
 
 const emit = defineEmits<{ reviewed: [] }>()

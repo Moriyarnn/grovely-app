@@ -35,3 +35,14 @@ export function clampQty(amount: number | string | null | undefined, unit: strin
   const numBudget = Math.max(2, totalBudget - unitStr.length)
   return clampNumber(amount, numBudget) + unitStr
 }
+
+export function formatMonthDayRange(startDate: string, endDate?: string | null): string {
+  const formatDate = (date: string) => new Date(date + 'T12:00:00')
+    .toLocaleDateString('en-US', { month: 'long', day: 'numeric' })
+  if (!endDate || endDate === startDate) return formatDate(startDate)
+  return `${formatDate(startDate)} → ${formatDate(endDate)}`
+}
+
+export function formatPeriodDayType(excluded: boolean): string {
+  return excluded ? 'Period day - Excluded from calculations' : 'Period day'
+}

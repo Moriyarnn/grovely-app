@@ -52,6 +52,17 @@ module.exports = (db) => {
     const { cycle_id, date, flow_intensity, notes, symptoms } = req.body
     if (!cycle_id || !date) return res.status(400).json({ error: 'cycle_id and date are required' })
 
+    const existingDay = db.prepare(
+      'SELECT id, cycle_id, date FROM cycle_days WHERE date = ? ORDER BY id ASC LIMIT 1'
+    ).get(date)
+    if (existingDay) {
+      return res.status(409).json({
+        error: 'This day is already logged',
+        code: 'CYCLE_DAY_EXISTS',
+        date: existingDay.date,
+      })
+    }
+
     // Insert the day
     const result = db.prepare(`
       INSERT INTO cycle_days (cycle_id, date, flow_intensity, notes)
@@ -112,16 +123,47 @@ module.exports = (db) => {
   router.delete('/:id', requireOwner, (req, res) => {
     const id = Number(req.params.id)
     const day = db.prepare(`
-      SELECT cd.cycle_id, cd.date, c.start_date, c.end_date as cycle_end_date
+      SELECT cd.cycle_id, cd.date, c.start_date, c.end_date as cycle_end_date, c.review_state
       FROM cycle_days cd
       JOIN cycles c ON c.id = cd.cycle_id
       WHERE cd.id = ?
     `).get(id)
     if (!day) return res.status(404).json({ error: 'Day not found' })
+    const outsideCycleRange = day.date < day.start_date || (day.cycle_end_date && day.date > day.cycle_end_date)
 
     db.prepare('DELETE FROM symptoms WHERE cycle_day_id = ?').run(id)
     db.prepare('DELETE FROM cycle_days WHERE id = ?').run(id)
     logPeriodEvent(db, { entity: 'cycle_day', entity_id: id, action: 'delete', cycle_id: day.cycle_id, date: day.date })
+
+    // Adjust Cycle makes start_date/end_date authoritative. Removing data that
+    // was deliberately left outside that range must not resize or delete it.
+    if (outsideCycleRange) {
+      emitActivity(req, { type: 'period.change', action: 'delete', dates: [day.date] })
+      return res.json({ success: true, range_preserved: true })
+    }
+
+    // For a multi-day period, deleting an actual edge moves that edge by one
+    // day. Remaining orphan rows must never become the new boundary.
+    if (day.cycle_end_date && day.start_date < day.cycle_end_date) {
+      let boundaryChanged = false
+      const reviewState = day.review_state === 'confirmed' ? null : day.review_state
+      if (day.date === day.start_date) {
+        const nextStart = new Date(day.start_date + 'T00:00:00')
+        nextStart.setDate(nextStart.getDate() + 1)
+        db.prepare('UPDATE cycles SET start_date = ?, review_state = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+          .run(nextStart.toISOString().split('T')[0], reviewState, day.cycle_id)
+        boundaryChanged = true
+      } else if (day.date === day.cycle_end_date) {
+        const previousEnd = new Date(day.cycle_end_date + 'T00:00:00')
+        previousEnd.setDate(previousEnd.getDate() - 1)
+        db.prepare('UPDATE cycles SET end_date = ?, review_state = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+          .run(previousEnd.toISOString().split('T')[0], reviewState, day.cycle_id)
+        boundaryChanged = true
+      }
+      if (boundaryChanged) recomputeAllPredictions(db)
+      emitActivity(req, { type: 'period.change', action: 'delete', dates: [day.date] })
+      return res.json({ success: true, boundary_changed: boundaryChanged })
+    }
 
     // Auto-update end_date to the latest remaining day (NULL if none left)
     db.prepare(`

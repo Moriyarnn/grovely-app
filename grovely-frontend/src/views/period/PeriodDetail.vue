@@ -230,6 +230,8 @@ import PremiumGate from '@/components/PremiumGate.vue'
 import { getUser } from '../../api'
 import { usePeriodData } from '../../composables/usePeriodData'
 import { useLicense } from '../../composables/useLicense'
+import { getLatestEligibleCycle } from '../../utils/periodForecastVisibility'
+import { getPeriodWarningGuidance } from '../../utils/periodWarningPulse'
 
 const { summary, allCycles, allWarnings, goToWarning } = usePeriodData()
 const layoutGoTo = inject('appLayoutGoTo', null)
@@ -246,13 +248,7 @@ onMounted(() => { fetchLicenseStatus() })
 const activeWarnings = computed(() => allWarnings.value.filter(w => !w.reviewState))
 const acknowledgedWarnings = computed(() => allWarnings.value.filter(w => w.reviewState))
 
-function warningGuidance(w) {
-  if (w.code === 'SHORT_CYCLE_GAP') return 'Tap either period. Exclude the mistaken entry, or confirm the pair if both are real.'
-  if (w.code === 'LONG_PERIOD') return 'Tap the period. Exclude it from predictions, or confirm it is correct.'
-  if (w.code === 'FUTURE_CYCLE') return 'Tap the period to correct its date or remove it.'
-  if (w.isOrphaned) return 'Tap the date to update or remove the logged data.'
-  return 'Tap the highlighted date to review it.'
-}
+const warningGuidance = getPeriodWarningGuidance
 
 const todayStr = new Date().toISOString().split('T')[0]
 const currentUser = ref(getUser())
@@ -290,9 +286,7 @@ const isLockedTeaserShown = computed(() =>
 // even when currentCycle is null (e.g. gap in day-by-day logging)
 const recentCycle = computed(() => {
   if (!allCycles.value.length) return null
-  return allCycles.value
-    .filter(c => c.review_state !== 'excluded')
-    .sort((a, b) => b.start_date.localeCompare(a.start_date))[0] ?? null
+  return getLatestEligibleCycle(allCycles.value, summary.value?.dataWarnings ?? [])
 })
 
 // Day 1 of the cycle today belongs to.
@@ -312,10 +306,7 @@ const phaseAnchorDate = computed(() => {
       return Math.floor((today - d) / 86400000) < maxDay
     })
   if (recent.length) return recent[recent.length - 1].startDate
-  const latest = allCycles.value.length
-    ? allCycles.value.reduce((a, b) => (a.start_date > b.start_date ? a : b))
-    : null
-  return latest?.start_date ?? null
+  return recentCycle.value?.start_date ?? null
 })
 
 // Source of the displayed phase:

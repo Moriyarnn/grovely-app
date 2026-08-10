@@ -2,11 +2,18 @@ const express = require('express')
 const router = express.Router()
 const { logPeriodEvent } = require('../../logger')
 const { requireOwner } = require('../../middleware/auth')
-const { recomputeAllPredictions } = require('./_calcHelpers')
+const { getCalculationCycleState, recomputeAllPredictions } = require('./_calcHelpers')
 const { findUnresolvedShortCyclePair } = require('./_shortCyclePairs')
 const { emitActivity } = require('../../realtime')
 
-module.exports = (db) => {
+function resolveConfirmationCycleId(cycles, unresolvedLongCycleIds, selectedCycleId, pairCycleId) {
+  if (pairCycleId === undefined || pairCycleId === null) {
+    return unresolvedLongCycleIds.has(Number(selectedCycleId)) ? Number(selectedCycleId) : null
+  }
+  return findUnresolvedShortCyclePair(cycles, selectedCycleId, pairCycleId)?.later.id ?? null
+}
+
+function createCyclesRouter(db) {
   // Get all cycles with last logged day
   router.get('/', (req, res) => {
     const cycles = db.prepare(`
@@ -104,11 +111,13 @@ module.exports = (db) => {
     if (!cycle) return res.status(404).json({ error: 'Cycle not found' })
     if (reviewState === 'confirmed') {
       const cycles = db.prepare(`SELECT * FROM cycles WHERE start_date IS NOT NULL ORDER BY start_date ASC`).all()
-      const pair = findUnresolvedShortCyclePair(cycles, id, pairCycleId ?? id)
-      if (!pair) {
-        return res.status(400).json({ error: 'No unresolved short-cycle pair found' })
+      const { unresolvedLongCycles } = getCalculationCycleState(db)
+      const unresolvedLongCycleIds = new Set(unresolvedLongCycles.map(item => item.id))
+      const confirmationId = resolveConfirmationCycleId(cycles, unresolvedLongCycleIds, id, pairCycleId)
+      if (confirmationId === null) {
+        return res.status(400).json({ error: 'No unresolved cycle warning found' })
       }
-      db.prepare('UPDATE cycles SET review_state = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run('confirmed', pair.later.id)
+      db.prepare('UPDATE cycles SET review_state = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run('confirmed', confirmationId)
     } else {
       db.prepare('UPDATE cycles SET review_state = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(reviewState ?? null, id)
     }
@@ -146,3 +155,6 @@ module.exports = (db) => {
 
   return router
 }
+
+module.exports = createCyclesRouter
+module.exports.resolveConfirmationCycleId = resolveConfirmationCycleId

@@ -1,68 +1,85 @@
-const MIN_CYCLE_GAP = 21
+const MAX_PERIOD_LENGTH = 10
 const ALPHA = 0.3
+const {
+  getConfirmedShortCycleForecastSuppressionIds,
+  getUnresolvedShortCycleIds,
+  getUnresolvedShortCyclePairs
+} = require('./_shortCyclePairs')
 
-function computeCycleParams(db) {
+function getCalculationCycleState(db) {
   const cycles = db.prepare(`
-    SELECT c.* FROM cycles c
+    SELECT c.*,
+      COALESCE(c.end_date, MAX(cd.date)) AS effective_end,
+      CAST(julianday(COALESCE(c.end_date, MAX(cd.date))) - julianday(c.start_date) + 1 AS INTEGER) AS period_length
+    FROM cycles c
+    LEFT JOIN cycle_days cd ON cd.cycle_id = c.id
     WHERE c.start_date IS NOT NULL
       AND c.start_date <= date('now')
-      AND (c.end_date IS NOT NULL OR EXISTS (SELECT 1 FROM cycle_days cd WHERE cd.cycle_id = c.id))
+    GROUP BY c.id
+    HAVING effective_end IS NOT NULL
     ORDER BY c.start_date ASC
   `).all()
 
-  const effective = cycles.filter(c => c.review_state !== 'excluded')
+  const includedCycles = cycles.filter(cycle => cycle.review_state !== 'excluded')
+  const shortPairs = getUnresolvedShortCyclePairs(includedCycles)
+  const unresolvedCycleIds = getUnresolvedShortCycleIds(includedCycles)
+  const today = new Date().toISOString().split('T')[0]
+  const unresolvedLongCycles = includedCycles.filter(cycle =>
+    cycle.effective_end < today &&
+    cycle.period_length > MAX_PERIOD_LENGTH &&
+    cycle.review_state !== 'confirmed'
+  )
+  unresolvedLongCycles.forEach(cycle => unresolvedCycleIds.add(cycle.id))
 
-  const lengths = []
-  let anchorIdx = 0
-  for (let i = 1; i < effective.length; i++) {
-    const diff = Math.round(
-      (new Date(effective[i].start_date) - new Date(effective[anchorIdx].start_date)) / 86400000
-    )
-    if (diff >= MIN_CYCLE_GAP || effective[i].review_state === 'confirmed') {
-      lengths.push(diff)
-      anchorIdx = i
-    }
+  const eligibleCycles = includedCycles.filter(cycle => !unresolvedCycleIds.has(cycle.id))
+  const cycleLengths = eligibleCycles.slice(1).map((cycle, index) =>
+    Math.round((new Date(cycle.start_date) - new Date(eligibleCycles[index].start_date)) / 86400000)
+  )
+
+  return {
+    cycles,
+    includedCycles,
+    eligibleCycles,
+    cycleLengths,
+    shortPairs,
+    unresolvedCycleIds,
+    unresolvedLongCycles
   }
+}
 
-  const avgCycleLength = lengths.length > 0
-    ? Math.round(lengths.slice(1).reduce((est, len) => ALPHA * len + (1 - ALPHA) * est, lengths[0]))
+function computeCycleParams(db, cycleState = getCalculationCycleState(db)) {
+  const { eligibleCycles, cycleLengths } = cycleState
+
+  const avgCycleLength = cycleLengths.length > 0
+    ? Math.round(cycleLengths.slice(1).reduce((est, len) => ALPHA * len + (1 - ALPHA) * est, cycleLengths[0]))
     : 28
 
-  const lutealLengths = db.prepare(`
-    SELECT
-      CAST(julianday(next_c.start_date) - julianday(c.ovulation_date) AS INTEGER) AS luteal_length
-    FROM cycles c
-    JOIN cycles next_c ON next_c.start_date = (
-      SELECT MIN(start_date) FROM cycles WHERE start_date > c.start_date AND review_state IS NOT 'excluded'
-    )
-    WHERE c.ovulation_date IS NOT NULL
-      AND c.start_date <= date('now')
-      AND c.review_state IS NOT 'excluded'
-    ORDER BY c.start_date ASC
-  `).all()
-    .map(r => r.luteal_length)
-    .filter(l => l >= 7 && l <= 20)
+  const lutealLengths = eligibleCycles.slice(0, -1)
+    .map((cycle, index) => cycle.ovulation_date
+      ? Math.round((new Date(eligibleCycles[index + 1].start_date) - new Date(cycle.ovulation_date)) / 86400000)
+      : null)
+    .filter(length => length !== null && length >= 7 && length <= 20)
 
   const avgLutealPhase = lutealLengths.length > 0
     ? Math.round(lutealLengths.slice(1).reduce((est, l) => ALPHA * l + (1 - ALPHA) * est, lutealLengths[0]))
     : 14
 
-  const predictionErrors = db.prepare(`
-    SELECT CAST(julianday(start_date) - julianday(predicted_start_date) AS INTEGER) AS error_days
-    FROM cycles
-    WHERE predicted_start_date IS NOT NULL
-      AND start_date IS NOT NULL
-      AND start_date <= date('now')
-      AND ABS(julianday(start_date) - julianday(predicted_start_date)) <= 14
-      AND review_state IS NOT 'excluded'
-    ORDER BY start_date ASC
-  `).all().map(r => r.error_days)
+  const predictionErrors = eligibleCycles
+    .filter(cycle => cycle.predicted_start_date)
+    .map(cycle => Math.round((new Date(cycle.start_date) - new Date(cycle.predicted_start_date)) / 86400000))
+    .filter(error => Math.abs(error) <= 14)
 
   const avgPredictionError = predictionErrors.length >= 2
     ? predictionErrors.slice(1).reduce((est, e) => ALPHA * e + (1 - ALPHA) * est, predictionErrors[0])
     : 0
 
   return { avgCycleLength, avgLutealPhase, avgPredictionError }
+}
+
+function computeAveragePeriodLength(cycles) {
+  return cycles.length > 0
+    ? Math.round(cycles.reduce((sum, cycle) => sum + cycle.period_length, 0) / cycles.length)
+    : 5
 }
 
 function computePredictionsForCycle(startDate, avgCycleLength, avgLutealPhase, avgPredictionError = 0) {
@@ -87,16 +104,10 @@ function computePredictionsForCycle(startDate, avgCycleLength, avgLutealPhase, a
 // Recomputes and stores predictions for all past cycles.
 // Called at startup and after any mutation that could change avgCycleLength or avgLutealPhase.
 function recomputeAllPredictions(db) {
-  const cycles = db.prepare(`
-    SELECT c.id, c.start_date
-    FROM cycles c
-    WHERE c.start_date <= date('now')
-      AND c.review_state IS NOT 'excluded'
-  `).all()
-
-  if (cycles.length === 0) return
-
-  const { avgCycleLength, avgLutealPhase, avgPredictionError } = computeCycleParams(db)
+  const cycleState = getCalculationCycleState(db)
+  const { eligibleCycles } = cycleState
+  const { avgCycleLength, avgLutealPhase, avgPredictionError } = computeCycleParams(db, cycleState)
+  const suppressedForecastIds = getConfirmedShortCycleForecastSuppressionIds(eligibleCycles)
 
   const stmt = db.prepare(`
     UPDATE cycles SET
@@ -106,9 +117,25 @@ function recomputeAllPredictions(db) {
       updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
   `)
+  const clearStmt = db.prepare(`
+    UPDATE cycles SET
+      predicted_fertile_start = NULL,
+      predicted_fertile_end = NULL,
+      predicted_ovulation_date = NULL,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+      AND (predicted_fertile_start IS NOT NULL
+        OR predicted_fertile_end IS NOT NULL
+        OR predicted_ovulation_date IS NOT NULL)
+  `)
 
   db.transaction(() => {
-    for (const cycle of cycles) {
+    const eligibleIds = new Set(eligibleCycles.map(cycle => cycle.id))
+    for (const cycle of db.prepare('SELECT id FROM cycles').all()) {
+      if (!eligibleIds.has(cycle.id) || suppressedForecastIds.has(cycle.id)) clearStmt.run(cycle.id)
+    }
+    for (const cycle of eligibleCycles) {
+      if (suppressedForecastIds.has(cycle.id)) continue
       const p = computePredictionsForCycle(cycle.start_date, avgCycleLength, avgLutealPhase, avgPredictionError)
       stmt.run(p.predicted_fertile_start, p.predicted_fertile_end, p.predicted_ovulation_date, cycle.id)
     }
@@ -154,4 +181,12 @@ function upcomingFertileWindow(db, lastCycle, today) {
   return { fertileWindow: null, ovulationDate: null }
 }
 
-module.exports = { computeCycleParams, computePredictionsForCycle, recomputeAllPredictions, upcomingFertileWindow }
+module.exports = {
+  MAX_PERIOD_LENGTH,
+  getCalculationCycleState,
+  computeAveragePeriodLength,
+  computeCycleParams,
+  computePredictionsForCycle,
+  recomputeAllPredictions,
+  upcomingFertileWindow
+}

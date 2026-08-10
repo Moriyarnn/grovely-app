@@ -154,12 +154,73 @@ router.patch('/period/cycles/:id/adjust', requireOwner, (req, res) => {
   const newEnd   = end_date   ?? cycle.end_date;
   if (newEnd && newStart > newEnd)
     return res.status(400).json({ error: 'start_date must be before end_date' });
-  db.prepare('UPDATE cycles SET start_date = ?, end_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
-    .run(newStart, newEnd, id);
-  logPeriodEvent(db, { entity: 'cycle', entity_id: id, action: 'update', cycle_id: id, date: newStart });
+  const today = new Date().toISOString().split('T')[0];
+  const futureDate = newStart > today ? newStart : (newEnd && newEnd > today ? newEnd : null);
+  if (futureDate)
+    return res.status(400).json({ error: "Can't log future dates", code: 'FUTURE_CYCLE_DATE', date: futureDate });
+
+  const currentEnd = cycle.end_date ?? cycle.start_date;
+  let existingDay = null;
+  if (newStart < cycle.start_date) {
+    existingDay = db.prepare(`
+      SELECT date FROM cycle_days
+      WHERE cycle_id <> ? AND date >= ? AND date < ?
+      ORDER BY date ASC LIMIT 1
+    `).get(id, newStart, cycle.start_date);
+  }
+  if (!existingDay && newEnd && newEnd > currentEnd) {
+    existingDay = db.prepare(`
+      SELECT date FROM cycle_days
+      WHERE cycle_id <> ? AND date > ? AND date <= ?
+      ORDER BY date ASC LIMIT 1
+    `).get(id, currentEnd, newEnd);
+  }
+  if (existingDay)
+    return res.status(409).json({ error: 'This day is already logged', code: 'CYCLE_DAY_EXISTS', date: existingDay.date });
+
+  const overlappingCycle = db.prepare(`
+    SELECT c.id
+    FROM cycles c
+    WHERE c.id <> ?
+      AND c.start_date <= ?
+      AND COALESCE(
+        c.end_date,
+        (SELECT MAX(cd.date) FROM cycle_days cd WHERE cd.cycle_id = c.id),
+        c.start_date
+      ) >= ?
+    LIMIT 1
+  `).get(id, newEnd ?? newStart, newStart);
+  if (overlappingCycle)
+    return res.status(409).json({ error: 'Adjusted period overlaps an existing period' });
+  const datesChanged = newStart !== cycle.start_date || newEnd !== cycle.end_date;
+  const reviewState = datesChanged && cycle.review_state === 'confirmed' ? null : cycle.review_state;
+  const adjustRange = db.transaction(() => {
+    db.prepare('UPDATE cycles SET start_date = ?, end_date = ?, review_state = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+      .run(newStart, newEnd, reviewState, id);
+    logPeriodEvent(db, { entity: 'cycle', entity_id: id, action: 'update', cycle_id: id, date: newStart });
+
+    const emptyOutsideDays = db.prepare(`
+      SELECT cd.id, cd.date
+      FROM cycle_days cd
+      WHERE cd.cycle_id = ?
+        AND (cd.date < ? OR (? IS NOT NULL AND cd.date > ?))
+        AND cd.flow_intensity IS NULL
+        AND (cd.notes IS NULL OR trim(cd.notes) = '')
+        AND NOT EXISTS (SELECT 1 FROM symptoms s WHERE s.cycle_day_id = cd.id)
+    `).all(id, newStart, newEnd, newEnd);
+    if (emptyOutsideDays.length > 0) {
+      const placeholders = emptyOutsideDays.map(() => '?').join(',');
+      db.prepare(`DELETE FROM cycle_days WHERE id IN (${placeholders})`).run(...emptyOutsideDays.map(day => day.id));
+      emptyOutsideDays.forEach(day => {
+        logPeriodEvent(db, { entity: 'cycle_day', entity_id: day.id, action: 'delete', cycle_id: id, date: day.date });
+      });
+    }
+    recomputeAllPredictions(db);
+    return emptyOutsideDays.length;
+  });
+  const removedEmptyDays = adjustRange();
   emitActivity(req, { type: 'period.change', action: 'cycle', dates: [newStart] });
-  res.json({ id, start_date: newStart, end_date: newEnd });
-  setImmediate(() => recomputeAllPredictions(db));
+  res.json({ id, start_date: newStart, end_date: newEnd, removed_empty_days: removedEmptyDays });
 });
 
 module.exports = router;

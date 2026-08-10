@@ -5,6 +5,17 @@ record; the in-app "What's New" panel shows a short summary of major releases on
 
 ---
 
+## v0.14.10 - Period tracker polish
+*August 10, 2026*
+
+- Prediction Health now keeps unresolved warning periods out of calculations and forecasts, hides misleading duration ghosts, and clearly supports confirming warning pairs (#201)
+- Any logged period can now be excluded from calculations without deleting it, included again later, and identified consistently in calendar and detail views (#202)
+- Prediction Health review actions and orphaned period-day details now use clear, consistent actions without offering a nonfunctional symptom logger (#203)
+- Confirmed nearby periods now produce one coherent fertile window instead of overlapping duplicate forecasts (#204)
+- Adjust Cycle now applies explicit range changes safely, preserves orphaned data without restoring removed dates, refreshes warnings reliably, and blocks future or duplicate dates (#205)
+
+---
+
 ## v0.14.9 - Pantry polish
 *August 8, 2026*
 

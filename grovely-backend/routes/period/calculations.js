@@ -1,70 +1,23 @@
 const express = require('express')
 const router = express.Router()
 const { logPeriodCalculation } = require('../../logger')
-const { getUnresolvedShortCyclePairs } = require('./_shortCyclePairs')
+const {
+  MAX_PERIOD_LENGTH,
+  computeAveragePeriodLength,
+  computeCycleParams,
+  getCalculationCycleState
+} = require('./_calcHelpers')
+
+function getFutureCycles(db) {
+  return db.prepare(`
+    SELECT * FROM cycles
+    WHERE start_date > date('now')
+      AND review_state IS NOT 'excluded'
+    ORDER BY start_date ASC
+  `).all()
+}
 
 module.exports = (db) => {
-
-  const MIN_CYCLE_GAP = 21 // days — gaps shorter than this are biologically unlikely (minimum normal cycle)
-
-  // Helper: get all completed cycles (past only, start_date <= today)
-  // Uses last logged cycle_day as effective end when end_date is not set
-  const getCompletedCycles = () => {
-    return db.prepare(`
-      SELECT c.*,
-        CAST(julianday(COALESCE(c.end_date, MAX(cd.date))) - julianday(c.start_date) + 1 AS INTEGER) as period_length
-      FROM cycles c
-      LEFT JOIN cycle_days cd ON cd.cycle_id = c.id
-      WHERE c.start_date IS NOT NULL
-        AND c.start_date <= date('now')
-        AND c.review_state IS NOT 'excluded'
-      GROUP BY c.id
-      HAVING COALESCE(c.end_date, MAX(cd.date)) IS NOT NULL
-        AND COALESCE(c.end_date, MAX(cd.date)) < date('now')
-      ORDER BY c.start_date ASC
-    `).all()
-  }
-
-  // Helper: get cycle lengths (start to start) — past cycles only, skips short gaps
-  // Returns { lengths, skippedGaps } where skippedGaps holds warning details
-  const getCycleLengths = () => {
-    const cycles = db.prepare(`
-      SELECT c.* FROM cycles c
-      WHERE c.start_date IS NOT NULL
-        AND c.start_date <= date('now')
-        AND (c.end_date IS NOT NULL OR EXISTS (SELECT 1 FROM cycle_days cd WHERE cd.cycle_id = c.id))
-      ORDER BY c.start_date ASC
-    `).all()
-
-    // Drop explicitly excluded cycles before gap analysis
-    const effective = cycles.filter(c => c.review_state !== 'excluded')
-
-    const lengths = []
-    const skippedGaps = []
-    const shortPairs = getUnresolvedShortCyclePairs(effective)
-    let anchorIdx = 0
-
-    for (let i = 1; i < effective.length; i++) {
-      const diff = Math.round(
-        (new Date(effective[i].start_date) - new Date(effective[anchorIdx].start_date))
-        / (1000 * 60 * 60 * 24)
-      )
-      if (diff >= MIN_CYCLE_GAP || effective[i].review_state === 'confirmed') {
-        lengths.push(diff)
-        anchorIdx = i
-      } else {
-        // Flagged cycle: skip it as an anchor point, bridge over it from the current anchor
-        skippedGaps.push({
-          from: effective[anchorIdx].start_date,
-          to: effective[i].start_date,
-          gap: diff,
-          cycleId: effective[i].id,
-          reviewState: effective[i].review_state
-        })
-      }
-    }
-    return { lengths, skippedGaps, shortPairs }
-  }
 
   // GET /api/calculations/summary
   // Returns everything the frontend needs in one call
@@ -76,31 +29,50 @@ module.exports = (db) => {
     const prefs = prefRows.reduce((acc, r) => { acc[r.key] = r.value; return acc }, {})
 
     // Detect future cycles (start_date > today), one warning per cycle
-    const futureCycles = db.prepare(`
-      SELECT * FROM cycles WHERE start_date > date('now') ORDER BY start_date ASC
-    `).all()
+    const futureCycles = getFutureCycles(db)
     futureCycles.forEach(c => {
       dataWarnings.push({
         code: 'FUTURE_CYCLE',
-        message: `Cycle starting on ${c.start_date} is in the future, so it was excluded from predictions. Remove it or correct the date.`,
+        message: `The period starting on ${c.start_date} is in the future, so it is excluded from calculations. Correct its date, remove it, or exclude it to dismiss this warning.`,
         targetDate: c.start_date,
-        affectedDates: [c.start_date]
+        affectedDates: [c.start_date],
+        cycleId: c.id,
+        reviewState: null
       })
     })
 
-    const completedCycles = getCompletedCycles()
-    const { lengths: cycleLengths, skippedGaps, shortPairs } = getCycleLengths()
+    const cycleState = getCalculationCycleState(db)
+    const {
+      cycles: allCycles,
+      eligibleCycles,
+      cycleLengths,
+      shortPairs,
+      unresolvedCycleIds,
+      unresolvedLongCycles
+    } = cycleState
+    const completedCycles = allCycles.filter(cycle => cycle.effective_end < today)
 
     // Warn about impossibly short gaps
     shortPairs.forEach(({ earlier, later, gap }) => {
       dataWarnings.push({
         code: 'SHORT_CYCLE_GAP',
-        message: `Cycles on ${earlier.start_date} and ${later.start_date} are only ${gap} day(s) apart (minimum expected is 21). This looks like a data entry mistake, so the gap was excluded from predictions.`,
+        message: `The periods starting on ${earlier.start_date} and ${later.start_date} begin only ${gap} ${gap === 1 ? 'day' : 'days'} apart (minimum expected cycle length is 21 days). Both periods are excluded from calculations until you review them.`,
         targetDate: earlier.start_date,
         affectedDates: [earlier.start_date, later.start_date],
         cycleId: later.id,
         cycleIds: [earlier.id, later.id],
         confirmationCycleId: later.id,
+        reviewState: null
+      })
+    })
+
+    unresolvedLongCycles.forEach(c => {
+      dataWarnings.push({
+        code: 'LONG_PERIOD',
+        message: `The period starting on ${c.start_date} spans ${c.period_length} ${c.period_length === 1 ? 'day' : 'days'}. A period longer than ${MAX_PERIOD_LENGTH} days may be a data entry mistake. It is excluded from calculations until you review it.`,
+        targetDate: c.start_date,
+        affectedDates: [c.start_date, c.end_date].filter(Boolean),
+        cycleId: c.id,
         reviewState: null
       })
     })
@@ -138,89 +110,15 @@ module.exports = (db) => {
       ? 7
       : (cycleStdDev !== null && cycleLengths.length >= 3 ? Math.max(2, cycleStdDev) : null)
 
-    const MAX_PERIOD_LENGTH = 10 // days — longer than this is medically unusual
-
-    // Warn about and exclude abnormally long period entries
-    const validPeriodCycles = []
-    completedCycles.forEach(c => {
-      if (c.review_state === 'excluded') return
-      if (c.period_length > MAX_PERIOD_LENGTH && c.review_state !== 'confirmed') {
-        dataWarnings.push({
-          code: 'LONG_PERIOD',
-          message: `The entry starting on ${c.start_date} spans ${c.period_length} day(s). A period longer than ${MAX_PERIOD_LENGTH} days looks like a data entry mistake (e.g. the end date was set to the end of the cycle instead of the end of the bleeding). It was excluded from the period length average.`,
-          targetDate: c.start_date,
-          affectedDates: [c.start_date, c.end_date].filter(Boolean),
-          cycleId: c.id,
-          reviewState: c.review_state ?? null
-        })
-        return // both null and 'excluded' states are kept out of the avg
-      }
-      validPeriodCycles.push(c)
-    })
+    const validPeriodCycles = completedCycles.filter(cycle =>
+      cycle.review_state !== 'excluded' && !unresolvedCycleIds.has(cycle.id)
+    )
 
     // Average period length (start to end), using only valid entries
-    const avgPeriodLength = validPeriodCycles.length > 0
-      ? Math.round(validPeriodCycles.reduce((a, b) => a + b.period_length, 0) / validPeriodCycles.length)
-      : 5 // default assumption
+    const avgPeriodLength = computeAveragePeriodLength(validPeriodCycles)
 
-    // Last cycle — past only, exclude orphaned cycles (no days, no explicit end_date)
-    const allCycles = db.prepare(`
-      SELECT c.* FROM cycles c
-      WHERE c.start_date <= date('now')
-        AND (c.end_date IS NOT NULL
-         OR EXISTS (SELECT 1 FROM cycle_days cd WHERE cd.cycle_id = c.id))
-      ORDER BY c.start_date DESC
-    `).all()
-    const skippedCycleIds = new Set(skippedGaps.map(g => g.cycleId))
-    const lastCycle = allCycles.find(c =>
-      c.review_state !== 'excluded' && !skippedCycleIds.has(c.id)
-    ) || null
-
-    // Personalised luteal phase — days between ovulation_date and the next cycle's start
-    // Falls back to the clinical default of 14 if no ovulation days have been marked
-    const ovulationRows = db.prepare(`
-      SELECT
-        c.ovulation_date,
-        CAST(julianday(next_c.start_date) - julianday(c.ovulation_date) AS INTEGER) AS luteal_length
-      FROM cycles c
-      JOIN cycles next_c ON next_c.start_date = (
-        SELECT MIN(start_date) FROM cycles WHERE start_date > c.start_date AND review_state IS NOT 'excluded'
-      )
-      WHERE c.ovulation_date IS NOT NULL
-        AND c.start_date <= date('now')
-        AND c.review_state IS NOT 'excluded'
-      ORDER BY c.start_date ASC
-    `).all().filter(r => r.luteal_length >= 7 && r.luteal_length <= 20)
-
-    const lutealLengths = ovulationRows.map(r => r.luteal_length)
-    const avgLutealPhase = lutealLengths.length > 0
-      ? Math.round(
-          lutealLengths.slice(1).reduce(
-            (est, l) => ALPHA * l + (1 - ALPHA) * est,
-            lutealLengths[0]
-          )
-        )
-      : 14 // clinical default
-
-    // Prediction accuracy correction — compare stored predictions to actual start dates
-    // Only use pairs that are within 14 days of each other to filter out historical backdated entries
-    const predictionErrors = db.prepare(`
-      SELECT CAST(julianday(start_date) - julianday(predicted_start_date) AS INTEGER) AS error_days
-      FROM cycles
-      WHERE predicted_start_date IS NOT NULL
-        AND start_date IS NOT NULL
-        AND start_date <= date('now')
-        AND ABS(julianday(start_date) - julianday(predicted_start_date)) <= 14
-        AND review_state IS NOT 'excluded'
-      ORDER BY start_date ASC
-    `).all().map(r => r.error_days)
-
-    const avgPredictionError = predictionErrors.length >= 2
-      ? predictionErrors.slice(1).reduce(
-          (est, e) => ALPHA * e + (1 - ALPHA) * est,
-          predictionErrors[0]
-        )
-      : 0
+    const lastCycle = eligibleCycles[eligibleCycles.length - 1] ?? null
+    const { avgLutealPhase, avgPredictionError } = computeCycleParams(db, cycleState)
 
     // Next period prediction — always a future date.
     // Also collect missed predictions: predicted dates that passed without a logged cycle.
@@ -247,9 +145,7 @@ module.exports = (db) => {
       }
 
       // Between consecutive logged cycles: detect gaps wide enough for a missed prediction
-      const sorted = allCycles
-        .filter(c => c.review_state !== 'excluded' && !skippedCycleIds.has(c.id))
-        .sort((a, b) => a.start_date.localeCompare(b.start_date))
+      const sorted = eligibleCycles
 
       for (let i = 0; i < sorted.length - 1; i++) {
         const gap = Math.round(
@@ -279,7 +175,7 @@ module.exports = (db) => {
 
       // Drop missed predictions that overlap with an actually logged cycle.
       // When the user logs a period on a predicted date, the prediction is no longer "missed".
-      const loggedRanges = allCycles.filter(c => c.review_state !== 'excluded')
+      const loggedRanges = eligibleCycles
       for (let i = missedPredictions.length - 1; i >= 0; i--) {
         const pDate = missedPredictions[i].startDate
         if (loggedRanges.some(c => c.start_date <= pDate && (c.end_date ?? c.start_date) >= pDate)) {
@@ -319,15 +215,13 @@ module.exports = (db) => {
 
     // Is she currently on her period?
     // A cycle is active if end_date is today or yesterday (end_date is always kept at MAX logged day via #36)
-    const currentCycle = db.prepare(`
-      SELECT c.*
-      FROM cycles c
-      WHERE c.start_date <= ?
-        AND c.end_date >= date('now', '-1 day')
-        AND c.review_state IS NOT 'excluded'
-      ORDER BY c.start_date DESC
-      LIMIT 1
-    `).get(today)
+    const yesterdayDate = new Date(today + 'T00:00:00')
+    yesterdayDate.setDate(yesterdayDate.getDate() - 1)
+    const yesterday = yesterdayDate.toISOString().split('T')[0]
+    const currentCycle = eligibleCycles
+      .slice()
+      .reverse()
+      .find(cycle => cycle.start_date <= today && cycle.end_date && cycle.end_date >= yesterday) ?? null
 
     logPeriodCalculation(db, {
       source: 'api',
@@ -368,3 +262,5 @@ module.exports = (db) => {
 
   return router
 }
+
+module.exports.getFutureCycles = getFutureCycles

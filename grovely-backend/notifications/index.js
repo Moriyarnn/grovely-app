@@ -16,7 +16,7 @@ const cron = require('node-cron')
 const nodemailer = require('nodemailer')
 const { logSystemError, logNotificationRunStart, logNotificationRunEnd, logNotificationSend } = require('../logger')
 const { licensePayload } = require('../middleware/license')
-const { upcomingFertileWindow } = require('../routes/period/_calcHelpers')
+const { computeCycleParams, getCalculationCycleState } = require('../routes/period/_calcHelpers')
 
 // ---------------------------------------------------------------------------
 // Mailer
@@ -120,25 +120,10 @@ function autoCloseStale (db) {
 function getSummary (db) {
   const today = new Date().toISOString().split('T')[0]
   const ALPHA = 0.3
-  const MIN_CYCLE_GAP = 21
 
-  // Cycle lengths (start-to-start), skipping biologically impossible gaps
-  const cycles = db.prepare(`
-    SELECT c.* FROM cycles c
-    WHERE c.start_date IS NOT NULL AND c.start_date <= date('now')
-      AND (c.end_date IS NOT NULL OR EXISTS (SELECT 1 FROM cycle_days cd WHERE cd.cycle_id = c.id))
-    ORDER BY c.start_date ASC
-  `).all()
-
-  const cycleLengths = []
-  for (let i = 1; i < cycles.length; i++) {
-    const diff = Math.round((new Date(cycles[i].start_date) - new Date(cycles[i - 1].start_date)) / 86400000)
-    if (diff >= MIN_CYCLE_GAP) cycleLengths.push(diff)
-  }
-
-  const avgCycleLength = cycleLengths.length > 0
-    ? Math.round(cycleLengths.slice(1).reduce((est, l) => ALPHA * l + (1 - ALPHA) * est, cycleLengths[0]))
-    : 28
+  const cycleState = getCalculationCycleState(db)
+  const { eligibleCycles, cycleLengths } = cycleState
+  const { avgCycleLength, avgPredictionError } = computeCycleParams(db, cycleState)
 
   const cycleStdDev = cycleLengths.length >= 2
     ? Math.round(Math.sqrt(cycleLengths.reduce((s, l) => s + Math.pow(l - avgCycleLength, 2), 0) / cycleLengths.length))
@@ -160,29 +145,7 @@ function getSummary (db) {
   const prefRow = db.prepare("SELECT value FROM settings WHERE key = 'period_irregular'").get()
   const irregularSetting = prefRow?.value === '1'
 
-  // Most recent cycle with data
-  const lastCycle = db.prepare(`
-    SELECT c.* FROM cycles c
-    WHERE c.start_date <= date('now')
-      AND (c.end_date IS NOT NULL OR EXISTS (SELECT 1 FROM cycle_days cd WHERE cd.cycle_id = c.id))
-    ORDER BY c.start_date DESC LIMIT 1
-  `).get() || null
-
-  // Prediction accuracy correction
-  const predictionErrors = db.prepare(`
-    SELECT CAST(julianday(start_date) - julianday(predicted_start_date) AS INTEGER) AS error_days
-    FROM cycles
-    WHERE predicted_start_date IS NOT NULL
-      AND start_date IS NOT NULL
-      AND start_date <= date('now')
-      AND ABS(julianday(start_date) - julianday(predicted_start_date)) <= 14
-      AND review_state IS NOT 'excluded'
-    ORDER BY start_date ASC
-  `).all().map(r => r.error_days)
-
-  const avgPredictionError = predictionErrors.length >= 2
-    ? predictionErrors.slice(1).reduce((est, e) => ALPHA * e + (1 - ALPHA) * est, predictionErrors[0])
-    : 0
+  const lastCycle = eligibleCycles[eligibleCycles.length - 1] ?? null
   const errorAdj = Math.round(avgPredictionError)
 
   // Next period prediction — always a future date
@@ -206,13 +169,10 @@ function getSummary (db) {
   const ovulationDate = lastCycle?.ovulation_date ?? lastCycle?.predicted_ovulation_date ?? null
 
   // Is there an active cycle right now?
-  const currentCycle = db.prepare(`
-    SELECT c.* FROM cycles c
-    LEFT JOIN cycle_days cd ON cd.cycle_id = c.id
-    WHERE c.start_date <= ? GROUP BY c.id
-    HAVING COALESCE(c.end_date, MAX(cd.date)) >= ?
-    ORDER BY c.start_date DESC LIMIT 1
-  `).get(today, today) || null
+  const currentCycle = eligibleCycles
+    .slice()
+    .reverse()
+    .find(cycle => cycle.start_date <= today && cycle.effective_end >= today) ?? null
 
   return { today, avgCycleLength, cycleStdDev, isIrregular, becameIrregular, irregularSetting, lastCycle, nextPeriodDate, fertileWindow, ovulationDate, currentCycle }
 }
