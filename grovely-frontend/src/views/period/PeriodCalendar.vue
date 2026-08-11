@@ -462,11 +462,15 @@
             <WarningReviewActions
               v-if="mode === 'view'"
               :itemId="selectedCycle.id"
-              :reviewState="selectedCycle.review_state ?? null"
-              :endpoint="`period/cycles/${selectedCycle.id}/review`"
-              :itemLabel="selectedCycleLabel"
-              :pairCycleId="selectedCycleWarnings[0]?.confirmationCycleId ?? null"
+              :reviewState="selectedMissingPeriodWarning ? selectedMissingPeriodWarning.reviewState : (selectedCycle.review_state ?? null)"
+              :endpoint="selectedMissingPeriodWarning
+                ? `period/cycles/gaps/${selectedMissingPeriodWarning.earlierCycleId}/${selectedMissingPeriodWarning.laterCycleId}/review`
+                : `period/cycles/${selectedCycle.id}/review`"
+              :itemLabel="selectedReviewLabel"
+              :pairCycleId="selectedMissingPeriodWarning ? null : (selectedCycleWarnings[0]?.confirmationCycleId ?? null)"
               :canConfirm="selectedCycleWarnings.length > 0"
+              :reviewKind="selectedMissingPeriodWarning ? 'missing-gap' : 'cycle'"
+              :gapDays="selectedMissingPeriodWarning?.gapDays ?? null"
               @reviewed="loadData"
             />
           </div>
@@ -2014,6 +2018,16 @@ const selectedCycleLabel = computed(() => {
 const selectedCycleWarnings = computed(() =>
   selectedCycle.value ? (cycleWarningMap.value.get(selectedCycle.value.id) ?? []) : []
 )
+
+const selectedMissingPeriodWarning = computed(() =>
+  selectedCycleWarnings.value.find(warning => warning.code === 'MISSING_PERIOD_GAP') ?? null
+)
+
+const selectedReviewLabel = computed(() => {
+  const warning = selectedMissingPeriodWarning.value
+  if (!warning) return selectedCycleLabel.value
+  return formatMonthDayRange(warning.affectedDates[0], warning.affectedDates[1])
+})
 
 const selectedSymptoms = computed(() => {
   if (!selectedLoggedDay.value?.symptoms) return []

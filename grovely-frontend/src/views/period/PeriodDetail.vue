@@ -188,10 +188,6 @@
             <span class="warning-item-review">{{ warningGuidance(w) }}</span>
           </li>
         </AppScroller>
-        <p v-if="warningsOpen && activeWarnings.some(w => w.cycleId)" class="warnings-tap-hint">
-          <v-icon size="11" color="#b45309">mdi-gesture-tap</v-icon>
-          Tap the highlighted period on the calendar to review it.
-        </p>
       </template>
       <template v-else>
         <div class="warnings-clean">

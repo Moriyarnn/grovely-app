@@ -8,6 +8,7 @@ declare const __APP_VERSION__: string
 // dead-code eliminated.
 declare const __DEMO__: boolean
 declare const __DEMO_RELEASE_CURRENT__: boolean | null
+declare const __DEMO_PUBLIC_LINKS__: unknown
 
 // sql.js WASM, imported as a self-hosted asset URL in the demo build.
 declare module 'sql.js/dist/sql-wasm.wasm?url' {

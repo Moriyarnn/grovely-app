@@ -126,6 +126,52 @@ function createCyclesRouter(db) {
     res.json({ success: true })
   })
 
+  // Confirm one long cycle, exclude only its interval, or reopen the decision.
+  router.patch('/gaps/:earlierId/:laterId/review', requireOwner, (req, res) => {
+    const { reviewState, gapDays } = req.body
+    const valid = [null, 'confirmed', 'excluded']
+    if (!valid.includes(reviewState ?? null)) return res.status(400).json({ error: 'reviewState must be confirmed, excluded, or null' })
+
+    const earlierId = Number(req.params.earlierId)
+    const laterId = Number(req.params.laterId)
+    if (!Number.isInteger(earlierId) || !Number.isInteger(laterId)) {
+      return res.status(400).json({ error: 'Cycle IDs must be integers' })
+    }
+
+    const pair = getCalculationCycleState(db).missingPeriodPairs.find(item =>
+      item.earlier.id === earlierId && item.later.id === laterId
+    )
+    if (!pair) return res.status(400).json({ error: 'No missing-period warning found for this interval' })
+    if (!Number.isInteger(gapDays) || gapDays !== pair.gap) {
+      return res.status(409).json({ error: 'The cycle interval changed. Refresh and review it again.' })
+    }
+
+    if (reviewState === null || reviewState === undefined) {
+      db.prepare(`
+        DELETE FROM cycle_gap_reviews
+        WHERE earlier_cycle_id = ? AND later_cycle_id = ?
+      `).run(earlierId, laterId)
+    } else {
+      db.prepare(`
+        INSERT INTO cycle_gap_reviews (
+          earlier_cycle_id, later_cycle_id, gap_days, review_state, updated_at
+        ) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(earlier_cycle_id, later_cycle_id) DO UPDATE SET
+          gap_days = excluded.gap_days,
+          review_state = excluded.review_state,
+          updated_at = CURRENT_TIMESTAMP
+      `).run(earlierId, laterId, gapDays, reviewState)
+    }
+
+    recomputeAllPredictions(db)
+    emitActivity(req, {
+      type: 'period.change',
+      action: 'cycle',
+      dates: [pair.earlier.start_date, pair.later.start_date]
+    })
+    res.json({ success: true })
+  })
+
   // Set or clear ovulation date for a cycle
   router.patch('/:id/ovulation', requireOwner, (req, res) => {
     const { ovulation_date } = req.body

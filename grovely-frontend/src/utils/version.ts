@@ -3,6 +3,38 @@ type ParsedVersion = {
   prerelease: string[]
 }
 
+export type PublicReleaseLink = {
+  key: 'github' | 'discord' | 'instagram' | 'website'
+  label: string
+  icon: string
+  href: string | null
+}
+
+const PUBLIC_LINK_DEFINITIONS: Array<Omit<PublicReleaseLink, 'href'>> = [
+  { key: 'github', label: 'GitHub', icon: 'mdi-github' },
+  { key: 'discord', label: 'Discord', icon: 'mdi-discord' },
+  { key: 'instagram', label: 'Instagram', icon: 'mdi-instagram' },
+  { key: 'website', label: 'Grovely.org', icon: 'mdi-web' },
+]
+
+export function getPublicReleaseLinks (value: unknown): PublicReleaseLink[] {
+  const links = value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {}
+
+  return PUBLIC_LINK_DEFINITIONS.map(definition => {
+    const href = links[definition.key]
+    if (typeof href !== 'string') return { ...definition, href: null }
+    try {
+      const parsed = new URL(href)
+      if (parsed.protocol !== 'https:' || parsed.username || parsed.password) return { ...definition, href: null }
+      return { ...definition, href }
+    } catch {
+      return { ...definition, href: null }
+    }
+  })
+}
+
 function parseVersion (version = ''): ParsedVersion {
   const [core = '', prerelease = ''] = version.replace(/^v/, '').split('-', 2)
   return {

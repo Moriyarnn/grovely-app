@@ -15,10 +15,12 @@ const global = {
   },
 }
 
-function mountActions({ pairCycleId, canConfirm = true, reviewState = null }: {
+function mountActions({ pairCycleId, canConfirm = true, reviewState = null, reviewKind, gapDays }: {
   pairCycleId?: number
   canConfirm?: boolean
   reviewState?: string | null
+  reviewKind?: 'cycle' | 'missing-gap'
+  gapDays?: number
 } = {}) {
   return mount(WarningReviewActions, {
     props: {
@@ -28,6 +30,8 @@ function mountActions({ pairCycleId, canConfirm = true, reviewState = null }: {
       endpoint: 'period/cycles/1/review',
       pairCycleId,
       canConfirm,
+      reviewKind,
+      gapDays,
     },
     global,
   })
@@ -66,5 +70,15 @@ describe('WarningReviewActions', () => {
     expect(wrapper.text()).toContain('Include')
     expect(wrapper.text()).not.toContain('Unignore')
     expect(wrapper.text()).not.toContain('Exclude from predictions?')
+  })
+
+  it('describes a missing-period warning as an interval decision', () => {
+    const wrapper = mountActions({ reviewKind: 'missing-gap', gapDays: 60 })
+
+    expect(wrapper.text()).toContain('Exclude interval')
+    expect(wrapper.text()).toContain('Confirm long cycle')
+    expect(wrapper.text()).toContain('Both periods stay in your history')
+    expect(wrapper.text()).toContain('60-day interval')
+    expect(wrapper.text()).not.toContain('Confirm period')
   })
 })

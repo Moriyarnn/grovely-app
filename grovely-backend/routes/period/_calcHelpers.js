@@ -1,5 +1,7 @@
 const MAX_PERIOD_LENGTH = 10
 const ALPHA = 0.3
+const MISSING_PERIOD_GAP_FACTOR = 1.5
+const MIN_GAP_COMPARISON_INTERVALS = 3
 const {
   getConfirmedShortCycleForecastSuppressionIds,
   getUnresolvedShortCycleIds,
@@ -32,9 +34,52 @@ function getCalculationCycleState(db) {
   unresolvedLongCycles.forEach(cycle => unresolvedCycleIds.add(cycle.id))
 
   const eligibleCycles = includedCycles.filter(cycle => !unresolvedCycleIds.has(cycle.id))
-  const cycleLengths = eligibleCycles.slice(1).map((cycle, index) =>
-    Math.round((new Date(cycle.start_date) - new Date(eligibleCycles[index].start_date)) / 86400000)
-  )
+  const eligibleCycleIds = new Set(eligibleCycles.map(cycle => cycle.id))
+  const candidateCycleIntervals = cycles.slice(1).flatMap((cycle, index) => {
+    const previousCycle = cycles[index]
+    if (!eligibleCycleIds.has(previousCycle.id) || !eligibleCycleIds.has(cycle.id)) return []
+    return [{
+      earlier: previousCycle,
+      later: cycle,
+      gap: Math.round((new Date(cycle.start_date) - new Date(previousCycle.start_date)) / 86400000)
+    }]
+  })
+
+  const gapReviews = db.prepare(`
+    SELECT earlier_cycle_id, later_cycle_id, gap_days, review_state
+    FROM cycle_gap_reviews
+  `).all()
+  const gapReviewMap = new Map(gapReviews.map(review => [
+    `${review.earlier_cycle_id}:${review.later_cycle_id}`,
+    review
+  ]))
+
+  const missingPeriodPairs = candidateCycleIntervals.flatMap((interval, index) => {
+    const comparisonLengths = candidateCycleIntervals
+      .filter((_, comparisonIndex) => comparisonIndex !== index)
+      .map(candidate => candidate.gap)
+      .sort((a, b) => a - b)
+    if (comparisonLengths.length < MIN_GAP_COMPARISON_INTERVALS) return []
+
+    const middle = Math.floor(comparisonLengths.length / 2)
+    const baselineCycleLength = comparisonLengths.length % 2 === 0
+      ? (comparisonLengths[middle - 1] + comparisonLengths[middle]) / 2
+      : comparisonLengths[middle]
+    if (interval.gap < baselineCycleLength * MISSING_PERIOD_GAP_FACTOR) return []
+
+    const storedReview = gapReviewMap.get(`${interval.earlier.id}:${interval.later.id}`)
+    const reviewState = storedReview?.gap_days === interval.gap ? storedReview.review_state : null
+    return [{ ...interval, baselineCycleLength, reviewState }]
+  })
+  const missingPeriodPairMap = new Map(missingPeriodPairs.map(pair => [
+    `${pair.earlier.id}:${pair.later.id}`,
+    pair
+  ]))
+  const unresolvedMissingPeriodPairs = missingPeriodPairs.filter(pair => pair.reviewState === null)
+  const cycleLengths = candidateCycleIntervals.flatMap(interval => {
+    const pair = missingPeriodPairMap.get(`${interval.earlier.id}:${interval.later.id}`)
+    return !pair || pair.reviewState === 'confirmed' ? [interval.gap] : []
+  })
 
   return {
     cycles,
@@ -43,20 +88,29 @@ function getCalculationCycleState(db) {
     cycleLengths,
     shortPairs,
     unresolvedCycleIds,
-    unresolvedLongCycles
+    unresolvedLongCycles,
+    missingPeriodPairs,
+    unresolvedMissingPeriodPairs
   }
 }
 
 function computeCycleParams(db, cycleState = getCalculationCycleState(db)) {
-  const { eligibleCycles, cycleLengths } = cycleState
+  const { cycles, eligibleCycles, cycleLengths, missingPeriodPairs } = cycleState
+  const eligibleCycleIds = new Set(eligibleCycles.map(cycle => cycle.id))
+  const omittedIntervalKeys = new Set(missingPeriodPairs
+    .filter(pair => pair.reviewState !== 'confirmed')
+    .map(pair => `${pair.earlier.id}:${pair.later.id}`))
 
   const avgCycleLength = cycleLengths.length > 0
     ? Math.round(cycleLengths.slice(1).reduce((est, len) => ALPHA * len + (1 - ALPHA) * est, cycleLengths[0]))
     : 28
 
-  const lutealLengths = eligibleCycles.slice(0, -1)
-    .map((cycle, index) => cycle.ovulation_date
-      ? Math.round((new Date(eligibleCycles[index + 1].start_date) - new Date(cycle.ovulation_date)) / 86400000)
+  const lutealLengths = cycles.slice(0, -1)
+    .map((cycle, index) => cycle.ovulation_date &&
+      eligibleCycleIds.has(cycle.id) &&
+      eligibleCycleIds.has(cycles[index + 1].id) &&
+      !omittedIntervalKeys.has(`${cycle.id}:${cycles[index + 1].id}`)
+      ? Math.round((new Date(cycles[index + 1].start_date) - new Date(cycle.ovulation_date)) / 86400000)
       : null)
     .filter(length => length !== null && length >= 7 && length <= 20)
 
@@ -183,6 +237,8 @@ function upcomingFertileWindow(db, lastCycle, today) {
 
 module.exports = {
   MAX_PERIOD_LENGTH,
+  MISSING_PERIOD_GAP_FACTOR,
+  MIN_GAP_COMPARISON_INTERVALS,
   getCalculationCycleState,
   computeAveragePeriodLength,
   computeCycleParams,

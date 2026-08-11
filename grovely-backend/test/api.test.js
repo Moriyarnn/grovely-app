@@ -104,6 +104,15 @@ function createTestDatabase() {
       review_state TEXT,
       updated_at TEXT
     );
+    CREATE TABLE cycle_gap_reviews (
+      earlier_cycle_id INTEGER NOT NULL,
+      later_cycle_id INTEGER NOT NULL,
+      gap_days INTEGER NOT NULL,
+      review_state TEXT NOT NULL,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (earlier_cycle_id, later_cycle_id)
+    );
     CREATE TABLE cycle_days (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       cycle_id INTEGER NOT NULL,
@@ -155,6 +164,15 @@ async function startTestApp() {
     req.user = { id: 1, username: 'owner', role: 'owner1' }
     next()
   }, require('../routes/period/cycle_days')(db))
+  app.use('/api/test-period/cycles', (req, _res, next) => {
+    req.db = db
+    req.user = {
+      id: 1,
+      username: 'owner',
+      role: req.get('x-test-role') === 'owner2' ? 'owner2' : 'owner1'
+    }
+    next()
+  }, require('../routes/period/cycles')(db))
   app.get('/api/premium/check', requireAuth, requireLicense, (_req, res) => {
     res.json({ active: true })
   })
@@ -254,6 +272,83 @@ test('premium cycle adjustment reopens confirmed warnings and preserves exclusio
   })
   assert.equal(unchangedAdjustment.response.status, 200)
   assert.equal(app.db.prepare('SELECT review_state FROM cycles WHERE id = 4').get().review_state, 'confirmed')
+})
+
+test('premium adjustment reopens a confirmed following cycle when it creates a short pair', async () => {
+  app.db.prepare('DELETE FROM symptoms').run()
+  app.db.prepare('DELETE FROM cycle_days').run()
+  app.db.prepare('DELETE FROM cycles').run()
+  app.db.prepare(`
+    INSERT INTO cycles (id, start_date, end_date, review_state)
+    VALUES (1, '2026-01-01', '2026-01-20', NULL),
+           (2, '2026-02-01', '2026-02-05', 'confirmed')
+  `).run()
+
+  const adjustment = await request(app.baseUrl, '/api/test-premium/period/cycles/1/adjust', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ start_date: '2026-01-15' }),
+  })
+
+  assert.equal(adjustment.response.status, 200)
+  assert.equal(app.db.prepare('SELECT review_state FROM cycles WHERE id = 2').get().review_state, null)
+  assert.deepEqual(getCalculationCycleState(app.db).shortPairs.map(pair => [pair.earlier.id, pair.later.id]), [[1, 2]])
+
+  app.db.prepare("UPDATE cycles SET review_state = 'confirmed' WHERE id = 2").run()
+  const safeAdjustment = await request(app.baseUrl, '/api/test-premium/period/cycles/1/adjust', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ start_date: '2026-01-01' }),
+  })
+
+  assert.equal(safeAdjustment.response.status, 200)
+  assert.equal(app.db.prepare('SELECT review_state FROM cycles WHERE id = 2').get().review_state, 'confirmed')
+  assert.deepEqual(getCalculationCycleState(app.db).shortPairs, [])
+})
+
+test('missing-period interval reviews are owner-only and persist separately from cycles', async () => {
+  app.db.prepare('DELETE FROM cycle_gap_reviews').run()
+  app.db.prepare('DELETE FROM symptoms').run()
+  app.db.prepare('DELETE FROM cycle_days').run()
+  app.db.prepare('DELETE FROM cycles').run()
+  app.db.prepare(`
+    INSERT INTO cycles (id, start_date, end_date, review_state)
+    VALUES (1, '2025-01-01', '2025-01-05', NULL),
+           (2, '2025-01-31', '2025-02-04', NULL),
+           (3, '2025-03-02', '2025-03-06', NULL),
+           (4, '2025-04-01', '2025-04-05', NULL),
+           (5, '2025-05-01', '2025-05-05', NULL),
+           (6, '2025-06-30', '2025-07-04', NULL),
+           (7, '2025-07-30', '2025-08-03', NULL)
+  `).run()
+
+  const partnerReview = await request(app.baseUrl, '/api/test-period/cycles/gaps/5/6/review', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', 'x-test-role': 'owner2' },
+    body: JSON.stringify({ reviewState: 'confirmed', gapDays: 60 }),
+  })
+  assert.equal(partnerReview.response.status, 403)
+  assert.equal(app.db.prepare('SELECT COUNT(*) AS count FROM cycle_gap_reviews').get().count, 0)
+
+  const ownerReview = await request(app.baseUrl, '/api/test-period/cycles/gaps/5/6/review', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reviewState: 'confirmed', gapDays: 60 }),
+  })
+  assert.equal(ownerReview.response.status, 200)
+  assert.deepEqual(
+    app.db.prepare('SELECT earlier_cycle_id, later_cycle_id, gap_days, review_state FROM cycle_gap_reviews').get(),
+    { earlier_cycle_id: 5, later_cycle_id: 6, gap_days: 60, review_state: 'confirmed' }
+  )
+  assert.equal(app.db.prepare('SELECT review_state FROM cycles WHERE id = 5').get().review_state, null)
+  assert.equal(app.db.prepare('SELECT review_state FROM cycles WHERE id = 6').get().review_state, null)
+
+  const changedGap = await request(app.baseUrl, '/api/test-period/cycles/gaps/5/6/review', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reviewState: 'excluded', gapDays: 59 }),
+  })
+  assert.equal(changedGap.response.status, 409)
 })
 
 test('adjust cycle keeps explicit boundaries authoritative and deletes orphan data without resizing', async () => {
@@ -409,6 +504,101 @@ test('period day creation and adjustment softly reject dates that are already lo
   assert.equal(futureAdjustment.response.status, 400)
   assert.equal(futureAdjustment.body.code, 'FUTURE_CYCLE_DATE')
   assert.equal(app.db.prepare('SELECT end_date FROM cycles WHERE id = 40').get().end_date, '2026-05-03')
+})
+
+test('all supported period creation and extension paths preserve their ranges', async () => {
+  app.db.prepare('DELETE FROM cycle_gap_reviews').run()
+  app.db.prepare('DELETE FROM symptoms').run()
+  app.db.prepare('DELETE FROM cycle_days').run()
+  app.db.prepare('DELETE FROM cycles').run()
+
+  const startPeriod = async (startDate) => {
+    const result = await request(app.baseUrl, '/api/test-period/cycles/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ start_date: startDate }),
+    })
+    assert.equal(result.response.status, 200)
+    return Number(result.body.id)
+  }
+  const setBoundary = async (cycleId, boundary, date) => {
+    const result = await request(app.baseUrl, `/api/test-period/cycles/${cycleId}/${boundary}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ [`${boundary}_date`]: date }),
+    })
+    assert.equal(result.response.status, 200)
+  }
+  const logDay = async (cycleId, date) => {
+    const result = await request(app.baseUrl, '/api/test-period/cycle-days', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cycle_id: cycleId, date }),
+    })
+    assert.equal(result.response.status, 200)
+  }
+  const assertCycle = (cycleId, startDate, endDate, dayCount) => {
+    assert.deepEqual(
+      app.db.prepare(`
+        SELECT c.start_date, c.end_date, COUNT(cd.id) AS day_count
+        FROM cycles c
+        LEFT JOIN cycle_days cd ON cd.cycle_id = c.id
+        WHERE c.id = ?
+        GROUP BY c.id
+      `).get(cycleId),
+      { start_date: startDate, end_date: endDate, day_count: dayCount }
+    )
+  }
+
+  // First tap and consecutive taps create and then advance a day-by-day period.
+  const dayByDayId = await startPeriod('2025-01-01')
+  await logDay(dayByDayId, '2025-01-01')
+  assertCycle(dayByDayId, '2025-01-01', '2025-01-01', 1)
+  await logDay(dayByDayId, '2025-01-02')
+  assertCycle(dayByDayId, '2025-01-01', '2025-01-02', 2)
+
+  // Completed-range drag sets the explicit range before creating each day row.
+  const completedRangeId = await startPeriod('2025-02-01')
+  await setBoundary(completedRangeId, 'end', '2025-02-05')
+  await logDay(completedRangeId, '2025-02-01')
+  assertCycle(completedRangeId, '2025-02-01', '2025-02-05', 1)
+  for (const date of ['2025-02-02', '2025-02-03', '2025-02-04', '2025-02-05']) {
+    await logDay(completedRangeId, date)
+  }
+  assertCycle(completedRangeId, '2025-02-01', '2025-02-05', 5)
+
+  // A range-only period represents imported, restored, or legacy history.
+  const rangeOnlyId = await startPeriod('2025-03-02')
+  await setBoundary(rangeOnlyId, 'end', '2025-03-05')
+  assertCycle(rangeOnlyId, '2025-03-02', '2025-03-05', 0)
+
+  // Backward adjacent extension moves the start, then records the new first day.
+  await setBoundary(rangeOnlyId, 'start', '2025-03-01')
+  await logDay(rangeOnlyId, '2025-03-01')
+  assertCycle(rangeOnlyId, '2025-03-01', '2025-03-05', 1)
+
+  // Forward adjacent extension moves the end, then records the new last day.
+  await setBoundary(rangeOnlyId, 'end', '2025-03-06')
+  await logDay(rangeOnlyId, '2025-03-06')
+  assertCycle(rangeOnlyId, '2025-03-01', '2025-03-06', 2)
+
+  // Premium resizing changes range boundaries without manufacturing day rows.
+  const premiumRangeId = await startPeriod('2025-04-02')
+  await setBoundary(premiumRangeId, 'end', '2025-04-05')
+  const premiumStart = await request(app.baseUrl, `/api/test-premium/period/cycles/${premiumRangeId}/adjust`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ start_date: '2025-04-01' }),
+  })
+  assert.equal(premiumStart.response.status, 200)
+  assertCycle(premiumRangeId, '2025-04-01', '2025-04-05', 0)
+  const premiumEnd = await request(app.baseUrl, `/api/test-premium/period/cycles/${premiumRangeId}/adjust`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ end_date: '2025-04-06' }),
+  })
+  assert.equal(premiumEnd.response.status, 200)
+  assertCycle(premiumRangeId, '2025-04-01', '2025-04-06', 0)
 })
 
 test('settings reject unauthenticated requests', async () => {

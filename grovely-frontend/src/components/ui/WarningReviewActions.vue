@@ -1,11 +1,11 @@
 <template>
   <template v-if="reviewState === 'excluded'">
-    <IconAction icon="mdi-eye-outline" label="Include" color="#92400e" bg="#fef3c7" border="#fcd34d" :loading="loading === 'undo' ? 'Saving...' : ''" @click="undoReview" />
+    <IconAction icon="mdi-eye-outline" :label="reviewKind === 'missing-gap' ? 'Review interval' : 'Include'" color="#92400e" bg="#fef3c7" border="#fcd34d" :loading="loading === 'undo' ? 'Saving...' : ''" @click="undoReview" />
   </template>
   <template v-else-if="reviewState === null">
     <IconAction
       icon="mdi-eye-off-outline"
-      label="Exclude"
+      :label="reviewKind === 'missing-gap' ? 'Exclude interval' : 'Exclude'"
       color="#92400e"
       bg="#fef3c7"
       border="#fcd34d"
@@ -15,7 +15,7 @@
     <IconAction
       v-if="canConfirm"
       icon="mdi-eye-outline"
-      :label="pairCycleId != null ? 'Confirm pair' : 'Confirm period'"
+      :label="reviewKind === 'missing-gap' ? 'Confirm long cycle' : pairCycleId != null ? 'Confirm pair' : 'Confirm period'"
       color="#92400e"
       bg="#fef3c7"
       border="#fcd34d"
@@ -29,7 +29,7 @@
         {{ reviewState === 'confirmed' ? 'mdi-eye-outline' : 'mdi-eye-off-outline' }}
       </v-icon>
       <span class="wra-status-label">{{ reviewState === 'confirmed' ? 'Confirmed' : 'Excluded' }}</span>
-      <button class="wra-undo" @click="undoReview">Unconfirm</button>
+      <button class="wra-undo" @click="undoReview">{{ reviewKind === 'missing-gap' ? 'Review again' : 'Unconfirm' }}</button>
     </div>
   </template>
 
@@ -37,8 +37,8 @@
     :open="pendingAction === 'excluded'"
     icon="mdi-eye-off-outline"
     iconColor="#92400e"
-    title="Exclude from predictions?"
-    confirmLabel="Yes, exclude it"
+    :title="reviewKind === 'missing-gap' ? 'Exclude this interval?' : 'Exclude from predictions?'"
+    :confirmLabel="reviewKind === 'missing-gap' ? 'Yes, exclude interval' : 'Yes, exclude it'"
     loadingLabel="Saving..."
     confirmColor="#b45309"
     theme="amber"
@@ -46,7 +46,12 @@
     @update:open="onDialogOpenChange"
     @confirm="submitReview('excluded')"
   >
-    {{ itemLabel }} will be kept in your history but ignored when calculating averages and predictions.
+    <template v-if="reviewKind === 'missing-gap'">
+      Both periods stay in your history, but the {{ gapDays }}-day interval between them will be ignored when calculating cycle estimates and predictions.
+    </template>
+    <template v-else>
+      {{ itemLabel }} will be kept in your history but ignored when calculating averages and predictions.
+    </template>
   </ConfirmDialog>
 
   <ConfirmDialog
@@ -54,8 +59,8 @@
     :open="pendingAction === 'confirmed'"
     icon="mdi-eye-outline"
     iconColor="#92400e"
-    title="Confirm as real?"
-    confirmLabel="Yes, it happened"
+    :title="reviewKind === 'missing-gap' ? 'Confirm one long cycle?' : 'Confirm as real?'"
+    :confirmLabel="reviewKind === 'missing-gap' ? 'Yes, include interval' : 'Yes, it happened'"
     loadingLabel="Saving..."
     confirmColor="#b45309"
     theme="amber"
@@ -63,7 +68,10 @@
     @update:open="onDialogOpenChange"
     @confirm="submitReview('confirmed')"
   >
-    <template v-if="pairCycleId != null">
+    <template v-if="reviewKind === 'missing-gap'">
+      This {{ gapDays }}-day interval will be included in your cycle estimates and predictions as one long cycle.
+    </template>
+    <template v-else-if="pairCycleId != null">
       This pair will be included in your predictions, even though the gap looks unusual.
     </template>
     <template v-else>
@@ -85,6 +93,8 @@ const props = defineProps<{
   itemLabel: string      // e.g. "Aug 8" — used in dialog body
   pairCycleId?: number | null
   canConfirm?: boolean
+  reviewKind?: 'cycle' | 'missing-gap'
+  gapDays?: number | null
 }>()
 
 const emit = defineEmits<{ reviewed: [] }>()
@@ -102,7 +112,11 @@ async function submitReview(state: string) {
     await apiFetch(`${API}/${props.endpoint}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reviewState: state, pairCycleId: state === 'confirmed' ? props.pairCycleId : undefined })
+      body: JSON.stringify({
+        reviewState: state,
+        pairCycleId: state === 'confirmed' && props.reviewKind !== 'missing-gap' ? props.pairCycleId : undefined,
+        gapDays: props.reviewKind === 'missing-gap' ? props.gapDays : undefined
+      })
     })
     emit('reviewed')
   } finally {
@@ -117,7 +131,10 @@ async function undoReview() {
     await apiFetch(`${API}/${props.endpoint}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reviewState: null })
+      body: JSON.stringify({
+        reviewState: null,
+        gapDays: props.reviewKind === 'missing-gap' ? props.gapDays : undefined
+      })
     })
     emit('reviewed')
   } finally {

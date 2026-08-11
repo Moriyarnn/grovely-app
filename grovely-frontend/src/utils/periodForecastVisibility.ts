@@ -22,7 +22,7 @@ export type ForecastVisibility = {
 export function unresolvedWarningCycleIds(warnings: PredictionDataWarning[]) {
   return new Set(
     warnings
-      .filter(warning => !warning.reviewState)
+      .filter(warning => !warning.reviewState && warning.code !== 'MISSING_PERIOD_GAP')
       .flatMap(warning => warning.cycleIds ?? [warning.cycleId])
       .filter((id): id is number | string => id !== undefined && id !== null)
   )

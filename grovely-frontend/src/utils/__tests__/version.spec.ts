@@ -1,5 +1,36 @@
 import { describe, expect, it } from 'vitest'
-import { isCurrentOrNewerVersion, isNewerVersion, isSameVersion } from '../version'
+import { getPublicReleaseLinks, isCurrentOrNewerVersion, isNewerVersion, isSameVersion } from '../version'
+
+describe('getPublicReleaseLinks', () => {
+  it('keeps configured HTTPS links in display order', () => {
+    expect(getPublicReleaseLinks({
+      website: 'https://grovely.org',
+      discord: 'https://discord.gg/grovely',
+      instagram: 'https://www.instagram.com/grovely',
+      github: 'https://github.com/grovely-org/grovely-app',
+    })).toEqual([
+      { key: 'github', label: 'GitHub', icon: 'mdi-github', href: 'https://github.com/grovely-org/grovely-app' },
+      { key: 'discord', label: 'Discord', icon: 'mdi-discord', href: 'https://discord.gg/grovely' },
+      { key: 'instagram', label: 'Instagram', icon: 'mdi-instagram', href: 'https://www.instagram.com/grovely' },
+      { key: 'website', label: 'Grovely.org', icon: 'mdi-web', href: 'https://grovely.org' },
+    ])
+  })
+
+  it('keeps unavailable slots but removes malformed, credentialed, and non-HTTPS destinations', () => {
+    expect(getPublicReleaseLinks({
+      github: 'javascript:alert(1)',
+      discord: 'https://user:secret@discord.gg/grovely',
+      instagram: 'http://instagram.com/grovely',
+      website: 'not a URL',
+    }).map(link => link.href)).toEqual([null, null, null, null])
+    expect(getPublicReleaseLinks(null)).toEqual([
+      { key: 'github', label: 'GitHub', icon: 'mdi-github', href: null },
+      { key: 'discord', label: 'Discord', icon: 'mdi-discord', href: null },
+      { key: 'instagram', label: 'Instagram', icon: 'mdi-instagram', href: null },
+      { key: 'website', label: 'Grovely.org', icon: 'mdi-web', href: null },
+    ])
+  })
+})
 
 describe('isNewerVersion', () => {
   it('orders release candidates and their final release correctly', () => {

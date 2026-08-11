@@ -142,7 +142,7 @@
           <!-- Mobile-only sign out -->
           <div class="hub-footer mobile-only">
             <div class="hub-footer-card">
-              <Transition name="hub-footer-swap" mode="out-in">
+              <Transition name="hub-footer-swap" mode="out-in" :css="!reduceMobileFooterMotion">
                 <div v-if="showMobileFeedback && feedbackConfigured" key="feedback" class="hub-feedback-card">
                   <FeedbackPanel compact />
                 </div>
@@ -199,6 +199,7 @@ const { dynamicSubs, fetchAppStats } = useAppStats()
 const { licenseActive, fetchLicenseStatus } = useLicense()
 const feedbackConfigured = feedbackConfig() !== null
 const showMobileFeedback = ref(false)
+const reduceMobileFooterMotion = ref(false)
 const premiumGateOpen = ref(false)
 let mobileFooterTimer
 const currentUser = ref(getUser())
@@ -220,7 +221,8 @@ function syncMobileFooterRotation() {
   stopMobileFooterRotation()
   showMobileFeedback.value = false
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  if (isDesktop.value || !feedbackConfigured || licenseActive.value === null || reducedMotion) return
+  reduceMobileFooterMotion.value = reducedMotion
+  if (isDesktop.value || !feedbackConfigured || licenseActive.value === null) return
 
   mobileFooterTimer = window.setTimeout(() => {
     showMobileFeedback.value = true

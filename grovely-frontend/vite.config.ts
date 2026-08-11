@@ -38,13 +38,22 @@ function feedbackCspPlugin(origin: string) {
   }
 }
 
-async function demoReleaseCurrent(): Promise<boolean | null> {
+type DemoReleaseMetadata = {
+  current: boolean | null
+  links: unknown
+}
+
+async function demoReleaseMetadata(): Promise<DemoReleaseMetadata> {
   try {
     const response = await fetch('https://grovely.org/releases/stable.json')
-    const manifest = await response.json() as { version?: string }
-    return isCurrentOrNewerVersion(`v${pkg.version}`, manifest.version)
+    if (!response.ok) throw new Error(`Release feed returned ${response.status}`)
+    const manifest = await response.json() as { version?: string, links?: unknown }
+    return {
+      current: isCurrentOrNewerVersion(`v${pkg.version}`, manifest.version),
+      links: manifest.links ?? null,
+    }
   } catch {
-    return null
+    return { current: null, links: null }
   }
 }
 
@@ -52,9 +61,13 @@ function demoReleaseStatusPlugin(isDemo: boolean): Plugin {
   return {
     name: 'demo-release-status',
     async config() {
+      const metadata = isDemo
+        ? await demoReleaseMetadata()
+        : { current: null, links: null }
       return {
         define: {
-          __DEMO_RELEASE_CURRENT__: JSON.stringify(isDemo ? await demoReleaseCurrent() : null),
+          __DEMO_RELEASE_CURRENT__: JSON.stringify(metadata.current),
+          __DEMO_PUBLIC_LINKS__: JSON.stringify(metadata.links),
         },
       }
     },

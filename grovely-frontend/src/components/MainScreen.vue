@@ -30,7 +30,59 @@
       <span>No telemetry. Your data stays on your server.</span>
     </div>
 
-    <UpdateStatusCard />
+    <div class="ms-status-row">
+      <div class="ms-update-slot">
+        <UpdateStatusCard />
+      </div>
+
+      <section class="ms-thanks" aria-labelledby="ms-thanks-title">
+        <div class="ms-thanks-heading">
+          <div class="ms-thanks-icon">
+            <v-icon size="15" color="#993556">mdi-heart-outline</v-icon>
+          </div>
+          <p id="ms-thanks-title" class="ms-thanks-title">Thank you for using Grovely</p>
+        </div>
+        <div class="ms-thanks-text">
+          <p>Thank you for trying out the beta version of Grovely.</p>
+          <p>If you would like to share any thoughts, advice, bugs, or more, please use the feedback tool on the Apps screen. Every bit of information helps us improve the application.</p>
+          <p>If you are enjoying Grovely, my wife and I would really appreciate it if you gave us a GitHub star or joined our Discord. Both help more people discover it.</p>
+          <p>Thanks again for making it part of your household. More updates are on the way!</p>
+        </div>
+        <nav class="ms-thanks-links" aria-label="Grovely links">
+          <template v-for="link in publicLinks" :key="link.key">
+            <a
+              v-if="link.href"
+              class="ms-thanks-link"
+              :href="link.href"
+              :aria-label="link.label"
+              :title="link.label"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <svg v-if="link.key === 'discord'" class="ms-thanks-discord-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path fill="currentColor" d="M19.5 5.3A16.3 16.3 0 0 0 15.4 4l-.5 1a14 14 0 0 0-5.8 0l-.5-1a16.3 16.3 0 0 0-4.1 1.3C1.9 9.1 1.2 12.8 1.6 16.4A16.5 16.5 0 0 0 6.7 19l1.2-1.7c-.7-.3-1.4-.6-2-1.1l.5-.4c3.6 1.7 7.6 1.7 11.2 0l.5.4c-.6.5-1.3.8-2 1.1l1.2 1.7a16.5 16.5 0 0 0 5.1-2.6c.4-4.2-.8-7.9-2.9-11.1ZM9.3 14.2c-1.1 0-2-1-2-2.2s.9-2.2 2-2.2 2 1 2 2.2-.9 2.2-2 2.2Zm5.4 0c-1.1 0-2-1-2-2.2s.9-2.2 2-2.2 2 1 2 2.2-.9 2.2-2 2.2Z" />
+              </svg>
+              <img v-else-if="link.key === 'website'" class="ms-thanks-brand-icon" src="/favicon-32.png" alt="" />
+              <v-icon v-else size="15" :color="link.key === 'instagram' ? '#E4405F' : '#24292F'">{{ link.icon }}</v-icon>
+              <span class="ms-thanks-link-label">{{ link.label }}</span>
+            </a>
+            <span
+              v-else
+              class="ms-thanks-link ms-thanks-link--disabled"
+              :aria-label="`${link.label} link unavailable`"
+              title="Link not available yet"
+            >
+              <svg v-if="link.key === 'discord'" class="ms-thanks-discord-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path fill="currentColor" d="M19.5 5.3A16.3 16.3 0 0 0 15.4 4l-.5 1a14 14 0 0 0-5.8 0l-.5-1a16.3 16.3 0 0 0-4.1 1.3C1.9 9.1 1.2 12.8 1.6 16.4A16.5 16.5 0 0 0 6.7 19l1.2-1.7c-.7-.3-1.4-.6-2-1.1l.5-.4c3.6 1.7 7.6 1.7 11.2 0l.5.4c-.6.5-1.3.8-2 1.1l1.2 1.7a16.5 16.5 0 0 0 5.1-2.6c.4-4.2-.8-7.9-2.9-11.1ZM9.3 14.2c-1.1 0-2-1-2-2.2s.9-2.2 2-2.2 2 1 2 2.2-.9 2.2-2 2.2Zm5.4 0c-1.1 0-2-1-2-2.2s.9-2.2 2-2.2 2 1 2 2.2-.9 2.2-2 2.2Z" />
+              </svg>
+              <img v-else-if="link.key === 'website'" class="ms-thanks-brand-icon" src="/favicon-32.png" alt="" />
+              <v-icon v-else size="15" :color="link.key === 'instagram' ? '#E4405F' : '#24292F'">{{ link.icon }}</v-icon>
+              <span class="ms-thanks-link-label">{{ link.label }}</span>
+            </span>
+          </template>
+        </nav>
+      </section>
+    </div>
 
     <div class="ms-divider" />
 
@@ -162,6 +214,7 @@ import DetailSheet from '@/components/ui/DetailSheet.vue'
 import UpdateStatusCard from '@/components/UpdateStatusCard.vue'
 import { useRouter } from 'vue-router'
 import { API, apiFetch } from '../api'
+import { getPublicReleaseLinks } from '../utils/version'
 
 const props = defineProps({
   showBack: { type: Boolean, default: false }
@@ -176,6 +229,7 @@ const cycleCount = ref(null)
 const pantryCount = ref(null)
 const daysRunning = ref(null)
 const dbSizeLabel = ref('— MB')
+const publicLinks = ref(getPublicReleaseLinks(__DEMO__ ? __DEMO_PUBLIC_LINKS__ : null))
 
 const hasUnread = ref(localStorage.getItem(LAST_SEEN_KEY) !== APP_VERSION)
 const changelogOpen = ref(false)
@@ -219,6 +273,13 @@ onMounted(async () => {
       dbSizeLabel.value = `${data.dbSizeMB} MB`
     }
   } catch {}
+
+  if (!__DEMO__) {
+    try {
+      const r = await apiFetch(`${API}/system/update`)
+      if (r.ok) publicLinks.value = getPublicReleaseLinks((await r.json()).latest?.links)
+    } catch {}
+  }
 })
 onUnmounted(() => mobileMediaQuery?.removeEventListener('change', updateMobileMode))
 
@@ -304,6 +365,26 @@ const stats = computed(() => [
 //   mobile — one-liner per item shown on mobile (must fit a single line)
 // Both arrays are required on every entry.
 const CHANGELOG = [
+  {
+    version: 'v0.15.0',
+    title: 'Feedback system + Period tracker polish + Pantry polish',
+    date: 'August 11, 2026',
+    fixes: [189, 190, 192, 194, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 208, 209, 210],
+    items: [
+      { plan: 'Free', text: 'Encrypted feedback - send a bug report, feature request, or message without attaching household, account, license, or usage data' },
+      { plan: 'Free', text: 'Period Tracker Prediction Health - flags unusually short cycles and possible missing periods, excludes questionable intervals until reviewed, and lets any logged period be excluded from calculations' },
+      { plan: 'Premium', text: 'Period logging and Adjust Cycle - safely create, extend, and resize periods while preserving meaningful logged data and reopening warnings when ranges change' },
+      { plan: 'Premium', text: 'Pantry Smart Autofill polish - remembers categories and valid per-piece prices, keeps the active store, and clearly animates item and store price comparisons' },
+      { plan: 'Free', text: '9 Period Tracker issues solved and 5 Pantry issues solved across logging, predictions, cycle summaries, Smart Autofill, price entry, and store handling' },
+    ],
+    mobile: [
+      { plan: 'Free', text: 'Encrypted feedback without household or account data' },
+      { plan: 'Free', text: 'Period Tracker Prediction Health flags short cycles and possible missing periods' },
+      { plan: 'Premium', text: 'Period logging and Adjust Cycle safely preserve logged data' },
+      { plan: 'Premium', text: 'Smart Autofill polish remembers categories, prices, and stores' },
+      { plan: 'Free', text: '9 Period Tracker issues solved and 5 Pantry issues solved' },
+    ],
+  },
   {
     version: 'v0.14.0',
     title: 'Live in-browser demo',
@@ -514,6 +595,14 @@ const CHANGELOG = [
   overflow: hidden;
 }
 
+@media (max-width: 1023px) {
+  .ms-root {
+    height: auto;
+    min-height: 100dvh;
+    overflow-y: auto;
+  }
+}
+
 @media (min-width: 1024px) {
   .ms-root {
     padding: 2.5rem 3rem 2.5rem;
@@ -603,6 +692,91 @@ const CHANGELOG = [
   font-size: 11px;
   color: #aaa;
   margin-bottom: 0.25rem;
+}
+
+/* ── Thank-you links ──────────────────────────────────────────── */
+.ms-status-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 12px;
+}
+
+.ms-update-slot { min-width: 0; }
+.ms-update-slot :deep(.update-card) { margin: 0; box-sizing: border-box; }
+
+.ms-thanks {
+  display: flex;
+  flex-direction: column;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid #f0d6e0;
+  border-radius: 12px;
+  box-sizing: border-box;
+}
+
+@media (min-width: 1024px) {
+  .ms-status-row {
+    display: grid;
+    grid-template-columns: minmax(0, 7fr) minmax(0, 4fr);
+    align-items: stretch;
+    height: 192px;
+  }
+
+  .ms-update-slot :deep(.update-card) { height: 100%; }
+}
+
+.ms-thanks-icon {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fbeaf0;
+  border-radius: 7px;
+}
+
+.ms-thanks-heading { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.ms-thanks-title { margin: 0; color: #72243e; font-size: 12px; font-weight: 700; line-height: 1.25; }
+.ms-thanks-text { margin: 5px 0 0; color: #777; font-size: 10px; line-height: 1.35; }
+.ms-thanks-text p { margin: 0; }
+.ms-thanks-text p + p { margin-top: 6px; }
+.ms-thanks-links { display: flex; align-items: flex-end; gap: 6px; min-height: 29px; margin-top: auto; padding-top: 7px; }
+
+.ms-thanks-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 29px;
+  height: 29px;
+  box-sizing: border-box;
+  padding: 0;
+  color: #993556;
+  background: #f3f1f2;
+  border: 1px solid #ded9db;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.ms-thanks-link:hover { background: #e9e6e7; border-color: #cec7ca; }
+.ms-thanks-link:focus-visible { outline: 2px solid #993556; outline-offset: 2px; }
+.ms-thanks-link--disabled { color: #aaa; cursor: default; opacity: 0.5; }
+.ms-thanks-link-label { display: none; }
+.ms-thanks-brand-icon { display: block; width: 15px; height: 15px; object-fit: contain; }
+.ms-thanks-discord-icon { display: block; width: 15px; height: 15px; color: #5865f2; }
+
+@media (min-width: 1024px) {
+  .ms-thanks-text {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding-right: 3px;
+  }
+
 }
 
 /* ── Divider ──────────────────────────────────────────────────── */

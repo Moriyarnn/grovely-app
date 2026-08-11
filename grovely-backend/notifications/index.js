@@ -117,6 +117,82 @@ function autoCloseStale (db) {
 // Summary calculation (mirrors logic from routes/period/calculations.js)
 // ---------------------------------------------------------------------------
 
+const CYCLE_SUMMARY_LOOKBACK_DAYS = 3
+
+function getCycleSummaryContext (db, today, cycleState, avgCycleLength) {
+  const lookbackStart = addDays(today, -CYCLE_SUMMARY_LOOKBACK_DAYS)
+  const targetCycle = db.prepare(`
+    SELECT c.* FROM cycles c
+    WHERE c.start_date BETWEEN ? AND ?
+      AND DATE(c.created_at) BETWEEN ? AND ?
+      AND c.review_state IS NOT 'excluded'
+      AND (c.end_date IS NOT NULL OR EXISTS (
+        SELECT 1 FROM cycle_days cd WHERE cd.cycle_id = c.id
+      ))
+      AND NOT EXISTS (
+        SELECT 1 FROM notification_log nl
+        WHERE nl.type_id = 'cycle_summary'
+          AND (
+            nl.date_key = 'cycle:' || c.id
+            OR (
+              nl.date_key NOT LIKE 'cycle:%'
+              AND nl.date_key BETWEEN c.start_date AND date(c.start_date, '+3 days')
+            )
+          )
+      )
+    ORDER BY c.start_date DESC, c.id DESC
+    LIMIT 1
+  `).get(lookbackStart, today, lookbackStart, today)
+
+  if (!targetCycle) return null
+
+  const targetIndex = cycleState.cycles.findIndex(cycle => cycle.id === targetCycle.id)
+  if (targetIndex <= 0) return null
+
+  const previousCycle = cycleState.cycles[targetIndex - 1]
+  const cycleLength = daysBetween(targetCycle.start_date, previousCycle.start_date)
+  const eligibleCycleIds = new Set(cycleState.eligibleCycles.map(cycle => cycle.id))
+  const missingPeriodPair = cycleState.missingPeriodPairs.find(pair =>
+    pair.earlier.id === previousCycle.id && pair.later.id === targetCycle.id
+  )
+
+  let comparisonStatus = 'eligible'
+  if (cycleLength < 1) {
+    comparisonStatus = 'invalid'
+  } else if (missingPeriodPair?.reviewState === null) {
+    comparisonStatus = 'awaiting_review'
+  } else if (missingPeriodPair?.reviewState === 'excluded') {
+    comparisonStatus = 'excluded'
+  } else if (
+    cycleState.unresolvedCycleIds.has(previousCycle.id) ||
+    cycleState.unresolvedCycleIds.has(targetCycle.id)
+  ) {
+    comparisonStatus = 'awaiting_review'
+  } else if (
+    previousCycle.review_state === 'excluded' ||
+    targetCycle.review_state === 'excluded'
+  ) {
+    comparisonStatus = 'excluded'
+  } else if (
+    !eligibleCycleIds.has(previousCycle.id) ||
+    !eligibleCycleIds.has(targetCycle.id)
+  ) {
+    comparisonStatus = 'not_included'
+  }
+
+  return {
+    targetCycleId: targetCycle.id,
+    targetStartDate: targetCycle.start_date,
+    previousStartDate: previousCycle.start_date,
+    previousEndDate: previousCycle.effective_end,
+    previousOvulationDate: previousCycle.ovulation_date,
+    cycleLength,
+    periodLength: daysBetween(previousCycle.effective_end, previousCycle.start_date) + 1,
+    cycleLengthEstimate: comparisonStatus === 'eligible' ? avgCycleLength : null,
+    comparisonStatus
+  }
+}
+
 function getSummary (db) {
   const today = new Date().toISOString().split('T')[0]
   const ALPHA = 0.3
@@ -124,6 +200,7 @@ function getSummary (db) {
   const cycleState = getCalculationCycleState(db)
   const { eligibleCycles, cycleLengths } = cycleState
   const { avgCycleLength, avgPredictionError } = computeCycleParams(db, cycleState)
+  const cycleSummary = getCycleSummaryContext(db, today, cycleState, avgCycleLength)
 
   const cycleStdDev = cycleLengths.length >= 2
     ? Math.round(Math.sqrt(cycleLengths.reduce((s, l) => s + Math.pow(l - avgCycleLength, 2), 0) / cycleLengths.length))
@@ -174,7 +251,7 @@ function getSummary (db) {
     .reverse()
     .find(cycle => cycle.start_date <= today && cycle.effective_end >= today) ?? null
 
-  return { today, avgCycleLength, cycleStdDev, isIrregular, becameIrregular, irregularSetting, lastCycle, nextPeriodDate, fertileWindow, ovulationDate, currentCycle }
+  return { today, avgCycleLength, cycleStdDev, isIrregular, becameIrregular, irregularSetting, lastCycle, nextPeriodDate, fertileWindow, ovulationDate, currentCycle, cycleSummary }
 }
 
 // ---------------------------------------------------------------------------
@@ -192,6 +269,35 @@ const wrap = (body) => `
   ${body}
   <p style="margin-top:32px;font-size:12px;color:#bbb;">${_runContext.signoff}</p>
 </div>`
+
+function cycleSummaryHtml (summary) {
+  if (!summary) return wrap('<p>A cycle summary is ready! 📊</p>')
+
+  if (summary.comparisonStatus !== 'eligible') {
+    const intervalLine = summary.cycleLength >= 1
+      ? `<p>The new start was <strong>${summary.cycleLength} day${summary.cycleLength !== 1 ? 's' : ''}</strong> after the previous logged start.</p>`
+      : ''
+    const reviewLine = summary.comparisonStatus === 'awaiting_review'
+      ? '<p>This interval is awaiting review, so it has not been included in cycle estimates.</p>'
+      : '<p>This interval is not eligible for cycle estimates, so no estimate comparison is shown.</p>'
+    return wrap(`
+      <h2 style="color:#c06;">A cycle summary is ready 📊</h2>
+      ${intervalLine}
+      ${reviewLine}
+      <p>Review the cycle dates in Grovely when convenient. 💗</p>`)
+  }
+
+  const ovulationLine = summary.previousOvulationDate
+    ? `<p>Ovulation was tracked on <strong>${summary.previousOvulationDate}</strong>.</p>`
+    : ''
+
+  return wrap(`
+    <h2 style="color:#c06;">A cycle summary is ready 📊</h2>
+    <p>Your last cycle was <strong>${summary.cycleLength} day${summary.cycleLength !== 1 ? 's' : ''}</strong> long. Grovely's current cycle-length estimate is <strong>${summary.cycleLengthEstimate} days</strong>.</p>
+    <p>Your period lasted <strong>${summary.periodLength} day${summary.periodLength !== 1 ? 's' : ''}</strong> (${summary.previousStartDate} → ${summary.previousEndDate}).</p>
+    ${ovulationLine}
+    <p>Here's to a smooth new cycle 💗</p>`)
+}
 
 // ---------------------------------------------------------------------------
 // Notification registry
@@ -386,7 +492,7 @@ const NOTIFICATION_TYPES = [
       return wrap(`
         <h2 style="color:#c06;">Your period just ended 🌸</h2>
         <p>Your period lasted <strong>${periodLength} day${periodLength !== 1 ? 's' : ''}</strong> (${cycle.start_date} → ${cycle.end_date}).</p>
-        <p>Your average cycle length is currently <strong>${avgCycleLength} days</strong>.</p>
+        <p>Your current cycle-length estimate is <strong>${avgCycleLength} days</strong>.</p>
         <p>Rest up - you did great 💗</p>`)
     }
   },
@@ -542,7 +648,7 @@ const NOTIFICATION_TYPES = [
       return wrap(`
         <h2 style="color:#c06;">Her period just ended 🌸</h2>
         <p>Her period lasted <strong>${periodLength} day${periodLength !== 1 ? 's' : ''}</strong> (${cycle.start_date} → ${cycle.end_date}).</p>
-        <p>Her average cycle length is <strong>${avgCycleLength} days</strong> - so next time is coming eventually.</p>
+        <p>Her current cycle-length estimate is <strong>${avgCycleLength} days</strong>.</p>
         <p>She may appreciate some extra care and rest right now. 💗</p>`)
     }
   },
@@ -550,46 +656,12 @@ const NOTIFICATION_TYPES = [
   {
     id: 'cycle_summary',
     category: 'period',
-    dateKey: (today) => today,
-    check: ({ today }, db) => {
-      // Fires when a new period is logged today (by created_at), meaning the previous cycle just completed
-      const newCycle = db.prepare(
-        "SELECT id FROM cycles WHERE DATE(created_at) = ?"
-      ).get(today)
-      if (!newCycle) return false
-      // Need at least one previous cycle with an end_date to summarise
-      const prevCycle = db.prepare(`
-        SELECT id FROM cycles
-        WHERE DATE(created_at) < ? AND end_date IS NOT NULL
-        ORDER BY start_date DESC LIMIT 1
-      `).get(today)
-      return !!prevCycle
-    },
+    dateKey: (today, _db, summary) => summary.cycleSummary
+      ? `cycle:${summary.cycleSummary.targetCycleId}`
+      : `none:${today}`,
+    check: ({ cycleSummary }) => !!cycleSummary,
     subject: () => '📊 Your cycle summary',
-    html: ({ today, avgCycleLength }, db) => {
-      const newCycle = db.prepare(
-        "SELECT * FROM cycles WHERE DATE(created_at) = ? ORDER BY id DESC LIMIT 1"
-      ).get(today)
-      const prevCycle = db.prepare(`
-        SELECT * FROM cycles
-        WHERE DATE(created_at) < ? AND end_date IS NOT NULL
-        ORDER BY start_date DESC LIMIT 1
-      `).get(today)
-      if (!prevCycle || !newCycle) return wrap('<p>A new cycle has begun! 📊</p>')
-
-      const cycleLength = daysBetween(newCycle.start_date, prevCycle.start_date)
-      const periodLength = daysBetween(prevCycle.end_date, prevCycle.start_date) + 1
-      const ovulationLine = prevCycle.ovulation_date
-        ? `<p>Ovulation was tracked on <strong>${prevCycle.ovulation_date}</strong>.</p>`
-        : ''
-
-      return wrap(`
-        <h2 style="color:#c06;">A new cycle has begun 📊</h2>
-        <p>Your last cycle was <strong>${cycleLength} day${cycleLength !== 1 ? 's' : ''}</strong> long - your average is <strong>${avgCycleLength} days</strong>.</p>
-        <p>Your period lasted <strong>${periodLength} day${periodLength !== 1 ? 's' : ''}</strong> (${prevCycle.start_date} → ${prevCycle.end_date}).</p>
-        ${ovulationLine}
-        <p>Here's to a smooth new cycle 💗</p>`)
-    }
+    html: ({ cycleSummary }) => cycleSummaryHtml(cycleSummary)
   }
 
 ]
@@ -812,4 +884,9 @@ async function sendTestEmail (db) {
   }
 }
 
-module.exports = { startNotifications, rescheduleNotifications, sendTestEmail }
+module.exports = {
+  startNotifications,
+  rescheduleNotifications,
+  sendTestEmail,
+  __test: { cycleSummaryHtml, getCycleSummaryContext, notificationTypes: NOTIFICATION_TYPES }
+}

@@ -46,11 +46,11 @@ const allWarnings = computed(() => [
   ...orphanedWarnings.value
 ])
 
-// Map from cycleId → list of reviewable warnings (SHORT_CYCLE_GAP, LONG_PERIOD)
+// Map from cycleId to the reviewable warnings that can be resolved from the calendar.
 const cycleWarningMap = computed(() => {
   const map = new Map<number, any[]>()
   summary.value?.dataWarnings?.forEach((w: any) => {
-    if (w.cycleId && (w.code === 'SHORT_CYCLE_GAP' || w.code === 'LONG_PERIOD')) {
+    if (w.cycleId && ['SHORT_CYCLE_GAP', 'LONG_PERIOD', 'MISSING_PERIOD_GAP'].includes(w.code)) {
       const cycleIds = w.cycleIds ?? [w.cycleId]
       cycleIds.forEach((cycleId: number) => {
         if (!map.has(cycleId)) map.set(cycleId, [])

@@ -17,6 +17,29 @@ function getFutureCycles(db) {
   `).all()
 }
 
+function getMissingPeriodWarnings(cycleState) {
+  return cycleState.missingPeriodPairs.map(pair => {
+    const statusMessage = pair.reviewState === 'confirmed'
+      ? 'You confirmed this as one long cycle, so the interval is included in cycle estimates.'
+      : pair.reviewState === 'excluded'
+        ? 'You excluded this interval, so both periods stay in your history but the interval is not used in cycle estimates.'
+        : 'The interval is excluded from cycle estimates until you review it.'
+    return {
+      code: 'MISSING_PERIOD_GAP',
+      message: `The ${pair.gap}-day gap between the periods starting on ${pair.earlier.start_date} and ${pair.later.start_date} may contain an unlogged period. ${statusMessage}`,
+      targetDate: pair.earlier.start_date,
+      affectedDates: [pair.earlier.start_date, pair.later.start_date],
+      cycleId: pair.later.id,
+      cycleIds: [pair.earlier.id, pair.later.id],
+      earlierCycleId: pair.earlier.id,
+      laterCycleId: pair.later.id,
+      gapDays: pair.gap,
+      baselineCycleLength: pair.baselineCycleLength,
+      reviewState: pair.reviewState
+    }
+  })
+}
+
 module.exports = (db) => {
 
   // GET /api/calculations/summary
@@ -33,7 +56,7 @@ module.exports = (db) => {
     futureCycles.forEach(c => {
       dataWarnings.push({
         code: 'FUTURE_CYCLE',
-        message: `The period starting on ${c.start_date} is in the future, so it is excluded from calculations. Correct its date, remove it, or exclude it to dismiss this warning.`,
+        message: `The period starting on ${c.start_date} is in the future, so it is excluded from calculations.`,
         targetDate: c.start_date,
         affectedDates: [c.start_date],
         cycleId: c.id,
@@ -76,6 +99,8 @@ module.exports = (db) => {
         reviewState: null
       })
     })
+
+    dataWarnings.push(...getMissingPeriodWarnings(cycleState))
 
     // Average cycle length (start to start) — exponential smoothing (α=0.3)
     // Recent cycles get more weight: est = α * latest + (1-α) * past_estimate
@@ -264,3 +289,4 @@ module.exports = (db) => {
 }
 
 module.exports.getFutureCycles = getFutureCycles
+module.exports.getMissingPeriodWarnings = getMissingPeriodWarnings

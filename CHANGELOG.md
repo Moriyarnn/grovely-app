@@ -5,6 +5,17 @@ record; the in-app "What's New" panel shows a short summary of major releases on
 
 ---
 
+## v0.15.0 - Feedback system + Period tracker polish + Pantry polish
+*August 11, 2026*
+
+- Added an explicit encrypted feedback flow for self-hosted Home and the live demo, without attaching household, account, license, usage, or device data (#189, #190, #192)
+- Period Tracker Prediction Health now flags unusually short cycles and possible missing periods, excludes questionable intervals until reviewed, and lets any logged period be excluded from calculations (#194, #201, #202, #203, #204, #209)
+- Period logging, cycle-summary notifications, and Adjust Cycle now create, extend, resize, and explain periods safely while preserving meaningful logged data and reopening stale warnings after range changes (#205, #208, #210)
+- Pantry Smart Autofill polish now remembers item categories and valid per-piece prices, preserves the active store, and clearly animates item and store price comparisons (#196, #197, #198, #199, #200)
+- Completed 9 Period Tracker issues and 5 Pantry issues across logging, predictions, cycle summaries, Smart Autofill, price entry, and store handling
+
+---
+
 ## v0.14.10 - Period tracker polish
 *August 10, 2026*
 

@@ -84,9 +84,20 @@ test('writes lifecycle diagnostics without exposing the updater credential', () 
 
 test('accepts only valid public release metadata', async () => {
   const options = { method: 'POST', headers: { 'X-Grovely-Updater-Token': token } }
+  feedPayload = {
+    version: 'v0.14.1',
+    summary: 'Test release',
+    links: {
+      github: 'https://github.com/grovely-org/grovely-app',
+      discord: 'https://discord.gg/grovely',
+      instagram: 'https://www.instagram.com/grovely',
+      website: 'https://grovely.org',
+    },
+  }
   const valid = await request(`http://127.0.0.1:${updaterPort}/check`, options)
   assert.equal(valid.status, 200)
   assert.equal(valid.body.latest.version, 'v0.14.1')
+  assert.deepEqual(valid.body.latest.links, feedPayload.links)
 
   feedPayload = { version: 'v0.14.1-rc.1', summary: 'Prerelease test' }
   const prerelease = await request(`http://127.0.0.1:${updaterPort}/check`, options)

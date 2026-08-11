@@ -45,6 +45,20 @@ describe('period forecast visibility', () => {
     expect(isForecastDateVisible(1, '2026-07-10', visibility)).toBe(true)
   })
 
+  it('keeps both periods eligible when only their connecting interval is under review', () => {
+    const visibility = getForecastVisibility(
+      [
+        { id: 1, start_date: '2026-05-01', review_state: null },
+        { id: 2, start_date: '2026-06-30', review_state: null },
+      ],
+      [{ code: 'MISSING_PERIOD_GAP', cycleIds: [1, 2], reviewState: null }]
+    )
+
+    expect(visibility.get(1)?.hidden).toBe(false)
+    expect(visibility.get(1)?.cutoffDate).toBe('2026-06-30')
+    expect(visibility.get(2)?.hidden).toBe(false)
+  })
+
   it('does not let an excluded period cut off the preceding forecast', () => {
     const visibility = getForecastVisibility([
       { id: 1, start_date: '2026-06-13', review_state: null },

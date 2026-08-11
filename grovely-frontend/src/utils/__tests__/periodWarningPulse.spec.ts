@@ -25,6 +25,7 @@ describe('period warning pulse dates', () => {
 
 describe('period warning guidance', () => {
   it.each([
+    ['MISSING_PERIOD_GAP', 'log it between these dates'],
     ['SHORT_CYCLE_GAP', 'Confirm the pair to include both, or exclude the mistaken period to keep it out of calculations.'],
     ['LONG_PERIOD', 'Confirm it to include it, or exclude it to keep it out of calculations.'],
     ['FUTURE_CYCLE', 'Correct its date, remove it, or exclude it from calculations.'],

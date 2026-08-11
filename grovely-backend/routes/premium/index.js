@@ -5,6 +5,7 @@ const backupsRouter = require('./backups');
 const { requireOwner } = require('../../middleware/auth');
 const { logPeriodEvent } = require('../../logger');
 const { recomputeAllPredictions } = require('../period/_calcHelpers');
+const { MIN_CYCLE_GAP } = require('../period/_shortCyclePairs');
 const { emitActivity } = require('../../realtime');
 
 // Scheduled backup management (status, history, run-now, verify)
@@ -194,9 +195,33 @@ router.patch('/period/cycles/:id/adjust', requireOwner, (req, res) => {
     return res.status(409).json({ error: 'Adjusted period overlaps an existing period' });
   const datesChanged = newStart !== cycle.start_date || newEnd !== cycle.end_date;
   const reviewState = datesChanged && cycle.review_state === 'confirmed' ? null : cycle.review_state;
+  let confirmedFollowingCycleId = null;
+  // Short-pair confirmation is stored on the later cycle. Moving an earlier
+  // start changes the pair being reviewed, so reopen that confirmation.
+  if (newStart !== cycle.start_date && reviewState !== 'excluded') {
+    const followingCycle = db.prepare(`
+      SELECT id, start_date, review_state
+      FROM cycles
+      WHERE id <> ?
+        AND review_state IS NOT 'excluded'
+        AND start_date > ?
+      ORDER BY start_date ASC
+      LIMIT 1
+    `).get(id, newStart);
+    if (followingCycle?.review_state === 'confirmed') {
+      const gap = Math.round(
+        (new Date(`${followingCycle.start_date}T00:00:00`).getTime() - new Date(`${newStart}T00:00:00`).getTime()) / 86400000
+      );
+      if (gap > 0 && gap < MIN_CYCLE_GAP) confirmedFollowingCycleId = followingCycle.id;
+    }
+  }
   const adjustRange = db.transaction(() => {
     db.prepare('UPDATE cycles SET start_date = ?, end_date = ?, review_state = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
       .run(newStart, newEnd, reviewState, id);
+    if (confirmedFollowingCycleId !== null) {
+      db.prepare('UPDATE cycles SET review_state = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+        .run(confirmedFollowingCycleId);
+    }
     logPeriodEvent(db, { entity: 'cycle', entity_id: id, action: 'update', cycle_id: id, date: newStart });
 
     const emptyOutsideDays = db.prepare(`

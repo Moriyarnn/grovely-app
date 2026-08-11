@@ -19,6 +19,8 @@ type CycleDay = {
 }
 
 export function getPeriodWarningGuidance(warning: Warning) {
+  if (warning.code === 'MISSING_PERIOD_GAP')
+    return 'If a period is missing, log it between these dates. Otherwise, tap either period to confirm one long cycle or exclude only this interval.'
   if (warning.code === 'SHORT_CYCLE_GAP')
     return 'Tap either period. Confirm the pair to include both, or exclude the mistaken period to keep it out of calculations.'
   if (warning.code === 'LONG_PERIOD')

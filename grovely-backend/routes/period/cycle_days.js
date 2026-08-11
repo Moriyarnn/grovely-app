@@ -77,10 +77,20 @@ module.exports = (db) => {
       symptoms.forEach(symptom => insertSymptom.run(cycle_day_id, symptom))
     }
 
-    // Auto-update end_date to the latest logged day for this cycle
+    // Day-by-day logging advances the end boundary. It must not shrink an
+    // imported or range-logged period whose explicit end has no matching rows.
+    const latestLoggedDate = db.prepare(
+      'SELECT MAX(date) AS date FROM cycle_days WHERE cycle_id = ?'
+    ).get(cycle_id).date
     db.prepare(`
-      UPDATE cycles SET end_date = (SELECT MAX(date) FROM cycle_days WHERE cycle_id = ?), updated_at = CURRENT_TIMESTAMP WHERE id = ?
-    `).run(cycle_id, cycle_id)
+      UPDATE cycles SET
+        end_date = CASE
+          WHEN end_date IS NULL OR end_date < ? THEN ?
+          ELSE end_date
+        END,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(latestLoggedDate, latestLoggedDate, cycle_id)
 
     logPeriodEvent(db, { entity: 'cycle_day', entity_id: cycle_day_id, action: 'create', cycle_id, date })
     emitActivity(req, { type: 'period.change', action: 'create', dates: [date] })
