@@ -28,7 +28,7 @@ echo
 if [ ! -f "$ENV_FILE" ]; then
   err "$ENV_FILE not found in the current directory."
   echo "       Download the template with:"
-  echo "         curl -o .env https://raw.githubusercontent.com/Moriyarnn/grovely-app/main/example.env"
+  echo "         curl -L -o .env https://github.com/grovely-org/grovely-app/releases/latest/download/example.env"
   exit 1
 fi
 

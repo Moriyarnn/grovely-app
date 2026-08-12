@@ -18,6 +18,10 @@ require('dotenv').config({ path: path.resolve(__dirname, envFile) })
 const app = express()
 const PORT = process.env.PORT || 3000
 
+// Proxy overlays opt into one trusted hop. Direct installs leave forwarded
+// headers untrusted so clients cannot spoof their address for rate limiting.
+if (process.env.TRUST_PROXY === 'true') app.set('trust proxy', 1)
+
 app.use(cors())
 app.use(express.json({ limit: '50mb' }))
 app.use((req, _res, next) => { req.db = db; next() })

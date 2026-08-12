@@ -42,6 +42,8 @@ services:
       - proxy
 
   backend:
+    environment:
+      - TRUST_PROXY=true
     ports: !reset []
     networks:
       - app_net
