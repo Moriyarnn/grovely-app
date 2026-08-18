@@ -21,6 +21,12 @@
 
 <p align="center"><a href="https://try.grovely.org"><strong>Try the demo</strong></a> - if you have any thoughts or feedback, the application includes an easy way to submit it.</p>
 
+<p align="center">
+  <a href="https://grovely.org"><img src="https://img.shields.io/badge/Website-Visit-993556?logo=googlechrome&logoColor=white" alt="Visit the Grovely website" /></a>
+  <a href="https://discord.gg/TG7c82AJxy"><img src="https://img.shields.io/badge/Discord-Join-5865F2?logo=discord&logoColor=white" alt="Join the Grovely Discord" /></a>
+  <a href="https://www.instagram.com/grovelyapp"><img src="https://img.shields.io/badge/Instagram-Follow-E4405F?logo=instagram&logoColor=white" alt="Follow Grovely on Instagram" /></a>
+</p>
+
 <table align="center">
   <tbody>
     <tr>
